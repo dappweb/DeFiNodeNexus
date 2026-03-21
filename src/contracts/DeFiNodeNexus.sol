@@ -1,57 +1,63 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+/**
+ * @title DeFiNodeNexus
+ * @dev Core logic for managing NFTA/NFTB nodes and TOT/TOF token yields.
+ */
+contract DeFiNodeNexus {
+    string public name = "DeFi Node Nexus Core";
+    address public owner;
 
-contract TOTToken is ERC20 {
-    constructor() ERC20("TOT Yield Token", "TOT") {
-        _mint(msg.sender, 1000000000 * 10**decimals());
-    }
-}
-
-contract TOFToken is ERC20 {
-    constructor() ERC20("TOF Utility Token", "TOF") {
-        _mint(msg.sender, 10000000 * 10**decimals());
-    }
-
-    function burn(uint256 amount) public {
-        _burn(msg.sender, amount);
-    }
-}
-
-contract NFTANode is ERC721Enumerable, Ownable {
-    uint256 public nextNodeId;
-    mapping(uint256 => uint256) public yieldPerDay;
-
-    constructor() ERC721("NFTA Yield Node", "NFTA") Ownable(msg.sender) {}
-
-    function mintNode(address to, uint256 _yield) public onlyOwner {
-        uint256 tokenId = nextNodeId++;
-        _safeMint(to, tokenId);
-        yieldPerDay[tokenId] = _yield;
-    }
-}
-
-contract DeFiNodeNexus is Ownable {
-    TOTToken public tot;
-    TOFToken public tof;
-    NFTANode public nfta;
-
-    constructor(address _tot, address _tof, address _nfta) Ownable(msg.sender) {
-        tot = TOTToken(_tot);
-        tof = TOFToken(_tof);
-        nfta = NFTANode(_nfta);
+    struct NodeA {
+        uint256 id;
+        uint256 yieldPerDay;
+        uint256 lastClaimed;
+        bool isActive;
     }
 
-    function withdrawYield(uint256 nodeId) public {
-        // Business logic for consuming TOF and minting TOT
-        uint256 cost = 10 * 10**18; // 10 TOF
-        tof.transferFrom(msg.sender, address(this), cost);
-        tof.burn(cost);
+    struct NodeB {
+        uint256 id;
+        uint256 level;
+        uint256 weight;
+    }
+
+    mapping(address => NodeA[]) public userNodesA;
+    mapping(address => NodeB[]) public userNodesB;
+    mapping(address => uint256) public totBalances;
+    mapping(address => uint256) public tofBalances;
+
+    event NodeCreated(address indexed user, uint256 nodeId, string nodeType);
+    event YieldClaimed(address indexed user, uint256 amount);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    function createNodeA(uint256 _yield) external {
+        userNodesA[msg.sender].push(NodeA({
+            id: userNodesA[msg.sender].length + 1,
+            yieldPerDay: _yield,
+            lastClaimed: block.timestamp,
+            isActive: true
+        }));
+        emit NodeCreated(msg.sender, userNodesA[msg.sender].length, "NFTA");
+    }
+
+    function claimYield(uint256 _nodeIdx) external {
+        NodeA storage node = userNodesA[msg.sender][_nodeIdx];
+        require(node.isActive, "Node is not active");
         
-        uint256 reward = nfta.yieldPerDay(nodeId) * 10**18;
-        tot.transfer(msg.sender, reward);
+        uint256 timePassed = block.timestamp - node.lastClaimed;
+        uint256 reward = (timePassed * node.yieldPerDay) / 1 days;
+        
+        totBalances[msg.sender] += reward;
+        node.lastClaimed = block.timestamp;
+        
+        emit YieldClaimed(msg.sender, reward);
+    }
+
+    function getNodesA(address _user) external view returns (NodeA[] memory) {
+        return userNodesA[_user];
     }
 }

@@ -134,18 +134,24 @@ export async function aiPoweredYieldInsight(
   input: AiPoweredYieldInsightInput
 ): Promise<AiPoweredYieldInsightOutput> {
   try {
+    if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_GENAI_API_KEY) {
+      throw new Error('Missing API Key');
+    }
     const {output} = await prompt(input);
     if (!output) throw new Error('AI failed to generate a response');
     return output;
   } catch (error) {
     console.error('Error in aiPoweredYieldInsight flow:', error);
-    // Return a graceful fallback if the AI key is missing or service is down
     return {
-      overallSummary: "We are currently experiencing issues connecting to the AI analysis engine. Please ensure your environment variables are configured correctly.",
-      totYieldStrategy: "Maintain current staking levels.",
-      tofYieldStrategy: "Accumulate TOF for future node upgrades.",
-      potentialEarningsEstimation: "Analysis unavailable.",
-      actionableInsights: ["Verify GEMINI_API_KEY", "Try again in a few minutes"]
+      overallSummary: input.language === 'zh' 
+        ? "目前无法连接到 AI 分析引擎。请检查您的 GEMINI_API_KEY 环境配置。"
+        : "We are currently experiencing issues connecting to the AI analysis engine. Please ensure your GEMINI_API_KEY is configured correctly.",
+      totYieldStrategy: input.language === 'zh' ? "保持当前质押水平。" : "Maintain current staking levels.",
+      tofYieldStrategy: input.language === 'zh' ? "累积 TOF 用于未来的节点升级。" : "Accumulate TOF for future node upgrades.",
+      potentialEarningsEstimation: input.language === 'zh' ? "分析不可用。" : "Analysis unavailable.",
+      actionableInsights: input.language === 'zh' 
+        ? ["验证环境变量", "几分钟后重试"] 
+        : ["Verify environment variables", "Try again in a few minutes"]
     };
   }
 }

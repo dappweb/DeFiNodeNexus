@@ -3,45 +3,55 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 /**
  * @title DeFiNodeNexus
- * @dev Core logic for TOT (Yield Token) and TOF (Consumption Token) in the Nexus ecosystem.
+ * @dev Core business logic for managing TOT/TOF tokens and NFT nodes.
  */
-contract DeFiNodeNexus is ERC20, Ownable {
-    uint256 public constant INITIAL_SUPPLY = 1000000000 * 10**18;
+contract DeFiNodeNexus is Ownable {
     
-    // Mapping for NFTA node yields
-    mapping(address => uint256) public dailyYieldRate;
-    mapping(address => uint256) public lastClaimTimestamp;
+    struct NodeA {
+        uint256 dailyYield;
+        uint256 lastClaim;
+        bool isActive;
+    }
+
+    mapping(uint256 => NodeA) public nftaNodes;
+    mapping(address => uint256[]) public userNodes;
+
+    ERC20 public totToken;
+    ERC20 public tofToken;
 
     event YieldClaimed(address indexed user, uint256 amount);
     event NodeActivated(address indexed user, uint256 nodeId);
 
-    constructor() ERC20("Nexus Yield Token", "TOT") Ownable(msg.sender) {
-        _mint(msg.sender, INITIAL_SUPPLY);
+    constructor(address _tot, address _tof) Ownable(msg.sender) {
+        totToken = ERC20(_tot);
+        tofToken = ERC20(_tof);
     }
 
-    /**
-     * @dev Simple yield claim simulation logic for testing on Sepolia.
-     */
-    function claimYield() external {
-        uint256 timePassed = block.timestamp - lastClaimTimestamp[msg.sender];
-        require(timePassed >= 1 days, "Can only claim once per day");
-        
-        uint256 amount = dailyYieldRate[msg.sender];
-        require(amount > 0, "No active nodes found");
-
-        lastClaimTimestamp[msg.sender] = block.timestamp;
-        _mint(msg.sender, amount);
-        
-        emit YieldClaimed(msg.sender, amount);
+    function activateNode(uint256 _nodeId, uint256 _yield) external onlyOwner {
+        nftaNodes[_nodeId] = NodeA({
+            dailyYield: _yield,
+            lastClaim: block.timestamp,
+            isActive: true
+        });
+        emit NodeActivated(msg.sender, _nodeId);
     }
 
-    /**
-     * @dev Set daily yield for a user (called by system/owner).
-     */
-    function setYieldRate(address user, uint256 amount) external onlyOwner {
-        dailyYieldRate[user] = amount;
+    function claimYield(uint256 _nodeId) external {
+        NodeA storage node = nftaNodes[_nodeId];
+        require(node.isActive, "Node not active");
+        
+        uint256 timePassed = block.timestamp - node.lastClaim;
+        uint256 reward = (timePassed * node.dailyYield) / 1 days;
+        
+        require(reward > 0, "No reward to claim");
+        
+        node.lastClaim = block.timestamp;
+        require(totToken.transfer(msg.sender, reward), "Transfer failed");
+        
+        emit YieldClaimed(msg.sender, reward);
     }
 }

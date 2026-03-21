@@ -10,7 +10,7 @@ Precision DeFi node management and yield optimization platform built with Next.j
 2. **在项目根目录下运行以下命令：**
 
 ```bash
-# 如果还没初始化，先初始化 Git 仓库
+# 初始化 Git 仓库
 git init
 
 # 添加所有文件
@@ -22,10 +22,10 @@ git commit -m "Initial commit: DeFi Node Nexus with Web3 and AI features"
 # 设置主分支名为 main
 git branch -M main
 
-# 关联你指定的远程仓库
+# 关联远程仓库
 git remote add origin https://github.com/dappweb/DeFiNodeNexus.git
 
-# 推送代码 (如果远程已有内容，可能需要先 git pull 或强制推送 -f)
+# 推送代码
 git push -u origin main
 ```
 
