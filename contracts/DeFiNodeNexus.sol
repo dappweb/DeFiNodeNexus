@@ -2,35 +2,46 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title DeFiNodeNexus
- * @dev Core business logic for TOT/TOF tokens and NFTA yield nodes.
+ * @dev Core logic for TOT (Yield Token) and TOF (Consumption Token) in the Nexus ecosystem.
  */
 contract DeFiNodeNexus is ERC20, Ownable {
-    uint256 public constant MAX_SUPPLY = 1_000_000_000 * 10**18;
+    uint256 public constant INITIAL_SUPPLY = 1000000000 * 10**18;
     
-    constructor() ERC20("Total Optimization Token", "TOT") Ownable(msg.sender) {
-        _mint(msg.sender, MAX_SUPPLY / 10); // Initial ecosystem liquidity
+    // Mapping for NFTA node yields
+    mapping(address => uint256) public dailyYieldRate;
+    mapping(address => uint256) public lastClaimTimestamp;
+
+    event YieldClaimed(address indexed user, uint256 amount);
+    event NodeActivated(address indexed user, uint256 nodeId);
+
+    constructor() ERC20("Nexus Yield Token", "TOT") Ownable(msg.sender) {
+        _mint(msg.sender, INITIAL_SUPPLY);
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Exceeds max supply");
-        _mint(to, amount);
+    /**
+     * @dev Simple yield claim simulation logic for testing on Sepolia.
+     */
+    function claimYield() external {
+        uint256 timePassed = block.timestamp - lastClaimTimestamp[msg.sender];
+        require(timePassed >= 1 days, "Can only claim once per day");
+        
+        uint256 amount = dailyYieldRate[msg.sender];
+        require(amount > 0, "No active nodes found");
+
+        lastClaimTimestamp[msg.sender] = block.timestamp;
+        _mint(msg.sender, amount);
+        
+        emit YieldClaimed(msg.sender, amount);
     }
-}
 
-contract NFTANode is ERC721Enumerable, Ownable {
-    uint256 private _nextTokenId;
-    mapping(uint256 => uint256) public nodeYieldRate;
-
-    constructor() ERC721("NFTA Yield Node", "NFTA") Ownable(msg.sender) {}
-
-    function mintNode(address to, uint256 yieldRate) external onlyOwner {
-        uint256 tokenId = _nextTokenId++;
-        _safeMint(to, tokenId);
-        nodeYieldRate[tokenId] = yieldRate;
+    /**
+     * @dev Set daily yield for a user (called by system/owner).
+     */
+    function setYieldRate(address user, uint256 amount) external onlyOwner {
+        dailyYieldRate[user] = amount;
     }
 }
