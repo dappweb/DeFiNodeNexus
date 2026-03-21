@@ -1,4 +1,3 @@
-
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -10,7 +9,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true, // Cloudflare Pages 不支持 Next.js 默认的图像优化器
+    unoptimized: true, // Cloudflare Pages does not support Next.js default image optimization
     remotePatterns: [
       {
         protocol: 'https',

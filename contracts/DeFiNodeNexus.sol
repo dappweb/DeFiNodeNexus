@@ -1,54 +1,75 @@
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 /**
  * @title DeFiNodeNexus
- * @dev 用于管理 TOT/TOF 代币和 NFTA 收益节点的业务逻辑合约。
+ * @dev Core business logic for TOT/TOF tokens and NFTA yield node management.
+ * This contract handles node registration, yield calculations, and consumption logic.
  */
 contract DeFiNodeNexus {
-    string public name = "DeFi Node Nexus";
+    string public constant name = "DeFi Node Nexus Core";
     
     struct Node {
         string nodeId;
         address owner;
-        uint256 yieldPerDay;
-        uint256 lastClaim;
-        bool active;
+        uint256 lastClaimTimestamp;
+        uint256 yieldPerDay; // In TOT decimals
+        bool isActive;
     }
 
     mapping(string => Node) public nftaNodes;
     mapping(address => uint256) public totBalances;
     mapping(address => uint256) public tofBalances;
 
-    event NodeRegistered(string nodeId, address owner, uint256 yieldPerDay);
-    event YieldClaimed(string nodeId, address owner, uint256 amount);
+    event NodeRegistered(string indexed nodeId, address indexed owner, uint256 yieldPerDay);
+    event YieldClaimed(string indexed nodeId, address indexed owner, uint256 amount);
+    event TofConsumed(address indexed user, uint256 amount, string reason);
 
-    function registerNode(string memory _nodeId, uint256 _yieldPerDay) public {
-        require(!nftaNodes[_nodeId].active, "Node already registered");
+    /**
+     * @dev Simulates registering an NFTA node.
+     */
+    function registerNode(string memory _nodeId, uint256 _yieldPerDay) external {
+        require(nftaNodes[_nodeId].owner == address(0), "Node already registered");
+        
         nftaNodes[_nodeId] = Node({
             nodeId: _nodeId,
             owner: msg.sender,
+            lastClaimTimestamp: block.timestamp,
             yieldPerDay: _yieldPerDay,
-            lastClaim: block.timestamp,
-            active: true
+            isActive: true
         });
+
         emit NodeRegistered(_nodeId, msg.sender, _yieldPerDay);
     }
 
-    function claimYield(string memory _nodeId) public {
+    /**
+     * @dev Simulates claiming TOT yield. Consumes TOF as fee.
+     */
+    function claimYield(string memory _nodeId) external {
         Node storage node = nftaNodes[_nodeId];
-        require(node.active, "Node not active");
-        require(node.owner == msg.sender, "Not node owner");
+        require(node.owner == msg.sender, "Not the owner");
+        require(node.isActive, "Node is not active");
 
-        uint256 timePassed = block.timestamp - node.lastClaim;
-        uint256 claimable = (timePassed * node.yieldPerDay) / 1 days;
+        uint256 timeElapsed = block.timestamp - node.lastClaimTimestamp;
+        uint256 yieldAmount = (node.yieldPerDay * timeElapsed) / 1 days;
         
-        require(claimable > 0, "No yield to claim");
+        // Simulate TOF consumption (e.g., 5% of yield value in TOF)
+        uint256 tofFee = yieldAmount / 20; 
+        require(tofBalances[msg.sender] >= tofFee, "Insufficient TOF balance");
 
-        node.lastClaim = block.timestamp;
-        totBalances[msg.sender] += claimable;
+        tofBalances[msg.sender] -= tofFee;
+        totBalances[msg.sender] += yieldAmount;
+        node.lastClaimTimestamp = block.timestamp;
 
-        emit YieldClaimed(_nodeId, msg.sender, claimable);
+        emit YieldClaimed(_nodeId, msg.sender, yieldAmount);
+        emit TofConsumed(msg.sender, tofFee, "Yield Withdrawal Fee");
+    }
+
+    /**
+     * @dev Simple faucet for testing in Sepolia.
+     */
+    function testnetFaucet() external {
+        totBalances[msg.sender] += 1000 * 10**18;
+        tofBalances[msg.sender] += 100 * 10**18;
     }
 }
