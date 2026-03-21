@@ -1,4 +1,3 @@
-
 export const translations = {
   en: {
     appName: "DEFI NODE",
@@ -58,6 +57,11 @@ export const translations = {
     walletConnected: "Wallet Connected",
     switchToTestnet: "Switch to Testnet",
     unsupportedNetwork: "Unsupported Network",
+    syncData: "Sync On-Chain",
+    syncing: "Syncing...",
+    syncComplete: "Sync Complete",
+    onChainDataUpdated: "Portfolio data successfully synchronized with Sepolia Testnet.",
+    connecting: "Connecting...",
   },
   zh: {
     appName: "DEFI 节点",
@@ -117,6 +121,11 @@ export const translations = {
     walletConnected: "钱包已连接",
     switchToTestnet: "切换至测试网",
     unsupportedNetwork: "不支持的网络",
+    syncData: "同步链上数据",
+    syncing: "正在同步...",
+    syncComplete: "同步完成",
+    onChainDataUpdated: "投资组合数据已成功与 Sepolia 测试网同步。",
+    connecting: "连接中...",
   }
 };
 

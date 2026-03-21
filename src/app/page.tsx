@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,7 +12,8 @@ import {
   Search,
   Plus,
   Database,
-  Link as LinkIcon
+  Link as LinkIcon,
+  RefreshCw
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { NftaNodeManager } from "@/components/dashboard/nfta-node-manager";
@@ -27,17 +27,32 @@ import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useWeb3 } from "@/lib/web3-provider";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const { t } = useLanguage();
   const { address, isConnected, isConnecting, connect } = useWeb3();
+  const { toast } = useToast();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) return null;
+
+  const handleSyncData = () => {
+    setIsSyncing(true);
+    // Simulate fetching data from Ethereum Testnet
+    setTimeout(() => {
+      setIsSyncing(false);
+      toast({
+        title: t('syncComplete'),
+        description: t('onChainDataUpdated'),
+      });
+    }, 1500);
+  };
 
   const displayAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : MOCK_USER_DATA.walletAddress;
 
@@ -67,6 +82,17 @@ export default function DashboardPage() {
             <div className="flex-1" />
 
             <div className="flex items-center gap-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSyncData}
+                disabled={isSyncing}
+                className="hidden lg:flex border-accent/20 text-accent hover:bg-accent/5"
+              >
+                <RefreshCw size={14} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? t('syncing') : t('syncData')}
+              </Button>
+
               <LanguageSwitcher />
               
               {!isConnected ? (
@@ -76,7 +102,7 @@ export default function DashboardPage() {
                   className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-6 font-semibold cyan-glow"
                 >
                   <LinkIcon size={16} className="mr-2" />
-                  {isConnecting ? "Connecting..." : t('connectWallet')}
+                  {isConnecting ? t('connecting') : t('connectWallet')}
                 </Button>
               ) : (
                 <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/30 border border-accent/20">
