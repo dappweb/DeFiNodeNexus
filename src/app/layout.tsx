@@ -1,8 +1,7 @@
-
 import type {Metadata} from 'next';
 import './globals.css';
 import { LanguageProvider } from '@/components/language-provider';
-import { Web3Provider } from '@/components/web3-provider';
+import { Web3Provider } from '@/lib/web3-provider';
 
 export const metadata: Metadata = {
   title: 'DeFi Node Nexus',
