@@ -11,7 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const AiPoweredYieldInsightInputSchema = z.object({
-  walletAddress: z.string().describe('The user\u0027s blockchain wallet address.'),
+  walletAddress: z.string().describe('The user\'s blockchain wallet address.'),
   language: z.enum(['en', 'zh']).default('en').describe('The preferred language for the response.'),
   totBalance: z.number().describe('Current balance of TOT tokens.'),
   tofBalance: z.number().describe('Current balance of TOF tokens.'),
@@ -64,7 +64,7 @@ export type AiPoweredYieldInsightInput = z.infer<typeof AiPoweredYieldInsightInp
 const AiPoweredYieldInsightOutputSchema = z.object({
   overallSummary: z
     .string()
-    .describe('An overall summary of the user\u0027s current DeFi portfolio and performance.'),
+    .describe('An overall summary of the user\'s current DeFi portfolio and performance.'),
   totYieldStrategy: z.string().describe('Recommended strategies to optimize TOT yield.'),
   tofYieldStrategy: z.string().describe('Recommended strategies to optimize TOF yield.'),
   potentialEarningsEstimation: z
@@ -73,12 +73,6 @@ const AiPoweredYieldInsightOutputSchema = z.object({
   actionableInsights: z.array(z.string()).describe('A list of actionable steps the user can take.'),
 });
 export type AiPoweredYieldInsightOutput = z.infer<typeof AiPoweredYieldInsightOutputSchema>;
-
-export async function aiPoweredYieldInsight(
-  input: AiPoweredYieldInsightInput
-): Promise<AiPoweredYieldInsightOutput> {
-  return aiPoweredYieldInsightFlow(input);
-}
 
 const prompt = ai.definePrompt({
   name: 'aiPoweredYieldInsightPrompt',
@@ -136,14 +130,22 @@ Prediction Market Participation History:
 Based on the above information, provide a comprehensive analysis and strategy. Ensure your recommendations are specific, practical, and tailored to maximize TOT/TOF yield and potential earnings.`,
 });
 
-const aiPoweredYieldInsightFlow = ai.defineFlow(
-  {
-    name: 'aiPoweredYieldInsightFlow',
-    inputSchema: AiPoweredYieldInsightInputSchema,
-    outputSchema: AiPoweredYieldInsightOutputSchema,
-  },
-  async input => {
+export async function aiPoweredYieldInsight(
+  input: AiPoweredYieldInsightInput
+): Promise<AiPoweredYieldInsightOutput> {
+  try {
     const {output} = await prompt(input);
-    return output!;
+    if (!output) throw new Error('AI failed to generate a response');
+    return output;
+  } catch (error) {
+    console.error('Error in aiPoweredYieldInsight flow:', error);
+    // Return a graceful fallback if the AI key is missing or service is down
+    return {
+      overallSummary: "We are currently experiencing issues connecting to the AI analysis engine. Please ensure your environment variables are configured correctly.",
+      totYieldStrategy: "Maintain current staking levels.",
+      tofYieldStrategy: "Accumulate TOF for future node upgrades.",
+      potentialEarningsEstimation: "Analysis unavailable.",
+      actionableInsights: ["Verify GEMINI_API_KEY", "Try again in a few minutes"]
+    };
   }
-);
+}
