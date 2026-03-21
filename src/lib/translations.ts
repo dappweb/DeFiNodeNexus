@@ -1,3 +1,4 @@
+
 export const translations = {
   en: {
     appName: "DEFI NODE",
@@ -52,6 +53,11 @@ export const translations = {
     generateStrategy: "Generate Optimized Strategy",
     analyzingHistory: "Analyzing Blockchain History...",
     footer: "© 2024 DeFi Node Nexus • Precision Blockchain Analytics & Yield Optimization",
+    connectWallet: "Connect Wallet",
+    disconnect: "Disconnect",
+    walletConnected: "Wallet Connected",
+    switchToTestnet: "Switch to Testnet",
+    unsupportedNetwork: "Unsupported Network",
   },
   zh: {
     appName: "DEFI 节点",
@@ -106,6 +112,11 @@ export const translations = {
     generateStrategy: "生成优化策略",
     analyzingHistory: "正在分析区块链历史...",
     footer: "© 2024 DeFi 节点中心 • 精准区块链分析与收益优化",
+    connectWallet: "连接钱包",
+    disconnect: "断开连接",
+    walletConnected: "钱包已连接",
+    switchToTestnet: "切换至测试网",
+    unsupportedNetwork: "不支持的网络",
   }
 };
 

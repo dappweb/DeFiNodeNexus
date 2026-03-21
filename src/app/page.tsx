@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,7 +12,8 @@ import {
   Bell,
   Search,
   Plus,
-  Database
+  Database,
+  Link as LinkIcon
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { NftaNodeManager } from "@/components/dashboard/nfta-node-manager";
@@ -24,16 +26,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { useWeb3 } from "@/lib/web3-provider";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const { t } = useLanguage();
+  const { address, isConnected, isConnecting, connect } = useWeb3();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   if (!mounted) return null;
+
+  const displayAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : MOCK_USER_DATA.walletAddress;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -62,10 +68,23 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-4">
               <LanguageSwitcher />
-              <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/30 border border-border/50">
-                <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-                <span className="text-xs font-mono text-muted-foreground">{MOCK_USER_DATA.walletAddress}</span>
-              </div>
+              
+              {!isConnected ? (
+                <Button 
+                  onClick={connect} 
+                  disabled={isConnecting}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-6 font-semibold cyan-glow"
+                >
+                  <LinkIcon size={16} className="mr-2" />
+                  {isConnecting ? "Connecting..." : t('connectWallet')}
+                </Button>
+              ) : (
+                <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/30 border border-accent/20">
+                  <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                  <span className="text-xs font-mono text-accent">{displayAddress}</span>
+                </div>
+              )}
+
               <Button size="icon" variant="ghost" className="relative">
                 <Bell size={20} />
                 <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive border-2 border-background" />
