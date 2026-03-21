@@ -12,6 +12,7 @@ import {z} from 'genkit';
 
 const AiPoweredYieldInsightInputSchema = z.object({
   walletAddress: z.string().describe('The user\u0027s blockchain wallet address.'),
+  language: z.enum(['en', 'zh']).default('en').describe('The preferred language for the response.'),
   totBalance: z.number().describe('Current balance of TOT tokens.'),
   tofBalance: z.number().describe('Current balance of TOF tokens.'),
   usdtBalance: z.number().describe('Current balance of USDT stablecoin.'),
@@ -84,6 +85,9 @@ const prompt = ai.definePrompt({
   input: {schema: AiPoweredYieldInsightInputSchema},
   output: {schema: AiPoweredYieldInsightOutputSchema},
   prompt: `You are a highly intelligent and experienced DeFi investment strategist. Your goal is to provide personalized, AI-generated strategies for optimizing TOT/TOF yield and potential earnings for a DeFi investor.
+
+IMPORTANT: You must provide the analysis in the language specified below.
+Preferred Language: {{{language}}} (If 'zh', respond in Chinese. If 'en', respond in English).
 
 Analyze the provided user data, including NFT holdings, token balances, and prediction market activity, to identify opportunities and risks. Then, recommend clear, actionable strategies.
 

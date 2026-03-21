@@ -1,19 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { 
   Wallet, 
   LayoutDashboard, 
   Coins, 
   Layers, 
-  Globe, 
-  Database, 
-  Menu, 
   User, 
   Bell,
   Search,
-  Plus
+  Plus,
+  Database
 } from "lucide-react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { NftaNodeManager } from "@/components/dashboard/nfta-node-manager";
@@ -24,9 +22,12 @@ import { AiInsightPanel } from "@/components/dashboard/ai-insight-panel";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from "@/components/language-provider";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     setMounted(true);
@@ -44,13 +45,15 @@ export default function DashboardPage() {
               <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground blue-glow">
                 <LayoutDashboard size={18} />
               </div>
-              <h1 className="text-xl font-headline font-bold text-primary">DEFI NODE <span className="text-accent">NEXUS</span></h1>
+              <h1 className="text-xl font-headline font-bold text-primary">
+                {t('appName')} <span className="text-accent">{t('appNexus')}</span>
+              </h1>
             </div>
             
             <div className="hidden md:flex flex-1 max-w-md relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
-                placeholder="Search assets, nodes, or metrics..." 
+                placeholder={t('searchPlaceholder')}
                 className="pl-10 bg-muted/30 border-border/50 focus-visible:ring-accent/30"
               />
             </div>
@@ -58,6 +61,7 @@ export default function DashboardPage() {
             <div className="flex-1" />
 
             <div className="flex items-center gap-4">
+              <LanguageSwitcher />
               <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/30 border border-border/50">
                 <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
                 <span className="text-xs font-mono text-muted-foreground">{MOCK_USER_DATA.walletAddress}</span>
@@ -79,31 +83,31 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-headline font-semibold flex items-center gap-2">
                   <Wallet className="text-accent h-5 w-5" />
-                  Asset Performance
+                  {t('assetPerformance')}
                 </h2>
                 <Button size="sm" className="bg-primary text-white">
                   <Plus className="mr-2 h-4 w-4" />
-                  Stake More
+                  {t('stakeMore')}
                 </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <StatCard 
-                  title="Total TOT Balance" 
+                  title={t('totalTotBalance')}
                   value={`${MOCK_USER_DATA.balances.tot.toLocaleString()} TOT`} 
                   icon={Coins}
                   trend={{ value: "12.4%", positive: true }}
                 />
                 <StatCard 
-                  title="Total TOF Balance" 
+                  title={t('totalTofBalance')}
                   value={`${MOCK_USER_DATA.balances.tof.toLocaleString()} TOF`} 
                   icon={Database}
                   trend={{ value: "3.1%", positive: false }}
                 />
                 <StatCard 
-                  title="NFT Portfolio Value" 
+                  title={t('nftPortfolioValue')}
                   value={`$${(MOCK_USER_DATA.balances.usdt * 12).toLocaleString()}`} 
                   icon={Layers}
-                  description="Estimated secondary market value"
+                  description={t('secondaryMarketValue')}
                 />
               </div>
             </section>
@@ -131,7 +135,7 @@ export default function DashboardPage() {
           
           <footer className="py-6 px-8 border-t border-border/50 text-center">
             <p className="text-xs text-muted-foreground">
-              © 2024 DeFi Node Nexus • Precision Blockchain Analytics & Yield Optimization
+              {t('footer')}
             </p>
           </footer>
         </div>

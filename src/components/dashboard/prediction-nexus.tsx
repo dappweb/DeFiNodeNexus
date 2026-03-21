@@ -5,19 +5,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Globe, ArrowUpRight, Trophy, Target } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { useLanguage } from "@/components/language-provider";
 
 export function PredictionNexus() {
   const history = MOCK_USER_DATA.predictionHistory;
+  const { t } = useLanguage();
 
   return (
     <Card className="glass-panel">
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           <Globe className="text-primary" />
-          <CardTitle>Prediction Nexus</CardTitle>
+          <CardTitle>{t('predictionNexus')}</CardTitle>
         </div>
         <Badge className="bg-accent/20 text-accent hover:bg-accent/30 cursor-pointer transition-colors">
-          LIVE STATS
+          {t('liveStats')}
         </Badge>
       </CardHeader>
       <CardContent>
@@ -26,17 +28,17 @@ export function PredictionNexus() {
             <div className="p-4 rounded-xl border border-border/50 bg-black/20 flex flex-col items-center justify-center text-center space-y-1">
               <Trophy className="h-6 w-6 text-accent mb-1" />
               <span className="text-2xl font-bold font-headline">$2.4M</span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Total Volume</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{t('totalVolume')}</span>
             </div>
             <div className="p-4 rounded-xl border border-border/50 bg-black/20 flex flex-col items-center justify-center text-center space-y-1">
               <Target className="h-6 w-6 text-primary mb-1" />
               <span className="text-2xl font-bold font-headline">84%</span>
-              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Global Win Rate</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{t('globalWinRate')}</span>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Your Latest Predictions</h4>
+            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{t('latestPredictions')}</h4>
             <div className="space-y-2">
               {history.map((p) => (
                 <div key={p.predictionId} className="group p-3 rounded-lg border border-border/30 bg-muted/10 hover:border-primary/50 transition-all flex items-center justify-between">
@@ -59,7 +61,7 @@ export function PredictionNexus() {
           </div>
 
           <Button className="w-full bg-secondary hover:bg-secondary/80 text-foreground border border-border">
-            Enter Prediction Portal
+            {t('enterPortal')}
           </Button>
         </div>
       </CardContent>

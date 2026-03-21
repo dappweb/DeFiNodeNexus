@@ -2,18 +2,20 @@
 
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { Layers, TrendingUp, History } from "lucide-react";
+import { Layers, TrendingUp } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLanguage } from "@/components/language-provider";
 
 export function NftbDividendTracking() {
   const nodes = MOCK_USER_DATA.nftbNodes;
+  const { t } = useLanguage();
 
   return (
     <Card className="glass-panel">
       <CardHeader className="flex flex-row items-center gap-2">
         <Layers className="text-accent" />
-        <CardTitle>NFTB Dividend Tracking</CardTitle>
+        <CardTitle>{t('nftbTracking')}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid gap-6">
@@ -22,11 +24,11 @@ export function NftbDividendTracking() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded border border-white/5">{node.nodeId}</span>
-                  <span className="text-xs text-muted-foreground">Level {node.level} • Weight {node.weight}x</span>
+                  <span className="text-xs text-muted-foreground">{t('level')} {node.level} • {t('weight')} {node.weight}x</span>
                 </div>
                 <div className="flex items-center gap-1 text-xs text-accent">
                   <TrendingUp size={14} />
-                  <span>Growing</span>
+                  <span>{t('growing')}</span>
                 </div>
               </div>
               
@@ -35,9 +37,9 @@ export function NftbDividendTracking() {
                   <Table>
                     <TableHeader className="bg-muted/50">
                       <TableRow className="border-border/30 hover:bg-transparent">
-                        <TableHead className="h-8 text-[10px] uppercase font-bold">Date</TableHead>
-                        <TableHead className="h-8 text-[10px] uppercase font-bold">TOT Reward</TableHead>
-                        <TableHead className="h-8 text-[10px] uppercase font-bold">USDT Reward</TableHead>
+                        <TableHead className="h-8 text-[10px] uppercase font-bold">{t('date')}</TableHead>
+                        <TableHead className="h-8 text-[10px] uppercase font-bold">{t('totReward')}</TableHead>
+                        <TableHead className="h-8 text-[10px] uppercase font-bold">{t('usdtReward')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

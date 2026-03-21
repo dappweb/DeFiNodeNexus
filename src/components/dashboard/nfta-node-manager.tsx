@@ -6,31 +6,33 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Download, Cpu, Activity, Coins } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { useLanguage } from "@/components/language-provider";
 
 export function NftaNodeManager() {
   const nodes = MOCK_USER_DATA.nftaNodes;
+  const { t } = useLanguage();
 
   return (
     <Card className="glass-panel">
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
           <Cpu className="text-primary" />
-          <CardTitle>NFTA Node Management</CardTitle>
+          <CardTitle>{t('nftaManager')}</CardTitle>
         </div>
         <Button size="sm" variant="outline" className="text-xs border-primary/20 hover:border-primary">
           <Coins className="mr-2 h-4 w-4" />
-          Withdraw All
+          {t('withdrawAll')}
         </Button>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow className="border-border/50">
-              <TableHead>Node ID</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Daily Yield (TOT)</TableHead>
-              <TableHead>Uptime</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('nodeId')}</TableHead>
+              <TableHead>{t('status')}</TableHead>
+              <TableHead>{t('dailyYield')} (TOT)</TableHead>
+              <TableHead>{t('uptime')}</TableHead>
+              <TableHead className="text-right">{t('actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -59,7 +61,7 @@ export function NftaNodeManager() {
           </TableBody>
         </Table>
         <p className="text-[10px] text-muted-foreground mt-4 text-center italic">
-          * Withdrawals consume TOF based on your active tier.
+          {t('withdrawalDisclaimer')}
         </p>
       </CardContent>
     </Card>
