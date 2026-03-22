@@ -1,309 +1,406 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import {
-  Users, Cpu, DollarSign, BarChart3, Settings, Megaphone,
-  ShieldCheck, Pencil, Trash2, Plus, Activity, ArrowRightLeft,
-} from "lucide-react";
-import { MOCK_USER_DATA } from "@/lib/mock-data";
-import { useLanguage } from "@/components/language-provider";
+import { Settings, ShieldCheck, Activity, Wallet } from "lucide-react";
+import { useWeb3 } from "@/lib/web3-provider";
+import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
-import { StatCard } from "@/components/dashboard/stat-card";
 
 export function AdminPage() {
-  const { t } = useLanguage();
+  const { account } = useWeb3();
+  const nexus = useNexusContract();
+  const swap = useSwapContract();
   const { toast } = useToast();
-  const { adminData, announcements } = MOCK_USER_DATA;
-  const { platformStats, users, recentTransactions, settings } = adminData;
 
-  const [maintenanceMode, setMaintenanceMode] = useState(settings.maintenanceMode);
-  const [feeRate, setFeeRate] = useState(settings.withdrawFeeRate);
-  const [minPurchase, setMinPurchase] = useState(String(settings.minPurchase));
+  const [loading, setLoading] = useState(false);
+  const [ownerAddress, setOwnerAddress] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
 
-  const handleSaveSettings = () => {
-    toast({ title: t('adminSettingsSaved') });
+  const [treasury, setTreasury] = useState("");
+  const [zeroLine, setZeroLine] = useState("");
+  const [community, setCommunity] = useState("");
+  const [foundation, setFoundation] = useState("");
+  const [institution, setInstitution] = useState("");
+
+  const [tofBurnBps, setTofBurnBps] = useState("");
+  const [tofClaimFeeBps, setTofClaimFeeBps] = useState("");
+  const [withdrawLevel, setWithdrawLevel] = useState("0");
+  const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
+
+  const [nftaTierId, setNftaTierId] = useState("0");
+  const [nftaPrice, setNftaPrice] = useState("");
+  const [nftaYield, setNftaYield] = useState("");
+  const [nftaSupply, setNftaSupply] = useState("");
+  const [nftaActive, setNftaActive] = useState(true);
+
+  const [rewardFundAmount, setRewardFundAmount] = useState("");
+  const [dividendAmount, setDividendAmount] = useState("");
+
+  const [distributorAddr, setDistributorAddr] = useState("");
+  const [distributorStatus, setDistributorStatus] = useState(true);
+
+  const [swapTotReserve, setSwapTotReserve] = useState("-");
+  const [swapUsdtReserve, setSwapUsdtReserve] = useState("-");
+  const [swapDividendPool, setSwapDividendPool] = useState("-");
+  const [swapBuyFeeBps, setSwapBuyFeeBps] = useState("");
+  const [swapSellFeeBps, setSwapSellFeeBps] = useState("");
+  const [swapProfitTaxBps, setSwapProfitTaxBps] = useState("");
+  const [swapDistributionThreshold, setSwapDistributionThreshold] = useState("");
+  const [swapMaxDailyBuy, setSwapMaxDailyBuy] = useState("");
+  const [swapMaxSellBps, setSwapMaxSellBps] = useState("");
+  const [swapDeflationBps, setSwapDeflationBps] = useState("");
+  const [addLpTot, setAddLpTot] = useState("");
+  const [addLpUsdt, setAddLpUsdt] = useState("");
+
+  const toUnits = (value: string) => ethers.parseUnits(value || "0", 18);
+
+  const notifyTx = (ok: boolean, hash?: string, error?: string) => {
+    if (ok) {
+      toast({ title: "交易成功", description: hash ? `${hash.slice(0, 10)}...` : "已上链" });
+    } else {
+      toast({ title: "交易失败", description: error || "未知错误", variant: "destructive" });
+    }
   };
+
+  const refreshData = async () => {
+    if (!nexus) return;
+    try {
+      const owner = await nexus.owner();
+      const tr = await nexus.treasury();
+      const z = await nexus.zeroLineWallet();
+      const c = await nexus.communityWallet();
+      const f = await nexus.foundationWallet();
+      const i = await nexus.institutionWallet();
+      const burn = await nexus.tofBurnBps();
+      const claim = await nexus.tofClaimFeeBps();
+
+      setOwnerAddress(owner);
+      setIsOwner(!!account && account.toLowerCase() === owner.toLowerCase());
+      setTreasury(tr);
+      setZeroLine(z);
+      setCommunity(c);
+      setFoundation(f);
+      setInstitution(i);
+      setTofBurnBps(burn.toString());
+      setTofClaimFeeBps(claim.toString());
+
+      if (swap) {
+        const [totR, usdtR, pool, b, s, p, th, dBuy, mSell, def] = await Promise.all([
+          swap.totReserve(),
+          swap.usdtReserve(),
+          swap.nftbDividendPool(),
+          swap.buyFeeBps(),
+          swap.sellFeeBps(),
+          swap.profitTaxBps(),
+          swap.distributionThreshold(),
+          swap.maxDailyBuy(),
+          swap.maxSellBps(),
+          swap.deflationBps(),
+        ]);
+
+        setSwapTotReserve(ethers.formatUnits(totR, 18));
+        setSwapUsdtReserve(ethers.formatUnits(usdtR, 18));
+        setSwapDividendPool(ethers.formatUnits(pool, 18));
+        setSwapBuyFeeBps(b.toString());
+        setSwapSellFeeBps(s.toString());
+        setSwapProfitTaxBps(p.toString());
+        setSwapDistributionThreshold(ethers.formatUnits(th, 18));
+        setSwapMaxDailyBuy(ethers.formatUnits(dBuy, 18));
+        setSwapMaxSellBps(mSell.toString());
+        setSwapDeflationBps(def.toString());
+      }
+    } catch {
+      toast({ title: "读取失败", description: "请确认已连接钱包并配置合约地址", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    refreshData();
+  }, [nexus, swap, account]);
 
   return (
     <div className="space-y-6 overflow-hidden">
-      {/* Admin Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-lg bg-red-500/10 text-red-500">
           <ShieldCheck size={24} />
         </div>
         <div>
-          <h2 className="text-xl font-headline font-bold">{t('adminPanel')}</h2>
-          <p className="text-xs text-muted-foreground">{t('adminOwnerAddress')}: {adminData.ownerAddress.slice(0, 10)}...{adminData.ownerAddress.slice(-6)}</p>
+          <h2 className="text-xl font-headline font-bold">Owner 管理员面板</h2>
+          <p className="text-xs text-muted-foreground">Owner: {ownerAddress ? `${ownerAddress.slice(0, 10)}...${ownerAddress.slice(-6)}` : "-"}</p>
+          <p className={`text-xs ${isOwner ? "text-green-500" : "text-yellow-500"}`}>
+            {isOwner ? "当前钱包是 Owner，可执行管理操作" : "当前钱包不是 Owner，仅可查看"}
+          </p>
         </div>
       </div>
 
-      {/* Platform Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title={t('adminTotalUsers')} value={platformStats.totalUsers.toLocaleString()} icon={Users} trend={{ value: "8.2%", positive: true }} />
-        <StatCard title={t('adminActiveNodes')} value={platformStats.activeNodes.toLocaleString()} icon={Cpu} trend={{ value: "5.1%", positive: true }} />
-        <StatCard title={t('adminTotalVolume')} value={`$${(platformStats.totalVolume / 1000).toFixed(0)}K`} icon={BarChart3} trend={{ value: "15.3%", positive: true }} />
-        <StatCard title={t('adminRevenue')} value={`$${(platformStats.revenue / 1000).toFixed(0)}K`} icon={DollarSign} trend={{ value: "11.7%", positive: true }} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">TOT Reserve</div><div className="text-lg font-semibold">{Number(swapTotReserve).toLocaleString()}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">USDT Reserve</div><div className="text-lg font-semibold">{Number(swapUsdtReserve).toLocaleString()}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">NFTB 分红池(TOT)</div><div className="text-lg font-semibold">{Number(swapDividendPool).toLocaleString()}</div></CardContent></Card>
       </div>
 
-      {/* Admin Tabs */}
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs defaultValue="nexus" className="space-y-6">
         <TabsList className="grid grid-cols-4 w-full max-w-lg">
-          <TabsTrigger value="users" className="text-xs gap-1"><Users size={14} /><span className="hidden sm:inline">{t('adminUserManagement')}</span><span className="sm:hidden">{t('adminUserManagement').slice(0, 2)}</span></TabsTrigger>
-          <TabsTrigger value="announcements" className="text-xs gap-1"><Megaphone size={14} /><span className="hidden sm:inline">{t('adminAnnouncementMgmt')}</span><span className="sm:hidden">{t('adminAnnouncementMgmt').slice(0, 2)}</span></TabsTrigger>
-          <TabsTrigger value="transactions" className="text-xs gap-1"><ArrowRightLeft size={14} /><span className="hidden sm:inline">{t('adminRecentTransactions')}</span><span className="sm:hidden">TX</span></TabsTrigger>
-          <TabsTrigger value="settings" className="text-xs gap-1"><Settings size={14} /><span className="hidden sm:inline">{t('adminSystemSettings')}</span><span className="sm:hidden">{t('adminSystemSettings').slice(0, 2)}</span></TabsTrigger>
+          <TabsTrigger value="nexus" className="text-xs gap-1"><Settings size={14} /><span>Nexus</span></TabsTrigger>
+          <TabsTrigger value="tiers" className="text-xs gap-1"><ShieldCheck size={14} /><span>Tiers</span></TabsTrigger>
+          <TabsTrigger value="swap" className="text-xs gap-1"><Wallet size={14} /><span>Swap</span></TabsTrigger>
+          <TabsTrigger value="ops" className="text-xs gap-1"><Activity size={14} /><span>Ops</span></TabsTrigger>
         </TabsList>
 
-        {/* === Users Tab === */}
-        <TabsContent value="users">
+        <TabsContent value="nexus">
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                {t('adminUserManagement')}
-              </CardTitle>
-              <CardDescription>{platformStats.totalUsers} {t('adminTotalUsers')}</CardDescription>
+              <CardTitle>Nexus 基础设置</CardTitle>
+              <CardDescription>项目钱包、手续费和授权分发者</CardDescription>
             </CardHeader>
-            <CardContent>
-              {/* Mobile card layout */}
-              <div className="space-y-3 md:hidden">
-                {users.map((user, i) => (
-                  <div key={i} className="rounded-lg border border-border/50 p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs">{user.address}</span>
-                      <Badge className={user.status === "enabled" ? "bg-green-500/15 text-green-500 border-green-500/30" : "bg-red-500/15 text-red-500 border-red-500/30"}>
-                        {user.status === "enabled" ? t('adminEnabled') : t('adminDisabled')}
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <p className="text-[10px] uppercase text-muted-foreground">{t('adminUserNodes')}</p>
-                        <p className="font-medium">{user.nodesCount}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase text-muted-foreground">{t('adminUserTeamSize')}</p>
-                        <p className="font-medium">{user.teamSize}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase text-muted-foreground">{t('adminUserTotalInvested')}</p>
-                        <p className="font-medium">${user.totalInvested.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="Treasury address" />
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r = await execTx(nexus.setTreasury(treasury));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                  refreshData();
+                }}>设置 Treasury</Button>
               </div>
-              {/* Desktop table */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border/50">
-                      <TableHead>{t('adminUserAddress')}</TableHead>
-                      <TableHead>{t('adminUserNodes')}</TableHead>
-                      <TableHead>{t('adminUserTeamSize')}</TableHead>
-                      <TableHead>{t('adminUserTotalInvested')}</TableHead>
-                      <TableHead>{t('adminUserStatus')}</TableHead>
-                      <TableHead className="text-right">{t('adminActions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user, i) => (
-                      <TableRow key={i} className="border-border/50">
-                        <TableCell className="font-mono text-xs">{user.address}</TableCell>
-                        <TableCell>{user.nodesCount}</TableCell>
-                        <TableCell>{user.teamSize}</TableCell>
-                        <TableCell className="font-medium">${user.totalInvested.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <Badge className={user.status === "enabled" ? "bg-green-500/15 text-green-500 border-green-500/30" : "bg-red-500/15 text-red-500 border-red-500/30"}>
-                            {user.status === "enabled" ? t('adminEnabled') : t('adminDisabled')}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs gap-1">
-                            <Pencil size={12} />
-                            {t('adminEdit')}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input value={zeroLine} onChange={(e) => setZeroLine(e.target.value)} placeholder="0号线钱包" />
+                <Input value={community} onChange={(e) => setCommunity(e.target.value)} placeholder="社区建设钱包" />
+                <Input value={foundation} onChange={(e) => setFoundation(e.target.value)} placeholder="基金会钱包" />
+                <Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="机构钱包" />
+              </div>
+              <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                if (!nexus) return;
+                setLoading(true);
+                const r = await execTx(nexus.setWallets(zeroLine, community, foundation, institution));
+                setLoading(false);
+                notifyTx(r.success, r.hash, r.error);
+                refreshData();
+              }}>设置 4 钱包</Button>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF burn bps" type="number" />
+                <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF claim bps" type="number" />
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r1 = await execTx(nexus.setTofBurnBps(BigInt(tofBurnBps || "0")));
+                  if (!r1.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r1.error);
+                    return;
+                  }
+                  const r2 = await execTx(nexus.setTofClaimFeeBps(BigInt(tofClaimFeeBps || "0")));
+                  setLoading(false);
+                  notifyTx(r2.success, r2.hash, r2.error);
+                  refreshData();
+                }}>更新 TOF 参数</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={withdrawLevel} onChange={(e) => setWithdrawLevel(e.target.value)} placeholder="level 0-5" type="number" />
+                <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="withdraw fee bps" type="number" />
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r = await execTx(nexus.setWithdrawFeeBps(Number(withdrawLevel || "0"), BigInt(withdrawFeeBps || "0")));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                }}>设置提现费率</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="Distributor address" />
+                <div className="flex items-center gap-2 px-2"><Switch checked={distributorStatus} onCheckedChange={setDistributorStatus} /><span className="text-sm">{distributorStatus ? "授权" : "取消授权"}</span></div>
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r = await execTx(nexus.setDistributor(distributorAddr, distributorStatus));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                }}>设置 Distributor</Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* === Announcements Tab === */}
-        <TabsContent value="announcements">
-          <Card className="glass-panel">
-            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Megaphone className="h-5 w-5 text-primary" />
-                  {t('adminAnnouncementMgmt')}
-                </CardTitle>
-              </div>
-              <Button size="sm" className="bg-primary gap-1">
-                <Plus size={14} />
-                {t('adminAddAnnouncement')}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {/* Mobile card layout */}
-              <div className="space-y-3 md:hidden">
-                {announcements.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-border/50 p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">{item.type}</Badge>
-                      <span className="text-xs text-muted-foreground">{item.date}</span>
-                    </div>
-                    <h4 className="text-sm font-semibold">{item.title}</h4>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{item.content}</p>
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1"><Pencil size={12} />{t('adminEdit')}</Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"><Trash2 size={12} />{t('adminDelete')}</Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {/* Desktop table */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border/50">
-                      <TableHead>{t('adminTitle')}</TableHead>
-                      <TableHead>{t('adminType')}</TableHead>
-                      <TableHead>{t('adminDate')}</TableHead>
-                      <TableHead className="text-right">{t('adminActions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {announcements.map((item) => (
-                      <TableRow key={item.id} className="border-border/50">
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-sm">{item.title}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">{item.content}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs">{item.type}</Badge></TableCell>
-                        <TableCell className="text-xs">{item.date}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1"><Pencil size={12} />{t('adminEdit')}</Button>
-                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"><Trash2 size={12} />{t('adminDelete')}</Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* === Transactions Tab === */}
-        <TabsContent value="transactions">
+        <TabsContent value="tiers">
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-accent" />
-                {t('adminRecentTransactions')}
-              </CardTitle>
+              <CardTitle>NFTA Tier 配置</CardTitle>
+              <CardDescription>创建或更新卡牌档位（tierId=0 代表新增）</CardDescription>
             </CardHeader>
-            <CardContent>
-              {/* Mobile card layout */}
-              <div className="space-y-3 md:hidden">
-                {recentTransactions.map((tx, i) => (
-                  <div key={i} className="rounded-lg border border-border/50 p-4 flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-mono text-xs truncate">{tx.from}</p>
-                      <p className="text-sm font-medium">{tx.action}</p>
-                      <p className="text-[10px] text-muted-foreground">{tx.time}</p>
-                    </div>
-                    <p className="font-bold text-sm whitespace-nowrap">${tx.amount.toLocaleString()}</p>
-                  </div>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="tierId" type="number" />
+                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="price (18 decimals)" />
+                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="dailyYield (18 decimals)" />
+                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="maxSupply" type="number" />
+                <div className="flex items-center gap-2 px-2"><Switch checked={nftaActive} onCheckedChange={setNftaActive} /><span className="text-sm">{nftaActive ? "启用" : "停用"}</span></div>
               </div>
-              {/* Desktop table */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border/50">
-                      <TableHead>{t('adminTxFrom')}</TableHead>
-                      <TableHead>{t('adminTxAction')}</TableHead>
-                      <TableHead>{t('adminTxAmount')}</TableHead>
-                      <TableHead>{t('adminTxTime')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentTransactions.map((tx, i) => (
-                      <TableRow key={i} className="border-border/50">
-                        <TableCell className="font-mono text-xs">{tx.from}</TableCell>
-                        <TableCell className="text-sm">{tx.action}</TableCell>
-                        <TableCell className="font-medium">${tx.amount.toLocaleString()}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{tx.time}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                if (!nexus) return;
+                setLoading(true);
+                const r = await execTx(
+                  nexus.configureNftaTier(
+                    BigInt(nftaTierId || "0"),
+                    toUnits(nftaPrice),
+                    toUnits(nftaYield),
+                    BigInt(nftaSupply || "0"),
+                    nftaActive
+                  )
+                );
+                setLoading(false);
+                notifyTx(r.success, r.hash, r.error);
+              }}>保存 NFTA Tier</Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="swap">
+          <Card className="glass-panel">
+            <CardHeader>
+              <CardTitle>TOTSwap 参数与流动性</CardTitle>
+              <CardDescription>手续费、限额、通缩与底池注入</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={swapBuyFeeBps} onChange={(e) => setSwapBuyFeeBps(e.target.value)} placeholder="buyFeeBps" type="number" />
+                <Input value={swapSellFeeBps} onChange={(e) => setSwapSellFeeBps(e.target.value)} placeholder="sellFeeBps" type="number" />
+                <Input value={swapProfitTaxBps} onChange={(e) => setSwapProfitTaxBps(e.target.value)} placeholder="profitTaxBps" type="number" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={swapDistributionThreshold} onChange={(e) => setSwapDistributionThreshold(e.target.value)} placeholder="distributionThreshold (TOT)" />
+                <Input value={swapMaxDailyBuy} onChange={(e) => setSwapMaxDailyBuy(e.target.value)} placeholder="maxDailyBuy (TOT)" />
+                <Input value={swapMaxSellBps} onChange={(e) => setSwapMaxSellBps(e.target.value)} placeholder="maxSellBps" type="number" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input value={swapDeflationBps} onChange={(e) => setSwapDeflationBps(e.target.value)} placeholder="deflationBps" type="number" />
+                <Button disabled={!isOwner || !swap || loading} onClick={async () => {
+                  if (!swap) return;
+                  setLoading(true);
+                  const r1 = await execTx(swap.setBuyFeeBps(BigInt(swapBuyFeeBps || "0")));
+                  if (!r1.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r1.error);
+                    return;
+                  }
+                  const r2 = await execTx(swap.setSellFeeBps(BigInt(swapSellFeeBps || "0")));
+                  if (!r2.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r2.error);
+                    return;
+                  }
+                  const r3 = await execTx(swap.setProfitTaxBps(BigInt(swapProfitTaxBps || "0")));
+                  if (!r3.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r3.error);
+                    return;
+                  }
+                  const r4 = await execTx(swap.setDistributionThreshold(toUnits(swapDistributionThreshold)));
+                  if (!r4.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r4.error);
+                    return;
+                  }
+                  const r5 = await execTx(swap.setMaxDailyBuy(toUnits(swapMaxDailyBuy)));
+                  if (!r5.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r5.error);
+                    return;
+                  }
+                  const r6 = await execTx(swap.setMaxSellBps(BigInt(swapMaxSellBps || "0")));
+                  if (!r6.success) {
+                    setLoading(false);
+                    notifyTx(false, undefined, r6.error);
+                    return;
+                  }
+                  const r7 = await execTx(swap.setDeflationBps(BigInt(swapDeflationBps || "0")));
+                  setLoading(false);
+                  notifyTx(r7.success, r7.hash, r7.error);
+                  refreshData();
+                }}>保存 Swap 参数</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input value={addLpTot} onChange={(e) => setAddLpTot(e.target.value)} placeholder="add TOT amount" />
+                <Input value={addLpUsdt} onChange={(e) => setAddLpUsdt(e.target.value)} placeholder="add USDT amount" />
+                <Button disabled={!isOwner || !swap || loading} onClick={async () => {
+                  if (!swap) return;
+                  setLoading(true);
+                  const r = await execTx(swap.addLiquidity(toUnits(addLpTot), toUnits(addLpUsdt)));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                  refreshData();
+                }}>注入流动性</Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* === Settings Tab === */}
-        <TabsContent value="settings">
+        <TabsContent value="ops">
           <Card className="glass-panel">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="h-5 w-5 text-primary" />
-                {t('adminSystemSettings')}
+                运营操作
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Owner Address */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('adminOwnerAddress')}</label>
-                  <Input value={adminData.ownerAddress} disabled className="font-mono text-xs bg-muted/30" />
-                </div>
-
-                {/* Withdraw Fee Rate */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('adminWithdrawFeeRate')}</label>
-                  <Input value={feeRate} onChange={(e) => setFeeRate(e.target.value)} placeholder="5%" />
-                </div>
-
-                {/* Min Purchase */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('adminMinPurchase')} (USDT)</label>
-                  <Input value={minPurchase} onChange={(e) => setMinPurchase(e.target.value)} placeholder="300" type="number" />
-                </div>
-
-                {/* Maintenance Mode */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('adminMaintenanceMode')}</label>
-                  <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/10">
-                    <Switch checked={maintenanceMode} onCheckedChange={setMaintenanceMode} />
-                    <span className={`text-sm font-medium ${maintenanceMode ? "text-orange-500" : "text-green-500"}`}>
-                      {maintenanceMode ? t('adminOn') : t('adminOff')}
-                    </span>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="fundRewardPool TOT amount" />
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r = await execTx(nexus.fundRewardPool(toUnits(rewardFundAmount)));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                }}>注入奖励池</Button>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <Button onClick={handleSaveSettings} className="bg-primary px-6">
-                  {t('adminSave')}
-                </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="distributeNftbDividends TOT amount" />
+                <Button disabled={!isOwner || !nexus || loading} onClick={async () => {
+                  if (!nexus) return;
+                  setLoading(true);
+                  const r = await execTx(nexus.distributeNftbDividends(toUnits(dividendAmount)));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                }}>手动分红 NFTB</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Button disabled={!isOwner || !swap || loading} onClick={async () => {
+                  if (!swap) return;
+                  setLoading(true);
+                  const r = await execTx(swap.deflate());
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                  refreshData();
+                }}>执行一次通缩</Button>
+                <Button disabled={!isOwner || !swap || loading} onClick={async () => {
+                  if (!swap) return;
+                  setLoading(true);
+                  const r = await execTx(swap.forceDistribute());
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error);
+                  refreshData();
+                }}>强制分红（Swap池）</Button>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={refreshData} disabled={loading}>刷新链上状态</Button>
               </div>
             </CardContent>
           </Card>
