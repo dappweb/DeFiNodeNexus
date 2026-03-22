@@ -111,6 +111,7 @@ contract DeFiNodeNexus is Ownable {
     mapping(address => uint256[]) public userNftbNodes;
     mapping(address => Account) public accounts;
     mapping(uint8 => uint256) public withdrawFeeBpsByLevel;
+    mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
 
     // ======================== Events ========================
 
@@ -129,6 +130,7 @@ contract DeFiNodeNexus is Ownable {
     event WalletsUpdated(address zeroLine, address community, address foundation, address institution);
     event TofBurnRateUpdated(uint256 newBps);
     event TofClaimFeeUpdated(uint256 newBps);
+    event DistributorUpdated(address indexed addr, bool status);
 
     // ======================== Constructor ========================
 
@@ -481,7 +483,8 @@ contract DeFiNodeNexus is Ownable {
         emit RewardPoolFunded(msg.sender, amount);
     }
 
-    function distributeNftbDividends(uint256 amount) external onlyOwner {
+    function distributeNftbDividends(uint256 amount) external {
+        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
         require(amount > 0, "Zero");
         require(totalNftbWeight > 0, "No weight");
 
@@ -489,6 +492,12 @@ contract DeFiNodeNexus is Ownable {
         accTotDividendPerWeight += (amount * ACC_PRECISION) / totalNftbWeight;
 
         emit DividendRoundFunded(amount, accTotDividendPerWeight);
+    }
+
+    function setDistributor(address addr, bool status) external onlyOwner {
+        require(addr != address(0), "Zero");
+        isDistributor[addr] = status;
+        emit DistributorUpdated(addr, status);
     }
 
     function setTreasury(address addr) external onlyOwner {

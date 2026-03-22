@@ -72,6 +72,36 @@ async function main() {
   const tx2 = await contract.configureNftaTier(0, tier2Price, tier2Yield, 5000, true);
   await tx2.wait();
   console.log("NFTA Tier 2 configured: 1000U, 2.0%/day, max 5000");
+
+  // --- Deploy TOTSwap ---
+
+  console.log("\n--- Deploying TOTSwap ---");
+
+  const TOTSwap = await hre.ethers.getContractFactory("TOTSwap");
+  const swap = await TOTSwap.deploy(totToken, usdtToken);
+  await swap.waitForDeployment();
+
+  const swapAddress = await swap.getAddress();
+  console.log("TOTSwap deployed to:", swapAddress);
+
+  // Link TOTSwap to DeFiNodeNexus
+  const txNexus = await swap.setNexus(deployedAddress);
+  await txNexus.wait();
+  console.log("TOTSwap → Nexus linked:", deployedAddress);
+
+  // Authorize TOTSwap as a distributor on DeFiNodeNexus
+  const txDist = await contract.setDistributor(swapAddress, true);
+  await txDist.wait();
+  console.log("TOTSwap authorized as distributor on Nexus");
+
+  // Summary
+  console.log("\n=== DEPLOYMENT SUMMARY ===");
+  console.log("DeFiNodeNexus:", deployedAddress);
+  console.log("TOTSwap:      ", swapAddress);
+  console.log("TOT token:    ", totToken);
+  console.log("TOF token:    ", tofToken);
+  console.log("USDT token:   ", usdtToken);
+  console.log("\nNOTE: Owner must call swap.addLiquidity() to seed 6% TOT + USDT into pool.");
 }
 
 main().catch((error) => {
