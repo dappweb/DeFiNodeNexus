@@ -13,7 +13,7 @@ import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract"
 import { useToast } from "@/hooks/use-toast";
 
 export function AdminPage() {
-  const { account } = useWeb3();
+  const { address } = useWeb3();
   const nexus = useNexusContract();
   const swap = useSwapContract();
   const { toast } = useToast();
@@ -81,7 +81,7 @@ export function AdminPage() {
       const claim = await nexus.tofClaimFeeBps();
 
       setOwnerAddress(owner);
-      setIsOwner(!!account && account.toLowerCase() === owner.toLowerCase());
+      setIsOwner(!!address && address.toLowerCase() === owner.toLowerCase());
       setTreasury(tr);
       setZeroLine(z);
       setCommunity(c);
@@ -122,7 +122,7 @@ export function AdminPage() {
 
   useEffect(() => {
     refreshData();
-  }, [nexus, swap, account]);
+  }, [nexus, swap, address]);
 
   return (
     <div className="space-y-6 overflow-hidden">

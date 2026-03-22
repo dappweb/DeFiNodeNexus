@@ -29,8 +29,10 @@ export const MOCK_USER_DATA = {
     {
       nodeId: "B-202",
       level: 3,
-      weight: 1.5,
-      tier: "Gold",
+      weight: 4,
+      tier: "Advanced",
+      paymentMethod: "USDT",
+      dividendShare: 40,
       historicalDividends: [
         { date: "2024-02-15", totAmount: 120, usdtAmount: 15 },
         { date: "2024-02-01", totAmount: 115, usdtAmount: 14.5 },
@@ -40,8 +42,10 @@ export const MOCK_USER_DATA = {
     {
       nodeId: "B-501",
       level: 1,
-      weight: 0.8,
-      tier: "Bronze",
+      weight: 1,
+      tier: "Junior",
+      paymentMethod: "TOF",
+      dividendShare: 20,
       historicalDividends: [
         { date: "2024-02-15", totAmount: 45, usdtAmount: 5 },
         { date: "2024-02-01", totAmount: 42, usdtAmount: 4.8 },
@@ -54,17 +58,17 @@ export const MOCK_USER_DATA = {
     { tier: "Elite", price: 5000, currency: "USDT", dailyYield: 150, description: "Maximum yield enterprise node" },
   ],
   nftbTiers: [
-    { tier: "Bronze", price: 300, currency: "USDT", level: 1, weight: 0.8, description: "Standard dividend share" },
-    { tier: "Silver", price: 1500, currency: "USDT", level: 2, weight: 1.2, description: "Enhanced dividend multiplier" },
-    { tier: "Gold", price: 4000, currency: "USDT", level: 3, weight: 1.5, description: "Premium dividend tier" },
+    { tier: "Junior", tierZh: "初级", name: "Ordinary Scepter", nameZh: "普通权杖", price: 500, currency: "USDT/TOF", level: 1, weight: 1, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 20, predictionFlow: 0.4, description: "Junior shareholder node – 20% dividend share" },
+    { tier: "Intermediate", tierZh: "中级", name: "Rare Crown", nameZh: "稀有王冠", price: 1000, currency: "USDT/TOF", level: 2, weight: 2, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 30, predictionFlow: 0.5, description: "Intermediate shareholder node – 30% dividend share" },
+    { tier: "Advanced", tierZh: "高级", name: "Legendary Throne", nameZh: "传说神座", price: 2000, currency: "USDT/TOF", level: 3, weight: 4, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 40, predictionFlow: 0.6, description: "Advanced shareholder node – 40% dividend share" },
   ],
   // --- Purchase Records ---
   purchaseRecords: [
     { id: "TX-001", type: "NFTA" as const, tier: "Pro", price: 2000, currency: "USDT", date: "2024-01-15", status: "completed" as const, nodeId: "A-001" },
     { id: "TX-002", type: "NFTA" as const, tier: "Pro", price: 2000, currency: "USDT", date: "2024-02-01", status: "completed" as const, nodeId: "A-012" },
     { id: "TX-003", type: "NFTA" as const, tier: "Basic", price: 500, currency: "USDT", date: "2024-02-10", status: "completed" as const, nodeId: "A-045" },
-    { id: "TX-004", type: "NFTB" as const, tier: "Gold", price: 4000, currency: "USDT", date: "2024-01-10", status: "completed" as const, nodeId: "B-202" },
-    { id: "TX-005", type: "NFTB" as const, tier: "Bronze", price: 300, currency: "USDT", date: "2024-02-12", status: "completed" as const, nodeId: "B-501" },
+    { id: "TX-004", type: "NFTB" as const, tier: "Advanced", price: 2000, currency: "USDT", date: "2024-01-10", status: "completed" as const, nodeId: "B-202" },
+    { id: "TX-005", type: "NFTB" as const, tier: "Junior", price: 500, currency: "TOF", date: "2024-02-12", status: "completed" as const, nodeId: "B-501" },
   ],
   // --- Swap ---
   swapTokens: [
@@ -146,7 +150,7 @@ export const MOCK_USER_DATA = {
     recentTransactions: [
       { from: "0xA3f...8b21", action: "Buy NFTA Pro", amount: 2000, time: "2 min ago" },
       { from: "0xB7c...2d45", action: "Withdraw TOT", amount: 450, time: "8 min ago" },
-      { from: "0xD4a...3c89", action: "Buy NFTB Gold", amount: 4000, time: "15 min ago" },
+      { from: "0xD4a...3c89", action: "Buy NFTB Advanced", amount: 2000, time: "15 min ago" },
       { from: "0xC1e...9f67", action: "Swap TOT→USDT", amount: 1200, time: "22 min ago" },
       { from: "0xF8d...1a34", action: "Buy NFTA Elite", amount: 5000, time: "35 min ago" },
       { from: "0xA3f...8b21", action: "Claim Dividends", amount: 320, time: "1 hr ago" },

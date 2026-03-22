@@ -45,8 +45,12 @@ contract DeFiNodeNexus is Ownable {
     }
 
     struct NftbTier {
-        uint256 price;
-        uint256 weight;
+        uint256 price;          // USDT price (with token decimals)
+        uint256 weight;         // weight for per-tier dividend distribution
+        uint256 maxSupply;      // max cards for this tier (default 2000)
+        uint256 usdtMinted;    // count minted via USDT (max maxSupply/2)
+        uint256 tofMinted;     // count minted via TOF (max maxSupply/2)
+        uint256 dividendBps;   // share of total dividend pool in bps (2000=20%, 3000=30%, 4000=40%)
         bool isActive;
     }
 
@@ -90,14 +94,15 @@ contract DeFiNodeNexus is Ownable {
     address public communityWallet;     // 社区建设  10%
     address public foundationWallet;    // 基金会   10%
     address public institutionWallet;   // 机构    40%
+    address public projectWallet;       // 项目方钱包 (NFTB dividend 10%)
 
     // ======================== State ========================
 
     uint256 public nextNftaTierId = 1;
     uint256 public nextNftbTierId = 1;
     uint256 public nextNodeId = 1;
-    uint256 public totalNftbWeight;
-    uint256 public accTotDividendPerWeight;
+    mapping(uint256 => uint256) public totalWeightByTier;
+    mapping(uint256 => uint256) public accDividendPerWeightByTier;
     uint256 public tofBurnBps = 500;           // 5% of TOF fee is burned
     uint256 public tofClaimFeeBps = 7000;      // 70% TOF fee when claiming NFTA yield
 
@@ -117,7 +122,8 @@ contract DeFiNodeNexus is Ownable {
 
     event ReferrerBound(address indexed user, address indexed referrer);
     event NftaTierConfigured(uint256 indexed tierId, uint256 price, uint256 dailyYield, uint256 maxSupply, bool isActive);
-    event NftbTierConfigured(uint256 indexed tierId, uint256 price, uint256 weight, bool isActive);
+    event NftbTierConfigured(uint256 indexed tierId, uint256 price, uint256 weight, uint256 maxSupply, uint256 dividendBps, bool isActive);
+    event ProjectWalletUpdated(address indexed newWallet);
     event NftaPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
     event NftbPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
     event NftaYieldClaimed(address indexed user, uint256 indexed nodeId, uint256 totAmount, uint256 tofConsumed);
@@ -148,6 +154,7 @@ contract DeFiNodeNexus is Ownable {
         communityWallet = msg.sender;
         foundationWallet = msg.sender;
         institutionWallet = msg.sender;
+        projectWallet = msg.sender;
 
         // Withdraw fee by user level (TOF cost per TOT withdrawn)
         withdrawFeeBpsByLevel[0] = 1000;  // Lv0  10%
@@ -221,6 +228,49 @@ contract DeFiNodeNexus is Ownable {
     }
 
     /**
+     * @notice Buy an NFTB card with USDT.
+     * Each tier has maxSupply total cards, half purchasable with USDT.
+     * Tiers: Junior (500U), Intermediate (1000U), Advanced (2000U).
+     */
+    function buyNftbWithUsdt(uint256 tierId, address referrer) external returns (uint256 nodeId) {
+        NftbTier storage tier = nftbTiers[tierId];
+        require(tier.isActive, "Tier inactive");
+        require(tier.price > 0, "Price is zero");
+        require(tier.usdtMinted < tier.maxSupply / 2, "USDT quota sold out");
+
+        _bindReferrerIfNeeded(msg.sender, referrer);
+
+        usdtToken.safeTransferFrom(msg.sender, address(this), tier.price);
+        usdtToken.safeTransfer(treasury, tier.price);
+
+        tier.usdtMinted += 1;
+        nodeId = _createNftbNode(msg.sender, tierId, tier.weight);
+
+        emit NftbPurchased(msg.sender, nodeId, tierId, tier.price);
+    }
+
+    /**
+     * @notice Buy an NFTB card with TOF (equivalent price in TOF tokens).
+     * Each tier has maxSupply total cards, half purchasable with TOF.
+     */
+    function buyNftbWithTof(uint256 tierId, address referrer) external returns (uint256 nodeId) {
+        NftbTier storage tier = nftbTiers[tierId];
+        require(tier.isActive, "Tier inactive");
+        require(tier.price > 0, "Price is zero");
+        require(tier.tofMinted < tier.maxSupply / 2, "TOF quota sold out");
+
+        _bindReferrerIfNeeded(msg.sender, referrer);
+
+        tofToken.safeTransferFrom(msg.sender, address(this), tier.price);
+        tofToken.safeTransfer(treasury, tier.price);
+
+        tier.tofMinted += 1;
+        nodeId = _createNftbNode(msg.sender, tierId, tier.weight);
+
+        emit NftbPurchased(msg.sender, nodeId, tierId, tier.price);
+    }
+
+    /**
      * @notice Claim today's NFTA yield for one node.
      * Use-it-or-lose-it: exactly 1 day's yield; missed days are forfeited.
      * Requires TOF payment (tofClaimFeeBps% of yield amount).
@@ -277,7 +327,7 @@ contract DeFiNodeNexus is Ownable {
         require(node.owner == msg.sender, "Not owner");
         require(node.isActive, "Inactive");
 
-        uint256 accumulated = (node.weight * accTotDividendPerWeight) / ACC_PRECISION;
+        uint256 accumulated = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         uint256 pending = accumulated - node.rewardDebt;
         require(pending > 0, "No dividend");
 
@@ -297,7 +347,7 @@ contract DeFiNodeNexus is Ownable {
             NodeB storage node = nftbNodes[nodes[i]];
             if (!node.isActive) continue;
 
-            uint256 accumulated = (node.weight * accTotDividendPerWeight) / ACC_PRECISION;
+            uint256 accumulated = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
             if (accumulated > node.rewardDebt) {
                 claimNftbDividend(nodes[i]);
             }
@@ -354,7 +404,7 @@ contract DeFiNodeNexus is Ownable {
         NodeB memory node = nftbNodes[nodeId];
         if (!node.isActive || node.owner == address(0)) return 0;
 
-        uint256 accumulated = (node.weight * accTotDividendPerWeight) / ACC_PRECISION;
+        uint256 accumulated = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         return accumulated - node.rewardDebt;
     }
 
@@ -381,6 +431,14 @@ contract DeFiNodeNexus is Ownable {
         NftaTier memory tier = nftaTiers[tierId];
         if (tier.currentSupply >= tier.maxSupply) return 0;
         return tier.maxSupply - tier.currentSupply;
+    }
+
+    /// @notice Get remaining USDT/TOF supply for an NFTB tier.
+    function getNftbTierRemaining(uint256 tierId) external view returns (uint256 usdtRemaining, uint256 tofRemaining) {
+        NftbTier memory tier = nftbTiers[tierId];
+        uint256 halfSupply = tier.maxSupply / 2;
+        usdtRemaining = tier.usdtMinted >= halfSupply ? 0 : halfSupply - tier.usdtMinted;
+        tofRemaining  = tier.tofMinted >= halfSupply ? 0 : halfSupply - tier.tofMinted;
     }
 
     // ================================================================
@@ -420,22 +478,33 @@ contract DeFiNodeNexus is Ownable {
         uint256 tierId,
         uint256 price,
         uint256 weight,
+        uint256 maxSupply,
+        uint256 dividendBps,
         bool isActive
     ) external onlyOwner returns (uint256 configuredTierId) {
         require(weight > 0, "Weight is zero");
+        require(maxSupply > 0, "MaxSupply is zero");
 
         configuredTierId = tierId;
         if (configuredTierId == 0) {
             configuredTierId = nextNftbTierId++;
         }
 
+        NftbTier storage existing = nftbTiers[configuredTierId];
+        uint256 preservedUsdtMinted = existing.usdtMinted;
+        uint256 preservedTofMinted = existing.tofMinted;
+
         nftbTiers[configuredTierId] = NftbTier({
             price: price,
             weight: weight,
+            maxSupply: maxSupply,
+            usdtMinted: preservedUsdtMinted,
+            tofMinted: preservedTofMinted,
+            dividendBps: dividendBps,
             isActive: isActive
         });
 
-        emit NftbTierConfigured(configuredTierId, price, weight, isActive);
+        emit NftbTierConfigured(configuredTierId, price, weight, maxSupply, dividendBps, isActive);
     }
 
     /// @notice Admin registers an NFTA purchase (off-chain payment).
@@ -455,24 +524,14 @@ contract DeFiNodeNexus is Ownable {
 
     function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {
         require(user != address(0), "User is zero");
-        NftbTier memory tier = nftbTiers[tierId];
+        NftbTier storage tier = nftbTiers[tierId];
         require(tier.isActive, "Tier inactive");
+        require(tier.usdtMinted + tier.tofMinted < tier.maxSupply, "Tier sold out");
 
         _bindReferrerIfNeeded(user, referrer);
 
-        nodeId = nextNodeId++;
-        nftbNodes[nodeId] = NodeB({
-            owner: user,
-            tierId: tierId,
-            weight: tier.weight,
-            rewardDebt: (tier.weight * accTotDividendPerWeight) / ACC_PRECISION,
-            isActive: true
-        });
-
-        totalNftbWeight += tier.weight;
-        userNftbNodes[user].push(nodeId);
-        accounts[user].totalNodes += 1;
-        _increaseUplineTeamNodes(user, 1);
+        tier.usdtMinted += 1;   // admin registration defaults to USDT slot
+        nodeId = _createNftbNode(user, tierId, tier.weight);
 
         emit NftbPurchased(user, nodeId, tierId, tier.price);
     }
@@ -483,15 +542,38 @@ contract DeFiNodeNexus is Ownable {
         emit RewardPoolFunded(msg.sender, amount);
     }
 
+    /**
+     * @notice Distribute NFTB dividends split by tier.
+     * Dividend source: daily pool burns 2.4% for NFTB dividend distribution.
+     * 10% → project wallet, then split by tier dividendBps:
+     *   Junior (20%), Intermediate (30%), Advanced (40%).
+     * All dividends are in TOT.
+     */
     function distributeNftbDividends(uint256 amount) external {
         require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
         require(amount > 0, "Zero");
-        require(totalNftbWeight > 0, "No weight");
 
         totToken.safeTransferFrom(msg.sender, address(this), amount);
-        accTotDividendPerWeight += (amount * ACC_PRECISION) / totalNftbWeight;
 
-        emit DividendRoundFunded(amount, accTotDividendPerWeight);
+        // 10% to project wallet
+        uint256 projectShare = (amount * 1000) / BASIS_POINTS;
+        if (projectShare > 0) {
+            totToken.safeTransfer(projectWallet, projectShare);
+        }
+
+        // Distribute to each tier by dividendBps (20%/30%/40%)
+        for (uint256 tid = 1; tid < nextNftbTierId; tid++) {
+            NftbTier memory tier = nftbTiers[tid];
+            if (!tier.isActive || tier.dividendBps == 0) continue;
+
+            uint256 tierWeight = totalWeightByTier[tid];
+            if (tierWeight == 0) continue;
+
+            uint256 tierShare = (amount * tier.dividendBps) / BASIS_POINTS;
+            accDividendPerWeightByTier[tid] += (tierShare * ACC_PRECISION) / tierWeight;
+        }
+
+        emit DividendRoundFunded(amount, 0);
     }
 
     function setDistributor(address addr, bool status) external onlyOwner {
@@ -522,6 +604,12 @@ contract DeFiNodeNexus is Ownable {
         foundationWallet = _foundation;
         institutionWallet = _institution;
         emit WalletsUpdated(_zeroLine, _community, _foundation, _institution);
+    }
+
+    function setProjectWallet(address addr) external onlyOwner {
+        require(addr != address(0), "Zero");
+        projectWallet = addr;
+        emit ProjectWalletUpdated(addr);
     }
 
     function setTofBurnBps(uint256 bps) external onlyOwner {
@@ -557,6 +645,22 @@ contract DeFiNodeNexus is Ownable {
         });
 
         userNftaNodes[user].push(nodeId);
+        accounts[user].totalNodes += 1;
+        _increaseUplineTeamNodes(user, 1);
+    }
+
+    function _createNftbNode(address user, uint256 tierId, uint256 weight) internal returns (uint256 nodeId) {
+        nodeId = nextNodeId++;
+        nftbNodes[nodeId] = NodeB({
+            owner: user,
+            tierId: tierId,
+            weight: weight,
+            rewardDebt: (weight * accDividendPerWeightByTier[tierId]) / ACC_PRECISION,
+            isActive: true
+        });
+
+        totalWeightByTier[tierId] += weight;
+        userNftbNodes[user].push(nodeId);
         accounts[user].totalNodes += 1;
         _increaseUplineTeamNodes(user, 1);
     }

@@ -28,6 +28,7 @@ export function NftbDividendTracking() {
 
   const [buyDialogOpen, setBuyDialogOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"USDT" | "TOF">("USDT");
   const [isPurchasing, setIsPurchasing] = useState(false);
 
   const handleBuyClick = () => {
@@ -36,6 +37,7 @@ export function NftbDividendTracking() {
       return;
     }
     setSelectedTier(null);
+    setPaymentMethod("USDT");
     setBuyDialogOpen(true);
   };
 
@@ -83,7 +85,7 @@ export function NftbDividendTracking() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-sm bg-muted px-2 py-0.5 rounded border border-white/5">{node.nodeId}</span>
-                    <span className="text-xs text-muted-foreground">{t('level')} {node.level} • {t('weight')} {node.weight}x</span>
+                    <span className="text-xs text-muted-foreground">{t('level')} {node.level} • {t('weight')} {node.weight}x • {t('dividendShare')} {node.dividendShare}%</span>
                   </div>
                   <div className="flex items-center gap-1 text-xs text-accent">
                     <TrendingUp size={14} />
@@ -131,6 +133,13 @@ export function NftbDividendTracking() {
           </DialogHeader>
 
           <div className="space-y-3 py-4">
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">{t('dividendSource')}</p>
+              <p className="text-xs text-muted-foreground">• {t('projectWalletShare')}</p>
+              <p className="text-xs text-muted-foreground">• {t('allDividendsInTot')}</p>
+              <p className="text-xs text-muted-foreground">• {t('distributionThreshold')}</p>
+            </div>
+
             <p className="text-sm font-medium text-muted-foreground">{t('selectTier')}</p>
             <div className="grid gap-3">
               {tiers.map((tier, idx) => (
@@ -147,21 +156,52 @@ export function NftbDividendTracking() {
                     </div>
                   )}
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-headline font-bold text-base">{tier.tier}</span>
+                    <span className="font-headline font-bold text-base">{tier.tier} <span className="text-xs font-normal text-muted-foreground">({tier.nameZh})</span></span>
                     <span className="font-bold text-lg">${tier.price.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{tier.currency}</span></span>
                   </div>
                   <p className="text-xs text-muted-foreground mb-2">{tier.description}</p>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Crown size={14} className="text-accent" />
                       {t('tierLevel')}: {tier.level}
                     </span>
-                    <span className="text-muted-foreground">
-                      {t('tierWeight')}: {tier.weight}x
-                    </span>
+                    <span>{t('tierWeight')}: {tier.weight}x</span>
+                    <span>{t('maxSupply')}: {tier.maxSupply}</span>
+                    <span>{t('dividendShare')}: {tier.dividendShare}%</span>
+                    <span>{t('usdtQuotaRemaining')}: {tier.usdtQuota}</span>
+                    <span>{t('tofQuotaRemaining')}: {tier.tofQuota}</span>
+                    <span>{t('predictionFlow')}: {tier.predictionFlow}%</span>
                   </div>
                 </button>
               ))}
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">{t('selectPayment')}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={paymentMethod === "USDT" ? "default" : "outline"}
+                  className={paymentMethod === "USDT" ? "bg-accent text-accent-foreground hover:bg-accent/90" : ""}
+                  onClick={() => setPaymentMethod("USDT")}
+                >
+                  {t('payWithUsdt')}
+                </Button>
+                <Button
+                  type="button"
+                  variant={paymentMethod === "TOF" ? "default" : "outline"}
+                  className={paymentMethod === "TOF" ? "bg-accent text-accent-foreground hover:bg-accent/90" : ""}
+                  onClick={() => setPaymentMethod("TOF")}
+                >
+                  {t('payWithTof')}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-3 space-y-1">
+              <p className="text-xs text-muted-foreground">{t('feesDividend')}: L1 20% / L2 30% / L3 40%</p>
+              <p className="text-xs text-muted-foreground">{t('profitTaxDividend')}: L1 20% / L2 30% / L3 40%</p>
+              <p className="text-xs text-muted-foreground">{t('predictionDividend')}: 0.4% / 0.5% / 0.6%</p>
             </div>
           </div>
 
@@ -177,7 +217,7 @@ export function NftbDividendTracking() {
               {isPurchasing ? t('purchasing') : t('confirmPurchase')}
               {selectedTier !== null && !isPurchasing && (
                 <span className="ml-2 text-xs opacity-80">
-                  ${tiers[selectedTier].price.toLocaleString()}
+                  ${tiers[selectedTier].price.toLocaleString()} • {paymentMethod}
                 </span>
               )}
             </Button>

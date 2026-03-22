@@ -21,6 +21,7 @@ import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useWeb3 } from "@/lib/web3-provider";
+import { useNexusContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 
@@ -36,8 +37,10 @@ type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<PageTab>("home");
+  const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
   const { t } = useLanguage();
   const { address, isConnected, isConnecting, connect } = useWeb3();
+  const nexus = useNexusContract();
   const { toast } = useToast();
 
   // Referral binding state
@@ -64,31 +67,60 @@ export default function DashboardPage() {
     }
   }, [address]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadOwner = async () => {
+      if (!nexus) {
+        if (!cancelled) setOwnerAddress(null);
+        return;
+      }
+      try {
+        const owner = await nexus.owner();
+        if (!cancelled) setOwnerAddress(owner);
+      } catch {
+        if (!cancelled) setOwnerAddress(null);
+      }
+    };
+    loadOwner();
+    return () => {
+      cancelled = true;
+    };
+  }, [nexus]);
+
   if (!mounted) return null;
 
   const displayAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : MOCK_USER_DATA.walletAddress;
 
-  // Owner detection — auto-show admin panel for contract owner
+  // Owner detection — auto-show admin panel for on-chain contract owner
   const isOwner = isConnected && address
-    ? address.toLowerCase() === MOCK_USER_DATA.adminData.ownerAddress.toLowerCase()
+    ? ownerAddress !== null && address.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
   // Referral binding required: connected + not owner + not yet bound
   const needsReferralBinding = isConnected && !isOwner && !referrerBound;
 
+  useEffect(() => {
+    if (!needsReferralBinding) return;
+    if (!ownerAddress) return;
+    if (referrerAddress.trim()) return;
+    setReferrerAddress(ownerAddress);
+  }, [needsReferralBinding, ownerAddress, referrerAddress]);
+
   const handleBindReferrer = () => {
     setReferrerError("");
     const trimmed = referrerAddress.trim();
+    const fallbackOwner = ownerAddress?.trim() ?? "";
+    const finalReferrer = trimmed || fallbackOwner;
 
     // Validate: must be valid Ethereum address
-    if (!trimmed || !/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+    if (!finalReferrer || !/^0x[a-fA-F0-9]{40}$/.test(finalReferrer)) {
       setReferrerError(t('referralInvalidAddress'));
       return;
     }
     // Cannot bind self
-    if (address && trimmed.toLowerCase() === address.toLowerCase()) {
+    if (address && finalReferrer.toLowerCase() === address.toLowerCase()) {
       setReferrerError(t('referralCannotSelf'));
       return;
     }
@@ -97,7 +129,7 @@ export default function DashboardPage() {
     // Simulate on-chain binding
     setTimeout(() => {
       setIsBindingReferrer(false);
-      localStorage.setItem(`referrer_${address!.toLowerCase()}`, trimmed.toLowerCase());
+      localStorage.setItem(`referrer_${address!.toLowerCase()}`, finalReferrer.toLowerCase());
       setReferrerBound(true);
       toast({
         title: t('referralSuccess'),
@@ -224,7 +256,7 @@ export default function DashboardPage() {
                 {/* Confirm Button */}
                 <Button
                   onClick={handleBindReferrer}
-                  disabled={isBindingReferrer || !referrerAddress.trim()}
+                  disabled={isBindingReferrer || (!referrerAddress.trim() && !ownerAddress?.trim())}
                   className="w-full bg-primary hover:bg-primary/90 h-11 font-semibold"
                 >
                   {isBindingReferrer ? (
