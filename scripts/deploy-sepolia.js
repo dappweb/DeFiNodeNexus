@@ -33,6 +33,45 @@ async function main() {
 
   const deployedAddress = await contract.getAddress();
   console.log("DeFiNodeNexus deployed to:", deployedAddress);
+
+  // --- Post-deploy configuration ---
+
+  // Set 4 project wallets if provided in .env
+  const zeroLine    = process.env.ZERO_LINE_WALLET;
+  const community   = process.env.COMMUNITY_WALLET;
+  const foundation  = process.env.FOUNDATION_WALLET;
+  const institution = process.env.INSTITUTION_WALLET;
+
+  if (zeroLine && community && foundation && institution) {
+    const tx = await contract.setWallets(zeroLine, community, foundation, institution);
+    await tx.wait();
+    console.log("Wallets configured:");
+    console.log("  0号线:  ", zeroLine);
+    console.log("  社区建设:", community);
+    console.log("  基金会:  ", foundation);
+    console.log("  机构:   ", institution);
+  } else {
+    console.log("Wallet addresses not set (missing env vars). All default to deployer.");
+  }
+
+  // Configure default NFTA tiers:
+  // Tier 1: 初级创世荣耀 500 USDT, maxSupply 10000
+  // Tier 2: 高级创世王者 1000 USDT, maxSupply 5000
+  // dailyYield = price * 1.3% = price * 13 / 1000  (conservative default)
+  const decimals = 18; // adjust if USDT uses 6 decimals
+  const unit = hre.ethers.parseUnits("1", decimals);
+
+  const tier1Price = hre.ethers.parseUnits("500", decimals);
+  const tier1Yield = tier1Price * 13n / 1000n; // 1.3% daily
+  const tx1 = await contract.configureNftaTier(0, tier1Price, tier1Yield, 10000, true);
+  await tx1.wait();
+  console.log("NFTA Tier 1 configured: 500U, 1.3%/day, max 10000");
+
+  const tier2Price = hre.ethers.parseUnits("1000", decimals);
+  const tier2Yield = tier2Price * 20n / 1000n; // 2.0% daily
+  const tx2 = await contract.configureNftaTier(0, tier2Price, tier2Yield, 5000, true);
+  await tx2.wait();
+  console.log("NFTA Tier 2 configured: 1000U, 2.0%/day, max 5000");
 }
 
 main().catch((error) => {
