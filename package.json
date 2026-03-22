@@ -10,9 +10,12 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "pages:build": "npx @cloudflare/next-on-pages"
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "hh:compile": "hardhat compile",
+    "hh:deploy:sepolia": "hardhat run scripts/deploy-sepolia.js --network sepolia"
   },
   "dependencies": {
+    "@openzeppelin/contracts": "^5.3.0",
     "@genkit-ai/google-genai": "^1.28.0",
     "@hookform/resolvers": "^4.1.3",
     "@radix-ui/react-accordion": "^1.2.3",
@@ -58,11 +61,13 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@cloudflare/next-on-pages": "^1.13.7",
     "@types/node": "^20",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "genkit-cli": "^1.28.0",
+    "hardhat": "^2.22.18",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
