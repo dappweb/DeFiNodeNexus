@@ -52,5 +52,6 @@ npm run dev
 
 - **构建命令**: `npm run pages:build`
 - **输出目录**: `.vercel/output/static`
+- **部署命令**: 留空（不要使用 `npx wrangler deploy`）
 - **环境变量**: `NODE_VERSION: 20`
-- **兼容性标志**: `nodejs_compat`
+- **说明**: 本项目不再依赖 `wrangler.toml`，按 Cloudflare Pages 的构建产物目录直接发布。
