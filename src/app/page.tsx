@@ -1,27 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { 
-  Wallet, 
-  LayoutDashboard, 
-  Coins, 
-  Layers, 
-  User, 
+import {
+  LayoutDashboard,
+  User,
   Bell,
-  Search,
-  Plus,
-  Database,
   Link as LinkIcon,
-  RefreshCw
+  Home,
+  Cpu,
+  ArrowDownUp,
+  TrendingUp,
+  Users,
+  ShieldCheck,
+  UserPlus,
+  CheckCircle2,
 } from "lucide-react";
-import { StatCard } from "@/components/dashboard/stat-card";
-import { NftaNodeManager } from "@/components/dashboard/nfta-node-manager";
-import { NftbDividendTracking } from "@/components/dashboard/nftb-dividend-tracking";
-import { PredictionNexus } from "@/components/dashboard/prediction-nexus";
-import { TokenomicsDashboard } from "@/components/dashboard/tokenomics-dashboard";
-import { AiInsightPanel } from "@/components/dashboard/ai-insight-panel";
-import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/components/language-provider";
@@ -29,225 +22,257 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { MOCK_USER_DATA } from "@/lib/mock-data";
+
+import { HomePage } from "@/components/pages/home-page";
+import { NodesPage } from "@/components/pages/nodes-page";
+import { SwapPage } from "@/components/pages/swap-page";
+import { EarningsPage } from "@/components/pages/earnings-page";
+import { TeamPage } from "@/components/pages/team-page";
+import { AdminPage } from "@/components/pages/admin-page";
+
+type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [stakeDialogOpen, setStakeDialogOpen] = useState(false);
-  const [stakeAmount, setStakeAmount] = useState("");
-  const [isStaking, setIsStaking] = useState(false);
+  const [activeTab, setActiveTab] = useState<PageTab>("home");
   const { t } = useLanguage();
   const { address, isConnected, isConnecting, connect } = useWeb3();
   const { toast } = useToast();
+
+  // Referral binding state
+  const [referrerBound, setReferrerBound] = useState(false);
+  const [referrerAddress, setReferrerAddress] = useState("");
+  const [isBindingReferrer, setIsBindingReferrer] = useState(false);
+  const [referrerError, setReferrerError] = useState("");
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Check localStorage for existing referrer binding when address changes
+  useEffect(() => {
+    if (address) {
+      const stored = localStorage.getItem(`referrer_${address.toLowerCase()}`);
+      if (stored) {
+        setReferrerBound(true);
+      } else {
+        setReferrerBound(false);
+      }
+    } else {
+      setReferrerBound(false);
+    }
+  }, [address]);
+
   if (!mounted) return null;
 
-  const handleSyncData = () => {
-    setIsSyncing(true);
-    // Simulate fetching data from Ethereum Testnet
+  const displayAddress = address
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : MOCK_USER_DATA.walletAddress;
+
+  // Owner detection — auto-show admin panel for contract owner
+  const isOwner = isConnected && address
+    ? address.toLowerCase() === MOCK_USER_DATA.adminData.ownerAddress.toLowerCase()
+    : false;
+
+  // Referral binding required: connected + not owner + not yet bound
+  const needsReferralBinding = isConnected && !isOwner && !referrerBound;
+
+  const handleBindReferrer = () => {
+    setReferrerError("");
+    const trimmed = referrerAddress.trim();
+
+    // Validate: must be valid Ethereum address
+    if (!trimmed || !/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+      setReferrerError(t('referralInvalidAddress'));
+      return;
+    }
+    // Cannot bind self
+    if (address && trimmed.toLowerCase() === address.toLowerCase()) {
+      setReferrerError(t('referralCannotSelf'));
+      return;
+    }
+
+    setIsBindingReferrer(true);
+    // Simulate on-chain binding
     setTimeout(() => {
-      setIsSyncing(false);
+      setIsBindingReferrer(false);
+      localStorage.setItem(`referrer_${address!.toLowerCase()}`, trimmed.toLowerCase());
+      setReferrerBound(true);
       toast({
-        title: t('syncComplete'),
-        description: t('onChainDataUpdated'),
+        title: t('referralSuccess'),
+        description: t('referralSuccessDesc'),
       });
-    }, 1500);
+    }, 2000);
   };
 
-  const handleStake = () => {
-    const amount = parseFloat(stakeAmount);
-    if (!amount || amount <= 0) return;
-    setIsStaking(true);
-    setTimeout(() => {
-      setIsStaking(false);
-      setStakeDialogOpen(false);
-      setStakeAmount("");
-      toast({
-        title: t('stakeSuccess'),
-        description: t('stakeSuccessDesc').replace('{amount}', amount.toString()),
-      });
-    }, 1500);
-  };
+  const navItems: { key: PageTab; icon: typeof Home; label: string }[] = [
+    { key: "home", icon: Home, label: t("navHome") },
+    { key: "nodes", icon: Cpu, label: t("navNodes") },
+    { key: "swap", icon: ArrowDownUp, label: t("navSwap") },
+    { key: "earnings", icon: TrendingUp, label: t("navEarnings") },
+    { key: "team", icon: Users, label: t("navTeam") },
+    ...(isOwner ? [{ key: "admin" as PageTab, icon: ShieldCheck, label: t("navAdmin") }] : []),
+  ];
 
-  const displayAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : MOCK_USER_DATA.walletAddress;
+  const pageContent: Record<PageTab, React.ReactNode> = {
+    home: <HomePage />,
+    nodes: <NodesPage />,
+    swap: <SwapPage />,
+    earnings: <EarningsPage />,
+    team: <TeamPage />,
+    admin: <AdminPage />,
+  };
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <SidebarProvider>
-        <div className="flex-1 flex flex-col">
-          {/* Header */}
-          <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-6 backdrop-blur-md">
-            <div className="flex items-center gap-2 mr-4">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground blue-glow">
-                <LayoutDashboard size={18} />
-              </div>
-              <h1 className="text-xl font-headline font-bold text-primary">
-                {t('appName')} <span className="text-accent">{t('appNexus')}</span>
-              </h1>
-            </div>
-            
-            <div className="hidden md:flex flex-1 max-w-md relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder={t('searchPlaceholder')}
-                className="pl-10 bg-muted/30 border-border/50 focus-visible:ring-accent/30"
-              />
-            </div>
-
-            <div className="flex-1" />
-
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleSyncData}
-                disabled={isSyncing}
-                className="hidden lg:flex border-accent/20 text-accent hover:bg-accent/5"
-              >
-                <RefreshCw size={14} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? t('syncing') : t('syncData')}
-              </Button>
-
-              <LanguageSwitcher />
-              <ThemeToggle />
-              
-              {!isConnected ? (
-                <Button 
-                  onClick={connect} 
-                  disabled={isConnecting}
-                  className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-6 font-semibold cyan-glow"
-                >
-                  <LinkIcon size={16} className="mr-2" />
-                  {isConnecting ? t('connecting') : t('connectWallet')}
-                </Button>
-              ) : (
-                <div className="hidden md:flex items-center gap-3 px-3 py-1.5 rounded-full bg-muted/30 border border-accent/20">
-                  <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-                  <span className="text-xs font-mono text-accent">{displayAddress}</span>
-                </div>
-              )}
-
-              <Button size="icon" variant="ghost" className="relative">
-                <Bell size={20} />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive border-2 border-background" />
-              </Button>
-              <Button size="icon" variant="outline" className="rounded-full border-border/50">
-                <User size={20} />
-              </Button>
-            </div>
-          </header>
-
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto p-6 md:p-8 space-y-8">
-            {/* Asset Overview */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-headline font-semibold flex items-center gap-2">
-                  <Wallet className="text-accent h-5 w-5" />
-                  {t('assetPerformance')}
-                </h2>
-                <Button size="sm" className="bg-primary text-white" onClick={() => setStakeDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('stakeMore')}
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <StatCard 
-                  title={t('totalTotBalance')}
-                  value={`${MOCK_USER_DATA.balances.tot.toLocaleString()} TOT`} 
-                  icon={Coins}
-                  trend={{ value: "12.4%", positive: true }}
-                />
-                <StatCard 
-                  title={t('totalTofBalance')}
-                  value={`${MOCK_USER_DATA.balances.tof.toLocaleString()} TOF`} 
-                  icon={Database}
-                  trend={{ value: "3.1%", positive: false }}
-                />
-                <StatCard 
-                  title={t('nftPortfolioValue')}
-                  value={`$${(MOCK_USER_DATA.balances.usdt * 12).toLocaleString()}`} 
-                  icon={Layers}
-                  description={t('secondaryMarketValue')}
-                />
-              </div>
-            </section>
-
-            {/* Dashboard Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left Column - Core Management */}
-              <div className="lg:col-span-8 space-y-8">
-                <NftaNodeManager />
-                <TokenomicsDashboard />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   <PredictionNexus />
-                   <NftbDividendTracking />
-                </div>
-              </div>
-
-              {/* Right Column - AI & Intelligence */}
-              <div className="lg:col-span-4 space-y-8">
-                <div className="sticky top-24">
-                  <AiInsightPanel />
-                </div>
-              </div>
-            </div>
-          </main>
-          
-          <footer className="py-6 px-8 border-t border-border/50 text-center">
-            <p className="text-xs text-muted-foreground">
-              {t('footer')}
-            </p>
-          </footer>
-
-          {/* Stake Dialog */}
-          <Dialog open={stakeDialogOpen} onOpenChange={setStakeDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('stakeMore')}</DialogTitle>
-                <DialogDescription>{t('stakeDescription')}</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>{t('stakeAmount')}</Label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={stakeAmount}
-                    onChange={(e) => setStakeAmount(e.target.value)}
-                    min="0"
-                    step="0.01"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t('availableBalance')}: {MOCK_USER_DATA.balances.tot.toLocaleString()} TOT
-                  </p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setStakeDialogOpen(false)}>
-                  {t('cancel')}
-                </Button>
-                <Button onClick={handleStake} disabled={isStaking || !stakeAmount || parseFloat(stakeAmount) <= 0}>
-                  {isStaking ? t('staking') : t('confirmStake')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+    <div className="flex min-h-screen flex-col bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 px-4 md:px-6 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground blue-glow">
+            <LayoutDashboard size={18} />
+          </div>
+          <h1 className="text-lg font-headline font-bold text-primary hidden sm:block">
+            {t("appName")} <span className="text-accent">{t("appNexus")}</span>
+          </h1>
         </div>
-      </SidebarProvider>
+
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-1 ml-6">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                activeTab === item.key
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <item.icon size={16} />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <LanguageSwitcher />
+          <ThemeToggle />
+
+          {!isConnected ? (
+            <Button
+              onClick={connect}
+              disabled={isConnecting}
+              size="sm"
+              className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-4 font-semibold cyan-glow text-xs"
+            >
+              <LinkIcon size={14} className="mr-1.5" />
+              {isConnecting ? t("connecting") : t("connectWallet")}
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/30 border border-accent/20">
+              <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-xs font-mono text-accent">{displayAddress}</span>
+            </div>
+          )}
+
+          <Button size="icon" variant="ghost" className="relative h-8 w-8">
+            <Bell size={18} />
+            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-background" />
+          </Button>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        {needsReferralBinding ? (
+          /* ===== Referral Binding Overlay ===== */
+          <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+            <div className="w-full max-w-md mx-auto">
+              <div className="rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl p-8 shadow-xl space-y-6">
+                {/* Icon & Title */}
+                <div className="text-center space-y-3">
+                  <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <UserPlus className="h-8 w-8 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-headline font-bold">{t('referralBindingTitle')}</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{t('referralBindingDesc')}</p>
+                </div>
+
+                {/* Your Address */}
+                <div className="rounded-lg bg-muted/30 border border-border/30 p-3">
+                  <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1">{t('connectWallet')}</p>
+                  <p className="font-mono text-xs text-accent">{displayAddress}</p>
+                </div>
+
+                {/* Referrer Input */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">{t('referralAddressLabel')}</label>
+                  <Input
+                    value={referrerAddress}
+                    onChange={(e) => { setReferrerAddress(e.target.value); setReferrerError(""); }}
+                    placeholder={t('referralAddressPlaceholder')}
+                    className="font-mono text-sm"
+                  />
+                  {referrerError && (
+                    <p className="text-xs text-destructive">{referrerError}</p>
+                  )}
+                </div>
+
+                {/* Confirm Button */}
+                <Button
+                  onClick={handleBindReferrer}
+                  disabled={isBindingReferrer || !referrerAddress.trim()}
+                  className="w-full bg-primary hover:bg-primary/90 h-11 font-semibold"
+                >
+                  {isBindingReferrer ? (
+                    <>{t('referralBinding')}</>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} className="mr-2" />
+                      {t('referralConfirmBind')}
+                    </>
+                  )}
+                </Button>
+
+                {/* Skip link */}
+                <p className="text-center text-xs text-muted-foreground">
+                  {t('referralSkip')}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          pageContent[activeTab]
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="hidden md:block py-4 px-6 border-t border-border/50 text-center">
+        <p className="text-xs text-muted-foreground">{t("footer")}</p>
+      </footer>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border/50 bg-background/95 backdrop-blur-md">
+        <div className="flex items-center justify-around h-16 px-2">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setActiveTab(item.key)}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0 ${
+                activeTab === item.key
+                  ? "text-primary"
+                  : "text-muted-foreground"
+              }`}
+            >
+              <item.icon size={20} />
+              <span className="text-[10px] font-medium truncate">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
