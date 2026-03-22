@@ -26,12 +26,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [stakeDialogOpen, setStakeDialogOpen] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState("");
+  const [isStaking, setIsStaking] = useState(false);
   const { t } = useLanguage();
   const { address, isConnected, isConnecting, connect } = useWeb3();
   const { toast } = useToast();
@@ -50,6 +63,21 @@ export default function DashboardPage() {
       toast({
         title: t('syncComplete'),
         description: t('onChainDataUpdated'),
+      });
+    }, 1500);
+  };
+
+  const handleStake = () => {
+    const amount = parseFloat(stakeAmount);
+    if (!amount || amount <= 0) return;
+    setIsStaking(true);
+    setTimeout(() => {
+      setIsStaking(false);
+      setStakeDialogOpen(false);
+      setStakeAmount("");
+      toast({
+        title: t('stakeSuccess'),
+        description: t('stakeSuccessDesc').replace('{amount}', amount.toString()),
       });
     }, 1500);
   };
@@ -94,6 +122,7 @@ export default function DashboardPage() {
               </Button>
 
               <LanguageSwitcher />
+              <ThemeToggle />
               
               {!isConnected ? (
                 <Button 
@@ -130,7 +159,7 @@ export default function DashboardPage() {
                   <Wallet className="text-accent h-5 w-5" />
                   {t('assetPerformance')}
                 </h2>
-                <Button size="sm" className="bg-primary text-white">
+                <Button size="sm" className="bg-primary text-white" onClick={() => setStakeDialogOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   {t('stakeMore')}
                 </Button>
@@ -183,6 +212,40 @@ export default function DashboardPage() {
               {t('footer')}
             </p>
           </footer>
+
+          {/* Stake Dialog */}
+          <Dialog open={stakeDialogOpen} onOpenChange={setStakeDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{t('stakeMore')}</DialogTitle>
+                <DialogDescription>{t('stakeDescription')}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>{t('stakeAmount')}</Label>
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    min="0"
+                    step="0.01"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {t('availableBalance')}: {MOCK_USER_DATA.balances.tot.toLocaleString()} TOT
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStakeDialogOpen(false)}>
+                  {t('cancel')}
+                </Button>
+                <Button onClick={handleStake} disabled={isStaking || !stakeAmount || parseFloat(stakeAmount) <= 0}>
+                  {isStaking ? t('staking') : t('confirmStake')}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </SidebarProvider>
     </div>

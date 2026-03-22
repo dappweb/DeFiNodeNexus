@@ -4,6 +4,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 
+declare global {
+  interface Window {
+    ethereum?: {
+      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      on: (event: string, handler: (...args: unknown[]) => void) => void;
+      removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
+  }
+}
+
 interface Web3ContextType {
   address: string | null;
   isConnected: boolean;
@@ -16,6 +26,33 @@ interface Web3ContextType {
 }
 
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
+
+const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111
+
+async function switchToSepolia() {
+  if (!window.ethereum) return;
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: SEPOLIA_CHAIN_ID }],
+    });
+  } catch (error) {
+    const switchError = error as { code?: number };
+    // Chain not added — add it
+    if (switchError.code === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: SEPOLIA_CHAIN_ID,
+          chainName: 'Ethereum Sepolia',
+          nativeCurrency: { name: 'SepoliaETH', symbol: 'ETH', decimals: 18 },
+          rpcUrls: ['https://rpc.sepolia.org'],
+          blockExplorerUrls: ['https://sepolia.etherscan.io'],
+        }],
+      });
+    }
+  }
+}
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
@@ -41,6 +78,9 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
     setIsConnecting(true);
     try {
+      // Switch to Sepolia before connecting
+      await switchToSepolia();
+
       const browserProvider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await browserProvider.send("eth_requestAccounts", []);
       const network = await browserProvider.getNetwork();
@@ -53,7 +93,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       setChainId(Number(network.chainId));
 
       // Listen for changes
-      window.ethereum.on('accountsChanged', (newAccounts: string[]) => {
+      window.ethereum.on('accountsChanged', (...args: unknown[]) => {
+        const newAccounts = args[0] as string[];
         if (newAccounts.length === 0) disconnect();
         else setAddress(newAccounts[0]);
       });
@@ -72,7 +113,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Optional: Auto-connect if already authorized
     if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
+      window.ethereum.request({ method: 'eth_accounts' }).then((result: unknown) => {
+        const accounts = result as string[];
         if (accounts.length > 0) connect();
       });
     }

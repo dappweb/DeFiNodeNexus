@@ -32,7 +32,7 @@ export function NftbDividendTracking() {
                 </div>
               </div>
               
-              <div className="rounded-lg border border-border/30 bg-black/20 overflow-hidden">
+              <div className="rounded-lg border border-border/30 bg-muted/20 overflow-hidden">
                 <ScrollArea className="h-32">
                   <Table>
                     <TableHeader className="bg-muted/50">

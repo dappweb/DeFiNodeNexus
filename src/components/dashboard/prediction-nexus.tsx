@@ -25,12 +25,12 @@ export function PredictionNexus() {
       <CardContent>
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-border/50 bg-black/20 flex flex-col items-center justify-center text-center space-y-1">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/30 flex flex-col items-center justify-center text-center space-y-1">
               <Trophy className="h-6 w-6 text-accent mb-1" />
               <span className="text-2xl font-bold font-headline">$2.4M</span>
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{t('totalVolume')}</span>
             </div>
-            <div className="p-4 rounded-xl border border-border/50 bg-black/20 flex flex-col items-center justify-center text-center space-y-1">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/30 flex flex-col items-center justify-center text-center space-y-1">
               <Target className="h-6 w-6 text-primary mb-1" />
               <span className="text-2xl font-bold font-headline">84%</span>
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest">{t('globalWinRate')}</span>
