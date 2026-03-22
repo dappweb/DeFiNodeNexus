@@ -38,3 +38,7 @@ next-env.d.ts
 # cloudflare
 .wrangler
 .dev.vars
+
+# hardhat
+artifacts/
+cache/
