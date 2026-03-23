@@ -52,6 +52,29 @@ type NodeBItem = {
   pending: bigint;
 };
 
+const NFTA_TIER_NAME_MAP: Record<number, string> = {
+  1: "初级 · 创世荣耀",
+  2: "高级 · 创世王者",
+};
+
+const NFTB_TIER_NAME_MAP: Record<number, string> = {
+  1: "初级 · 普通权杖",
+  2: "中级 · 稀有王冠",
+  3: "高级 · 传说神座",
+};
+
+const toTierId = (id: number | bigint) => Number(id);
+
+const getNftaTierName = (id: number | bigint) => {
+  const tierId = toTierId(id);
+  return NFTA_TIER_NAME_MAP[tierId] || `NFTA Tier #${tierId}`;
+};
+
+const getNftbTierName = (id: number | bigint) => {
+  const tierId = toTierId(id);
+  return NFTB_TIER_NAME_MAP[tierId] || `NFTB Tier #${tierId}`;
+};
+
 export function NodesPage() {
   const { address, isConnected } = useWeb3();
   const { toast } = useToast();
@@ -69,6 +92,7 @@ export function NodesPage() {
   const [nftbPayToken, setNftbPayToken] = useState<"USDT" | "TOF">("USDT");
   const [referrer, setReferrer] = useState(ethers.ZeroAddress);
   const zeroValue = ethers.parseUnits("0", 0);
+  const MAX_TIER_SCAN = 20;
 
   const refreshData = useCallback(async () => {
     if (!nexus) return;
@@ -76,9 +100,26 @@ export function NodesPage() {
     const nextNftaTierId = Number(await nexus.nextNftaTierId());
     const nextNftbTierId = Number(await nexus.nextNftbTierId());
 
-    const nftaTierCalls = Array.from({ length: Math.max(0, nextNftaTierId - 1) }, (_, i) => i + 1).map(async (id) => {
+    const nftaCandidateIds = Array.from(
+      new Set([
+        ...Array.from({ length: Math.max(0, nextNftaTierId - 1) }, (_, i) => i + 1),
+        ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
+      ])
+    );
+
+    const nftbCandidateIds = Array.from(
+      new Set([
+        ...Array.from({ length: Math.max(0, nextNftbTierId - 1) }, (_, i) => i + 1),
+        ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
+      ])
+    );
+
+    const nftaTierCalls = nftaCandidateIds.map(async (id) => {
       const tier = await nexus.nftaTiers(id);
       const remaining = await nexus.getNftaTierRemaining(id);
+      if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.currentSupply === 0n) {
+        return null;
+      }
       return {
         id,
         price: tier.price,
@@ -90,9 +131,12 @@ export function NodesPage() {
       } as NftaTier;
     });
 
-    const nftbTierCalls = Array.from({ length: Math.max(0, nextNftbTierId - 1) }, (_, i) => i + 1).map(async (id) => {
+    const nftbTierCalls = nftbCandidateIds.map(async (id) => {
       const tier = await nexus.nftbTiers(id);
       const remaining = await nexus.getNftbTierRemaining(id);
+      if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.usdtMinted === 0n && tier.tofMinted === 0n) {
+        return null;
+      }
       return {
         id,
         price: tier.price,
@@ -112,8 +156,8 @@ export function NodesPage() {
       Promise.all(nftbTierCalls),
     ]);
 
-    setNftaTiers(nftaTierList);
-    setNftbTiers(nftbTierList);
+    setNftaTiers(nftaTierList.filter((tier): tier is NftaTier => tier !== null));
+    setNftbTiers(nftbTierList.filter((tier): tier is NftbTier => tier !== null));
 
     if (!address) {
       setNftaNodes([]);
@@ -311,6 +355,29 @@ export function NodesPage() {
     return remaining > 0n;
   }, [selectedNftbTierData, nftbPayToken]);
 
+  const nftaDisabledReason = useMemo(() => {
+    if (loading) return "交易处理中，请稍候";
+    if (!isConnected) return "请先连接钱包";
+    if (selectedNftaTier === null) return "请先选择 NFTA 档位";
+    if (!selectedNftaTierData?.isActive) return "该档位未激活";
+    if ((selectedNftaTierData?.remaining ?? 0n) <= 0n) return "该档位已售罄";
+    return "";
+  }, [loading, isConnected, selectedNftaTier, selectedNftaTierData]);
+
+  const nftbDisabledReason = useMemo(() => {
+    if (loading) return "交易处理中，请稍候";
+    if (!isConnected) return "请先连接钱包";
+    if (selectedNftbTier === null) return "请先选择 NFTB 档位";
+    if (!selectedNftbTierData?.isActive) return "该档位未激活";
+    const remaining = nftbPayToken === "USDT"
+      ? (selectedNftbTierData?.usdtRemaining ?? 0n)
+      : (selectedNftbTierData?.tofRemaining ?? 0n);
+    if (remaining <= 0n) return `${nftbPayToken} 配额已售罄`;
+    return "";
+  }, [loading, isConnected, selectedNftbTier, selectedNftbTierData, nftbPayToken]);
+
+  const showEmptyActionHint = totalNftaPending === 0n && totalNftbPending === 0n && nftaNodes.length === 0 && nftbNodes.length === 0;
+
   return (
     <div className="space-y-6 overflow-hidden">
       <Card className="glass-panel">
@@ -323,6 +390,13 @@ export function NodesPage() {
           <div className="text-sm rounded-md border border-border px-3 py-2">NFTA 待领取: {ethers.formatUnits(totalNftaPending, 18)} TOT</div>
           <div className="text-sm rounded-md border border-border px-3 py-2">NFTB 待领取: {ethers.formatUnits(totalNftbPending, 18)} TOT</div>
         </CardContent>
+        {showEmptyActionHint && (
+          <CardContent className="pt-0">
+            <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+              当前暂无可领取收益。建议先选择档位购买 NFTA 或 NFTB 节点，完成后可在“我的节点”中查看并领取收益。
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       <Tabs defaultValue="nfta" className="space-y-6">
@@ -347,7 +421,7 @@ export function NodesPage() {
                     onClick={() => setSelectedNftaTier(tier.id)}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">Tier #{tier.id}</span>
+                      <span className="font-semibold">{getNftaTierName(tier.id)}</span>
                       <Badge variant={tier.isActive ? "default" : "secondary"}>{tier.isActive ? "Active" : "Inactive"}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-2">价格: {ethers.formatUnits(tier.price, 18)} USDT</div>
@@ -356,9 +430,15 @@ export function NodesPage() {
                   </button>
                 ))}
               </div>
+              {nftaTiers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">当前链上未读取到 NFTA 档位，请联系管理员先配置档位。</p>
+              ) : null}
               <Button onClick={buyNfta} disabled={!isConnected || loading || selectedNftaTier === null || !canBuySelectedNfta}>
                 {loading ? "处理中..." : "购买 NFTA"}
               </Button>
+              {!canBuySelectedNfta || !isConnected || loading || selectedNftaTier === null ? (
+                <p className="text-xs text-muted-foreground">{nftaDisabledReason}</p>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -383,7 +463,7 @@ export function NodesPage() {
                     onClick={() => setSelectedNftbTier(tier.id)}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">Tier #{tier.id}</span>
+                      <span className="font-semibold">{getNftbTierName(tier.id)}</span>
                       <Badge variant={tier.isActive ? "default" : "secondary"}>{tier.isActive ? "Active" : "Inactive"}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-2">价格: {ethers.formatUnits(tier.price, 18)} {nftbPayToken}</div>
@@ -393,10 +473,16 @@ export function NodesPage() {
                   </button>
                 ))}
               </div>
+              {nftbTiers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">当前链上未读取到 NFTB 档位，请联系管理员先配置档位。</p>
+              ) : null}
 
               <Button onClick={buyNftb} disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}>
                 {loading ? "处理中..." : `购买 NFTB (${nftbPayToken})`}
               </Button>
+              {!canBuySelectedNftb || !isConnected || loading || selectedNftbTier === null ? (
+                <p className="text-xs text-muted-foreground">{nftbDisabledReason}</p>
+              ) : null}
             </CardContent>
           </Card>
         </TabsContent>
@@ -409,11 +495,11 @@ export function NodesPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {nftaNodes.length === 0 ? (
-                <div className="text-sm text-muted-foreground">暂无 NFTA 节点</div>
+                <div className="text-sm text-muted-foreground">暂无 NFTA 节点，前往上方“购买 NFTA”完成首购后可在此管理。</div>
               ) : (
                 nftaNodes.map((node) => (
                   <div key={node.nodeId.toString()} className="rounded-lg border p-3">
-                    <div className="font-medium">Node #{node.nodeId.toString()} (Tier {node.tierId.toString()})</div>
+                    <div className="font-medium">Node #{node.nodeId.toString()} ({getNftaTierName(node.tierId)})</div>
                     <div className="text-xs text-muted-foreground">日产出: {ethers.formatUnits(node.dailyYield, 18)} TOT</div>
                     <div className="text-xs text-muted-foreground">待领取: {ethers.formatUnits(node.pending, 18)} TOT</div>
                     <div className="text-xs text-muted-foreground">状态: {node.isActive ? "Active" : "Inactive"}</div>
@@ -430,11 +516,11 @@ export function NodesPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               {nftbNodes.length === 0 ? (
-                <div className="text-sm text-muted-foreground">暂无 NFTB 节点</div>
+                <div className="text-sm text-muted-foreground">暂无 NFTB 节点，前往上方“购买 NFTB”选择支付方式后即可创建。</div>
               ) : (
                 nftbNodes.map((node) => (
                   <div key={node.nodeId.toString()} className="rounded-lg border p-3">
-                    <div className="font-medium">Node #{node.nodeId.toString()} (Tier {node.tierId.toString()})</div>
+                    <div className="font-medium">Node #{node.nodeId.toString()} ({getNftbTierName(node.tierId)})</div>
                     <div className="text-xs text-muted-foreground">权重: {node.weight.toString()}</div>
                     <div className="text-xs text-muted-foreground">待领取: {ethers.formatUnits(node.pending, 18)} TOT</div>
                     <div className="text-xs text-muted-foreground">状态: {node.isActive ? "Active" : "Inactive"}</div>

@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<PageTab>("home");
   const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
   const { t } = useLanguage();
-  const { address, isConnected, isConnecting, connect } = useWeb3();
+  const { address, isConnected, isConnecting, connect, chainId } = useWeb3();
   const nexus = useNexusContract();
   const { toast } = useToast();
 
@@ -244,6 +244,33 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+        <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+          <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-3">
+            <div className="flex items-center justify-between md:justify-start md:gap-2">
+              <span className="text-muted-foreground">网络</span>
+              <span className={chainId === 11155111 ? "text-primary font-medium" : "text-destructive font-medium"}>
+                {chainId === 11155111 ? "Sepolia" : "非测试网"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between md:justify-start md:gap-2">
+              <span className="text-muted-foreground">钱包</span>
+              <span className={isConnected ? "text-primary font-medium" : "text-muted-foreground"}>
+                {isConnected ? "已连接" : isConnecting ? "连接中" : "未连接"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between md:justify-start md:gap-2">
+              <span className="text-muted-foreground">推荐绑定</span>
+              <span className={
+                !isConnected || isOwner || referrerBound
+                  ? "text-primary font-medium"
+                  : "text-amber-600 dark:text-amber-400 font-medium"
+              }>
+                {!isConnected ? "待连接钱包" : isOwner || referrerBound ? "已完成" : "待绑定"}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {needsReferralBinding ? (
           /* ===== Referral Binding Overlay ===== */
           <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">

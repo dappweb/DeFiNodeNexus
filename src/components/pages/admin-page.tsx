@@ -262,6 +262,53 @@ export function AdminPage() {
                 setLoading(false);
                 notifyTx(r.success, r.hash, r.error);
               }}>保存 NFTA Tier</Button>
+
+              <div className="rounded-md border border-dashed border-border p-3 space-y-2">
+                <p className="text-sm font-medium">NFTB 档位快速初始化</p>
+                <p className="text-xs text-muted-foreground">
+                  将按固定参数写入：初级·普通权杖（500）、中级·稀有王冠（1000）、高级·传说神座（2000）；
+                  权重 1/2/3、分红 20%/30%/40%、每档 2000 张，状态启用。
+                </p>
+                <Button
+                  variant="secondary"
+                  disabled={!isOwner || !nexus || loading}
+                  onClick={async () => {
+                    if (!nexus) return;
+                    setLoading(true);
+
+                    const presets = [
+                      { tierId: 1n, price: "500", weight: 1n, maxSupply: 2000n, dividendBps: 2000n },
+                      { tierId: 2n, price: "1000", weight: 2n, maxSupply: 2000n, dividendBps: 3000n },
+                      { tierId: 3n, price: "2000", weight: 3n, maxSupply: 2000n, dividendBps: 4000n },
+                    ];
+
+                    for (const preset of presets) {
+                      const result = await execTx(
+                        nexus.configureNftbTier(
+                          preset.tierId,
+                          toUnits(preset.price),
+                          preset.weight,
+                          preset.maxSupply,
+                          preset.dividendBps,
+                          true
+                        )
+                      );
+
+                      if (!result.success) {
+                        setLoading(false);
+                        notifyTx(false, undefined, `Tier ${preset.tierId.toString()} 初始化失败: ${result.error || "未知错误"}`);
+                        return;
+                      }
+                    }
+
+                    setLoading(false);
+                    toast({ title: "初始化成功", description: "NFTB 三档已完成配置" });
+                    refreshData();
+                  }}
+                >
+                  一键初始化 NFTB 三档
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

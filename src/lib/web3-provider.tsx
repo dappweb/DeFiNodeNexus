@@ -28,6 +28,7 @@ interface Web3ContextType {
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
 
 const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111
+const SEPOLIA_CHAIN_ID_DECIMAL = 11155111;
 
 async function switchToSepolia() {
   if (!window.ethereum) return;
@@ -70,6 +71,32 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     setChainId(null);
   }, []);
 
+  const ensureSepolia = useCallback(async () => {
+    if (!window.ethereum) return;
+    const browserProvider = new ethers.BrowserProvider(window.ethereum);
+    const network = await browserProvider.getNetwork();
+    if (Number(network.chainId) !== SEPOLIA_CHAIN_ID_DECIMAL) {
+      await switchToSepolia();
+    }
+  }, []);
+
+  const hydrateConnection = useCallback(async (accounts: string[]) => {
+    if (!window.ethereum || accounts.length === 0) {
+      disconnect();
+      return;
+    }
+
+    const browserProvider = new ethers.BrowserProvider(window.ethereum);
+    const network = await browserProvider.getNetwork();
+    const browserSigner = await browserProvider.getSigner();
+
+    setAddress(accounts[0]);
+    setProvider(browserProvider);
+    setSigner(browserSigner);
+    setIsConnected(true);
+    setChainId(Number(network.chainId));
+  }, [disconnect]);
+
   const connect = useCallback(async () => {
     if (typeof window === 'undefined' || !window.ethereum) {
       alert('Please install MetaMask');
@@ -79,46 +106,83 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     setIsConnecting(true);
     try {
       // Switch to Sepolia before connecting
-      await switchToSepolia();
+      await ensureSepolia();
 
-      const browserProvider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await browserProvider.send("eth_requestAccounts", []);
-      const network = await browserProvider.getNetwork();
-      const browserSigner = await browserProvider.getSigner();
-
-      setAddress(accounts[0]);
-      setProvider(browserProvider);
-      setSigner(browserSigner);
-      setIsConnected(true);
-      setChainId(Number(network.chainId));
-
-      // Listen for changes
-      window.ethereum.on('accountsChanged', (...args: unknown[]) => {
-        const newAccounts = args[0] as string[];
-        if (newAccounts.length === 0) disconnect();
-        else setAddress(newAccounts[0]);
-      });
-
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload();
-      });
+      const result = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = result as string[];
+      await hydrateConnection(accounts);
 
     } catch (error) {
       console.error("Connection failed", error);
+      const walletError = error as { code?: number; message?: string };
+      if (walletError.code === 4001) {
+        alert('Connection request was rejected in wallet');
+      } else if (walletError.code === -32002) {
+        alert('Wallet request is already pending. Please open MetaMask and complete it.');
+      }
     } finally {
       setIsConnecting(false);
     }
-  }, [disconnect]);
+  }, [ensureSepolia, hydrateConnection]);
 
   useEffect(() => {
-    // Optional: Auto-connect if already authorized
-    if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum.request({ method: 'eth_accounts' }).then((result: unknown) => {
+    if (typeof window === 'undefined' || !window.ethereum) return;
+
+    const handleAccountsChanged = async (...args: unknown[]) => {
+      const newAccounts = args[0] as string[];
+      if (newAccounts.length === 0) {
+        disconnect();
+        return;
+      }
+      try {
+        await ensureSepolia();
+        await hydrateConnection(newAccounts);
+      } catch (error) {
+        console.error('Failed to refresh account state', error);
+        disconnect();
+      }
+    };
+
+    const handleChainChanged = async () => {
+      try {
+        await ensureSepolia();
+        const result = await window.ethereum?.request({ method: 'eth_accounts' });
+        const accounts = (result as string[] | undefined) ?? [];
+        if (accounts.length === 0) {
+          disconnect();
+          return;
+        }
+        await hydrateConnection(accounts);
+      } catch (error) {
+        console.error('Failed to refresh chain state', error);
+      }
+    };
+
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('chainChanged', handleChainChanged);
+
+    return () => {
+      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
+      window.ethereum?.removeListener('chainChanged', handleChainChanged);
+    };
+  }, [disconnect, ensureSepolia, hydrateConnection]);
+
+  useEffect(() => {
+    // Optional: Silent reconnect if already authorized
+    if (typeof window === 'undefined' || !window.ethereum) return;
+
+    window.ethereum.request({ method: 'eth_accounts' })
+      .then(async (result: unknown) => {
         const accounts = result as string[];
-        if (accounts.length > 0) connect();
+        if (accounts.length > 0) {
+          await ensureSepolia();
+          await hydrateConnection(accounts);
+        }
+      })
+      .catch((error) => {
+        console.error('Silent reconnect failed', error);
       });
-    }
-  }, [connect]);
+  }, [ensureSepolia, hydrateConnection]);
 
   return (
     <Web3Context.Provider value={{ address, isConnected, isConnecting, provider, signer, connect, disconnect, chainId }}>
