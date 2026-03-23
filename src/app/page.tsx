@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import {
   User,
-  Bell,
   Link as LinkIcon,
   Home,
   Cpu,
@@ -238,10 +237,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <Button size="icon" variant="ghost" className="relative h-8 w-8">
-            <Bell size={18} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive border-2 border-background" />
-          </Button>
         </div>
       </header>
 
