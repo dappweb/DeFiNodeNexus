@@ -188,6 +188,13 @@ export function EarningsPage() {
     Withdraw: "bg-orange-500/15 text-orange-500 border-orange-500/30",
   };
 
+  const typeLabels: Record<EarningRecord["type"], string> = {
+    "NFTA Yield": "NFT-A 收益",
+    "NFTB Dividend": "NFT-B 分红",
+    "Team Bonus": "团队奖励",
+    Withdraw: "提现",
+  };
+
   return (
     <div className="space-y-6 overflow-hidden">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -262,8 +269,8 @@ export function EarningsPage() {
             <Tabs value={filter} onValueChange={setFilter}>
               <TabsList className="h-8">
               <TabsTrigger value="all" className="text-xs px-2 sm:px-3 h-7">{t("allTypes")}</TabsTrigger>
-              <TabsTrigger value="nfta" className="text-xs px-2 sm:px-3 h-7">NFTA</TabsTrigger>
-              <TabsTrigger value="nftb" className="text-xs px-2 sm:px-3 h-7">NFTB</TabsTrigger>
+              <TabsTrigger value="nfta" className="text-xs px-2 sm:px-3 h-7">NFT-A</TabsTrigger>
+              <TabsTrigger value="nftb" className="text-xs px-2 sm:px-3 h-7">NFT-B</TabsTrigger>
               <TabsTrigger value="team" className="text-xs px-2 sm:px-3 h-7">{t("teamBonus")}</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -276,7 +283,7 @@ export function EarningsPage() {
             filtered.map((item) => (
               <div key={item.key} className="rounded-lg border border-border/50 p-4 flex items-center justify-between gap-3">
                 <div>
-                  <Badge className={typeColors[item.type]}>{item.type}</Badge>
+                  <Badge className={typeColors[item.type]}>{typeLabels[item.type]}</Badge>
                   <p className="text-xs text-muted-foreground mt-2">Block #{item.block}</p>
                   <p className="text-xs text-muted-foreground">时间: {item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : "-"}</p>
                   <p className="text-xs text-muted-foreground">Tx: {item.txHash.slice(0, 10)}...{item.txHash.slice(-6)}</p>
