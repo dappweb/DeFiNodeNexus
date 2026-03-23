@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, UserPlus, Trophy, Coins, Copy, Link2, Star, ShieldCheck } from "lucide-react";
+import { Users, UserPlus, Coins, Copy, Link2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useToast } from "@/hooks/use-toast";
 import { useNexusContract } from "@/hooks/use-contract";
@@ -14,7 +13,6 @@ import { useWeb3 } from "@/lib/web3-provider";
 
 type TeamMember = {
   address: string;
-  level: number;
   totalNodes: bigint;
   pendingTot: bigint;
 };
@@ -25,44 +23,86 @@ export function TeamPage() {
   const { address, provider } = useWeb3();
   const nexus = useNexusContract();
 
-  const [level, setLevel] = useState(0);
   const [directReferrals, setDirectReferrals] = useState<bigint>(BigInt(0));
-  const [teamCommissionEarned, setTeamCommissionEarned] = useState<bigint>(BigInt(0));
+  const [teamMemberCount, setTeamMemberCount] = useState(0);
+  const [directDepositTotal, setDirectDepositTotal] = useState<bigint>(BigInt(0));
+  const [teamDepositTotal, setTeamDepositTotal] = useState<bigint>(BigInt(0));
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [inviteUrl, setInviteUrl] = useState("");
 
   const refreshData = useCallback(async () => {
     if (!nexus || !address) return;
 
-    const [account, lv] = await Promise.all([
-      nexus.accounts(address),
-      nexus.getUserLevel(address),
-    ]);
-
-    setLevel(Number(lv));
+    const account = await nexus.accounts(address);
     setDirectReferrals(account.directReferrals);
-    setTeamCommissionEarned(account.teamCommissionEarned);
 
     if (!provider) {
       setMembers([]);
+      setTeamMemberCount(0);
+      setDirectDepositTotal(0n);
+      setTeamDepositTotal(0n);
       return;
     }
 
+    const userLower = address.toLowerCase();
     const latestBlock = await provider.getBlockNumber();
-    const fromBlock = Math.max(0, latestBlock - 120_000);
+    const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null), 0, latestBlock);
 
-    const events = await nexus.queryFilter(nexus.filters.ReferrerBound(null, address), fromBlock, latestBlock);
-    const directAddresses = Array.from(new Set(events.map((ev: any) => String(ev.args.user).toLowerCase())));
+    const childrenByReferrer = new Map<string, Set<string>>();
+    for (const ev of allBindEvents as any[]) {
+      const user = String(ev.args.user).toLowerCase();
+      const referrer = String(ev.args.referrer).toLowerCase();
+      if (!childrenByReferrer.has(referrer)) {
+        childrenByReferrer.set(referrer, new Set<string>());
+      }
+      childrenByReferrer.get(referrer)!.add(user);
+    }
+
+    const directSet = childrenByReferrer.get(userLower) ?? new Set<string>();
+    const directAddresses = Array.from(directSet);
+
+    const downlineSet = new Set<string>();
+    const queue = [...directAddresses];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (downlineSet.has(current)) continue;
+      downlineSet.add(current);
+      const children = childrenByReferrer.get(current);
+      if (!children) continue;
+      for (const child of children) {
+        if (!downlineSet.has(child)) queue.push(child);
+      }
+    }
+    setTeamMemberCount(downlineSet.size);
+
+    const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
+      nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null), 0, latestBlock),
+      nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null), 0, latestBlock),
+    ]);
+
+    let nextDirectDeposit = 0n;
+    let nextTeamDeposit = 0n;
+    const handlePurchase = (ev: any) => {
+      const buyer = String(ev.args.user).toLowerCase();
+      const price = BigInt(ev.args.price);
+      if (directSet.has(buyer)) {
+        nextDirectDeposit += price;
+      }
+      if (downlineSet.has(buyer)) {
+        nextTeamDeposit += price;
+      }
+    };
+    for (const ev of nftaPurchaseEvents as any[]) handlePurchase(ev);
+    for (const ev of nftbPurchaseEvents as any[]) handlePurchase(ev);
+
+    setDirectDepositTotal(nextDirectDeposit);
+    setTeamDepositTotal(nextTeamDeposit);
 
     const memberCalls = directAddresses.map(async (memberAddr) => {
-      const [memberAccount, memberLevel] = await Promise.all([
-        nexus.accounts(memberAddr),
-        nexus.getUserLevel(memberAddr),
-      ]);
+      const memberAccount = await nexus.accounts(memberAddr);
 
       return {
         address: memberAddr,
-        level: Number(memberLevel),
         totalNodes: memberAccount.totalNodes,
         pendingTot: memberAccount.pendingTot,
       } as TeamMember;
@@ -87,85 +127,30 @@ export function TeamPage() {
     toast({ title: t("linkCopied") });
   };
 
-  const totalMembers = useMemo(() => members.length, [members]);
-  const levelRules = useMemo(
-    () => [
-      { layer: 1, minReferrals: 3n },
-      { layer: 2, minReferrals: 8n },
-      { layer: 3, minReferrals: 15n },
-      { layer: 4, minReferrals: 30n },
-      { layer: 5, minReferrals: 50n },
-    ],
-    []
-  );
-
-  const predictedLayer = useMemo(() => {
-    let current = 0;
-    for (const rule of levelRules) {
-      if (directReferrals >= rule.minReferrals) {
-        current = rule.layer;
-      }
-    }
-    return current;
-  }, [directReferrals, levelRules]);
-
-  const nextRule = useMemo(
-    () => levelRules.find((rule) => rule.layer === predictedLayer + 1),
-    [levelRules, predictedLayer]
-  );
-
-  const referralsToNext = useMemo(
-    () => (nextRule ? nextRule.minReferrals - directReferrals : 0n),
-    [nextRule, directReferrals]
-  );
-
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="glass-panel p-4 text-center">
           <Users className="h-6 w-6 text-primary mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">Direct Members</p>
-          <p className="text-2xl font-bold font-headline">{totalMembers}</p>
-        </Card>
-        <Card className="glass-panel p-4 text-center">
-          <UserPlus className="h-6 w-6 text-accent mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">{t("directReferrals")}</p>
+          <p className="text-[10px] text-muted-foreground">直推人数</p>
           <p className="text-2xl font-bold font-headline">{directReferrals.toString()}</p>
         </Card>
         <Card className="glass-panel p-4 text-center">
-          <Star className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">团队层级</p>
-          <p className="text-2xl font-bold font-headline">第 {level} 层</p>
+          <UserPlus className="h-6 w-6 text-accent mx-auto mb-2" />
+          <p className="text-[10px] text-muted-foreground">网体团队人数</p>
+          <p className="text-2xl font-bold font-headline">{teamMemberCount}</p>
+        </Card>
+        <Card className="glass-panel p-4 text-center">
+          <Coins className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
+          <p className="text-[10px] text-muted-foreground">直推入金总额 (USDT)</p>
+          <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(directDepositTotal, 18)).toLocaleString()}</p>
         </Card>
         <Card className="glass-panel p-4 text-center col-span-2 md:col-span-1">
-          <Trophy className="h-6 w-6 text-purple-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">Team Commission (USDT)</p>
-          <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(teamCommissionEarned, 18)).toLocaleString()}</p>
+          <Coins className="h-6 w-6 text-purple-500 mx-auto mb-2" />
+          <p className="text-[10px] text-muted-foreground">网体团队入金总额 (USDT)</p>
+          <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(teamDepositTotal, 18)).toLocaleString()}</p>
         </Card>
       </div>
-
-      <Card className="glass-panel">
-        <CardHeader className="flex flex-row items-center gap-2 pb-3">
-          <ShieldCheck className="text-yellow-500" />
-          <CardTitle className="text-base">层级规则（链上）</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-1">
-            <div>预测层级：第 {predictedLayer} 层</div>
-            <div className="text-muted-foreground text-xs">
-              {nextRule
-                ? `距离第${nextRule.layer}层还差 ${referralsToNext.toString()} 个直推`
-                : "已达到当前规则最高层级"}
-            </div>
-            <div className="text-muted-foreground text-xs">链上当前层级：第 {level} 层</div>
-          </div>
-          <div>第1层：直推≥3</div>
-          <div>第2层：直推≥8</div>
-          <div>第3层：直推≥15</div>
-          <div>第4层：直推≥30</div>
-          <div>第5层：直推≥50</div>
-        </CardContent>
-      </Card>
 
       <Card className="glass-panel border-primary/20">
         <CardContent className="p-5">
@@ -191,7 +176,7 @@ export function TeamPage() {
       <Card className="glass-panel overflow-hidden">
         <CardHeader className="flex flex-row items-center gap-2">
           <Users className="text-primary" />
-          <CardTitle>Direct Referrals</CardTitle>
+          <CardTitle>直推成员</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {members.length === 0 ? (
@@ -201,7 +186,7 @@ export function TeamPage() {
               <div key={member.address} className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted-foreground">{member.address}</span>
-                  <Badge variant="outline" className="text-xs">第{member.level}层</Badge>
+                  <span className="text-xs text-muted-foreground">直推成员</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
