@@ -5,7 +5,7 @@ import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Info } from "lucide-react";
+import { ArrowDownUp, Info, TrendingUp, Clock, ShieldAlert } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,15 @@ export function SwapPage() {
   const [buyFeeBps, setBuyFeeBps] = useState("100");
   const [sellFeeBps, setSellFeeBps] = useState("500");
 
+  // Live pool & user info
+  const [currentPrice, setCurrentPrice] = useState("0");
+  const [avgPrice, setAvgPrice] = useState("0");
+  const [dailyBought, setDailyBought] = useState("0");
+  const [maxDailyBuy, setMaxDailyBuy] = useState("0");
+  const [maxSellAmount, setMaxSellAmount] = useState("0");
+  const [profitTaxBps, setProfitTaxBps] = useState("0");
+  const [deflationCountdown, setDeflationCountdown] = useState(0);
+
   const fromToken = side === "BUY" ? "USDT" : "TOT";
   const toToken = side === "BUY" ? "TOT" : "USDT";
 
@@ -50,21 +59,37 @@ export function SwapPage() {
   const refreshBalances = useCallback(async () => {
     if (!address || !tot || !usdt || !swap) return;
 
-    const [totDec, usdtDec, totBal, usdtBal, buyFee, sellFee] = await Promise.all([
+    const [totDec, usdtDec, totBal, usdtBal, buyFee, sellFee, price, avgP, dailyB, maxDB, maxSell, pTax, deflTime] = await Promise.all([
       tot.decimals(),
       usdt.decimals(),
       tot.balanceOf(address),
       usdt.balanceOf(address),
       swap.buyFeeBps(),
       swap.sellFeeBps(),
+      swap.getCurrentPrice(),
+      swap.getUserAvgPrice(address),
+      swap.getDailyBoughtAmount(address),
+      swap.maxDailyBuy(),
+      swap.getMaxSellAmount(address),
+      swap.profitTaxBps(),
+      swap.timeUntilNextDeflation(),
     ]);
 
-    setTotDecimals(Number(totDec));
-    setUsdtDecimals(Number(usdtDec));
-    setTotBalance(ethers.formatUnits(totBal, Number(totDec)));
-    setUsdtBalance(ethers.formatUnits(usdtBal, Number(usdtDec)));
+    const td = Number(totDec);
+    const ud = Number(usdtDec);
+    setTotDecimals(td);
+    setUsdtDecimals(ud);
+    setTotBalance(ethers.formatUnits(totBal, td));
+    setUsdtBalance(ethers.formatUnits(usdtBal, ud));
     setBuyFeeBps(buyFee.toString());
     setSellFeeBps(sellFee.toString());
+    setCurrentPrice(ethers.formatUnits(price, 18));
+    setAvgPrice(ethers.formatUnits(avgP, 18));
+    setDailyBought(ethers.formatUnits(dailyB, td));
+    setMaxDailyBuy(ethers.formatUnits(maxDB, td));
+    setMaxSellAmount(ethers.formatUnits(maxSell, td));
+    setProfitTaxBps(pTax.toString());
+    setDeflationCountdown(Number(deflTime));
   }, [address, tot, usdt, swap]);
 
   const refreshQuote = useCallback(async () => {
@@ -171,8 +196,47 @@ export function SwapPage() {
 
   const fromBalance = useMemo(() => (side === "BUY" ? usdtBalance : totBalance), [side, usdtBalance, totBalance]);
 
+  const formatCountdown = (seconds: number) => {
+    if (seconds <= 0) return "可触发";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  };
+
   return (
     <div className="max-w-md mx-auto space-y-6">
+      {/* ── Price & Pool Info Card ── */}
+      <Card className="glass-panel">
+        <CardContent className="pt-5 pb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium">市场信息</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
+              <p className="text-[10px] text-muted-foreground">当前价格</p>
+              <p className="text-sm font-bold">{Number(currentPrice).toFixed(6)} USDT</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
+              <p className="text-[10px] text-muted-foreground">我的均价</p>
+              <p className="text-sm font-bold">{Number(avgPrice) > 0 ? `${Number(avgPrice).toFixed(6)} USDT` : "-"}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
+              <p className="text-[10px] text-muted-foreground">今日已买 / 上限</p>
+              <p className="text-sm font-bold">{Number(dailyBought).toLocaleString()} / {Number(maxDailyBuy).toLocaleString()} TOT</p>
+            </div>
+            <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
+              <p className="text-[10px] text-muted-foreground">单笔最大可卖</p>
+              <p className="text-sm font-bold">{Number(maxSellAmount).toLocaleString()} TOT</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-3 px-1 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1"><Clock size={11} />通缩倒计时: {formatCountdown(deflationCountdown)}</span>
+            <span className="flex items-center gap-1"><ShieldAlert size={11} />利润税: {Number(profitTaxBps) / 100}%</span>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="glass-panel">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">

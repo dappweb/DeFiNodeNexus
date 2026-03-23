@@ -40,18 +40,35 @@ git push -u origin main
 
 在 GitHub Secrets 或 Cloudflare 控制面板中，请务必设置以下变量：
 - `GEMINI_API_KEY`: 你的 Google AI API 密钥。
-- `SUPABASE_URL`: Supabase 项目 URL。
-- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key（仅服务端）。
+- `MYSQL_HOST`: MySQL 主机地址。
+- `MYSQL_PORT`: MySQL 端口。
+- `MYSQL_USER`: MySQL 用户名。
+- `MYSQL_PASSWORD`: MySQL 密码。
+- `MYSQL_DATABASE`: MySQL 数据库名。
 - `ANNOUNCEMENT_ADMIN_TOKEN`: 可选，后台发布公告令牌。
+- `ANNOUNCEMENT_DATA_SERVICE_URL`: 公告 HTTP 数据服务地址（Edge 运行时推荐）。
+- `ANNOUNCEMENT_DATA_SERVICE_TOKEN`: 公告 HTTP 数据服务访问令牌（可选）。
 
-## Supabase 公告功能初始化
+## MySQL 公告功能初始化
 
-1. 在 Supabase SQL Editor 执行 [docs/supabase-announcements.sql](docs/supabase-announcements.sql)。
-2. 在 `.env.local` 填写 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY`。
+1. 在 MySQL 执行公告建表 SQL（可参考 [docs/supabase-announcements.sql](docs/supabase-announcements.sql) 并按 MySQL 语法调整）。
+2. 在 `.env.local` 填写 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_DATABASE`。
 3. （可选）设置 `ANNOUNCEMENT_ADMIN_TOKEN`，并在 Admin 页发布公告时填写同一个令牌。
 4. 启动项目后：
 	- 首页通过 `/api/announcements` 拉取公告。
 	- Admin 页通过 `/api/admin/announcements` 发布公告。
+
+## 通过 HTTP 数据服务层访问数据库
+
+当项目部署在 Cloudflare Pages（Edge Runtime）时，推荐通过 HTTP 数据服务层访问数据库：
+
+1. 提供一个独立 HTTP 服务，至少包含：
+	- `GET /announcements`（返回 `data` 或 `announcements` 数组）
+	- `POST /announcements`（接收 `title/content/type`，返回 `data` 或 `announcement`）
+2. 在 `.env.local` 配置：
+	- `ANNOUNCEMENT_DATA_SERVICE_URL`
+	- `ANNOUNCEMENT_DATA_SERVICE_TOKEN`（可选）
+3. 本项目 API 将自动转发请求到该 HTTP 服务，并保持前端接口不变。
 
 ## 本地开发
 

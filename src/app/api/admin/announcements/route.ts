@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeAnnouncementType } from "@/lib/announcement";
-import { getSupabaseAdminClient } from "@/lib/supabase/server";
+import { createAnnouncementViaService } from "@/lib/announcement-data-service";
 
 export const runtime = "edge";
 
@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = getSupabaseAdminClient();
-  if (!supabase) {
+  const serviceUrl = process.env.ANNOUNCEMENT_DATA_SERVICE_URL;
+  if (!serviceUrl) {
     return NextResponse.json(
-      { message: "Supabase is not configured on server" },
+      { message: "Announcement HTTP data service is not configured on server" },
       { status: 500 }
     );
   }
@@ -45,30 +45,32 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { data, error } = await supabase
-    .from("announcements")
-    .insert({ title, content, type })
-    .select("id,title,content,type,created_at")
-    .single();
+  try {
+    const created = await createAnnouncementViaService({
+      title,
+      content,
+      type,
+    });
 
-  if (error) {
+    if (!created) {
+      return NextResponse.json(
+        { message: "Announcement HTTP data service is not configured on server" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      message: "Announcement created",
+      data: created,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json(
       {
         message: "Failed to create announcement",
-        detail: error.message,
+        detail: message,
       },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    message: "Announcement created",
-    data: {
-      id: data.id,
-      title: data.title,
-      content: data.content,
-      type: normalizeAnnouncementType(data.type),
-      date: (data.created_at || "").slice(0, 10),
-    },
-  });
 }

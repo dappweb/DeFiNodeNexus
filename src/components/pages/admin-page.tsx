@@ -68,6 +68,17 @@ export function AdminPage() {
   const [swapDeflationBps, setSwapDeflationBps] = useState("");
   const [addLpTot, setAddLpTot] = useState("");
   const [addLpUsdt, setAddLpUsdt] = useState("");
+  const [removeLpTot, setRemoveLpTot] = useState("");
+  const [removeLpUsdt, setRemoveLpUsdt] = useState("");
+  const [emergencyToken, setEmergencyToken] = useState("");
+  const [emergencyAmount, setEmergencyAmount] = useState("");
+  const [swapNexusAddr, setSwapNexusAddr] = useState("");
+  const [swapCurrentPrice, setSwapCurrentPrice] = useState("-");
+  const [swapLastDeflation, setSwapLastDeflation] = useState("-");
+  const [swapDeflationCountdown, setSwapDeflationCountdown] = useState("-");
+  const [swapNexusDisplay, setSwapNexusDisplay] = useState("-");
+  const [swapTotToken, setSwapTotToken] = useState("-");
+  const [swapUsdtToken, setSwapUsdtToken] = useState("-");
   const [currentAction, setCurrentAction] = useState("");
   const [operationLogs, setOperationLogs] = useState<OperationLogItem[]>([]);
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
@@ -176,11 +187,6 @@ export function AdminPage() {
   };
 
   const publishAnnouncement = async () => {
-    if (!isOwner) {
-      toast({ title: "无权限", description: "仅 Owner 可发布公告", variant: "destructive" });
-      return;
-    }
-
     const title = announcementTitle.trim();
     const content = announcementContent.trim();
     if (!title || !content) {
@@ -246,7 +252,7 @@ export function AdminPage() {
       setTofClaimFeeBps(claim.toString());
 
       if (swap) {
-        const [totR, usdtR, pool, b, s, p, th, dBuy, mSell, def] = await Promise.all([
+        const [totR, usdtR, pool, b, s, p, th, dBuy, mSell, def, price, lastDefl, deflCD, nexAddr, totTk, usdtTk] = await Promise.all([
           swap.totReserve(),
           swap.usdtReserve(),
           swap.nftbDividendPool(),
@@ -257,6 +263,12 @@ export function AdminPage() {
           swap.maxDailyBuy(),
           swap.maxSellBps(),
           swap.deflationBps(),
+          swap.getCurrentPrice(),
+          swap.lastDeflationTime(),
+          swap.timeUntilNextDeflation(),
+          swap.nexus(),
+          swap.totToken(),
+          swap.usdtToken(),
         ]);
 
         setSwapTotReserve(ethers.formatUnits(totR, 18));
@@ -269,6 +281,14 @@ export function AdminPage() {
         setSwapMaxDailyBuy(ethers.formatUnits(dBuy, 18));
         setSwapMaxSellBps(mSell.toString());
         setSwapDeflationBps(def.toString());
+        setSwapCurrentPrice(ethers.formatUnits(price, 18));
+        const deflDate = new Date(Number(lastDefl) * 1000);
+        setSwapLastDeflation(deflDate.toLocaleString());
+        const cdSec = Number(deflCD);
+        setSwapDeflationCountdown(cdSec <= 0 ? "可触发" : `${Math.floor(cdSec / 3600)}h ${Math.floor((cdSec % 3600) / 60)}m`);
+        setSwapNexusDisplay(nexAddr);
+        setSwapTotToken(totTk);
+        setSwapUsdtToken(usdtTk);
       }
     } catch {
       toast({ title: "读取失败", description: "请确认已连接钱包并配置合约地址", variant: "destructive" });
@@ -339,6 +359,18 @@ export function AdminPage() {
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">TOT Reserve</div><div className="text-lg font-semibold">{Number(swapTotReserve).toLocaleString()}</div></CardContent></Card>
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">USDT Reserve</div><div className="text-lg font-semibold">{Number(swapUsdtReserve).toLocaleString()}</div></CardContent></Card>
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">NFT-B 分红池(TOT)</div><div className="text-lg font-semibold">{Number(swapDividendPool).toLocaleString()}</div></CardContent></Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">当前价格 (USDT/TOT)</div><div className="text-lg font-semibold">{Number(swapCurrentPrice).toFixed(6)}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">上次通缩时间</div><div className="text-sm font-semibold">{swapLastDeflation}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">通缩倒计时</div><div className="text-lg font-semibold">{swapDeflationCountdown}</div></CardContent></Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">关联 Nexus</div><div className="text-xs font-mono break-all">{swapNexusDisplay}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">TOT Token</div><div className="text-xs font-mono break-all">{swapTotToken}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">USDT Token</div><div className="text-xs font-mono break-all">{swapUsdtToken}</div></CardContent></Card>
       </div>
 
       <Tabs defaultValue="nexus" className="space-y-6">
@@ -760,7 +792,7 @@ export function AdminPage() {
 
               <div className="flex flex-wrap gap-3">
                 <Button
-                  disabled={!isOwner || isPublishingAnnouncement}
+                  disabled={isPublishingAnnouncement}
                   onClick={publishAnnouncement}
                 >
                   {isPublishingAnnouncement ? "发布中..." : "发布公告"}
