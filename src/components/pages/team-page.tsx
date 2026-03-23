@@ -129,7 +129,7 @@ export function TeamPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <Card className="glass-panel p-4 text-center">
           <Users className="h-6 w-6 text-primary mx-auto mb-2" />
           <p className="text-[10px] text-muted-foreground">直推人数</p>
@@ -145,7 +145,7 @@ export function TeamPage() {
           <p className="text-[10px] text-muted-foreground">直推入金总额 (USDT)</p>
           <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(directDepositTotal, 18)).toLocaleString()}</p>
         </Card>
-        <Card className="glass-panel p-4 text-center col-span-2 md:col-span-1">
+        <Card className="glass-panel p-4 text-center">
           <Coins className="h-6 w-6 text-purple-500 mx-auto mb-2" />
           <p className="text-[10px] text-muted-foreground">团队入金总额 (USDT)</p>
           <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(teamDepositTotal, 18)).toLocaleString()}</p>
