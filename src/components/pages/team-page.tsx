@@ -88,6 +88,36 @@ export function TeamPage() {
   };
 
   const totalMembers = useMemo(() => members.length, [members]);
+  const levelRules = useMemo(
+    () => [
+      { layer: 1, minReferrals: 3n },
+      { layer: 2, minReferrals: 8n },
+      { layer: 3, minReferrals: 15n },
+      { layer: 4, minReferrals: 30n },
+      { layer: 5, minReferrals: 50n },
+    ],
+    []
+  );
+
+  const predictedLayer = useMemo(() => {
+    let current = 0;
+    for (const rule of levelRules) {
+      if (directReferrals >= rule.minReferrals) {
+        current = rule.layer;
+      }
+    }
+    return current;
+  }, [directReferrals, levelRules]);
+
+  const nextRule = useMemo(
+    () => levelRules.find((rule) => rule.layer === predictedLayer + 1),
+    [levelRules, predictedLayer]
+  );
+
+  const referralsToNext = useMemo(
+    () => (nextRule ? nextRule.minReferrals - directReferrals : 0n),
+    [nextRule, directReferrals]
+  );
 
   return (
     <div className="space-y-6">
@@ -120,6 +150,15 @@ export function TeamPage() {
           <CardTitle className="text-base">层级规则（链上）</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
+          <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-1">
+            <div>预测层级：第 {predictedLayer} 层</div>
+            <div className="text-muted-foreground text-xs">
+              {nextRule
+                ? `距离第${nextRule.layer}层还差 ${referralsToNext.toString()} 个直推`
+                : "已达到当前规则最高层级"}
+            </div>
+            <div className="text-muted-foreground text-xs">链上当前层级：第 {level} 层</div>
+          </div>
           <div>第1层：直推≥3</div>
           <div>第2层：直推≥8</div>
           <div>第3层：直推≥15</div>
@@ -162,7 +201,7 @@ export function TeamPage() {
               <div key={member.address} className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted-foreground">{member.address}</span>
-                  <Badge variant="outline" className="text-xs">Lv.{member.level}</Badge>
+                  <Badge variant="outline" className="text-xs">第{member.level}层</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
