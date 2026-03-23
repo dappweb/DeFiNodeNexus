@@ -28,32 +28,14 @@ export function EarningsPage() {
   const [range, setRange] = useState<"7d" | "30d" | "all">("7d");
   const [pendingTot, setPendingTot] = useState<bigint>(BigInt(0));
   const [claimedTot, setClaimedTot] = useState<bigint>(BigInt(0));
-  const [withdrawnTot, setWithdrawnTot] = useState<bigint>(BigInt(0));
-  const [todayEstimate, setTodayEstimate] = useState<bigint>(BigInt(0));
-  const [userLevel, setUserLevel] = useState(0);
-  const [withdrawFeeBps, setWithdrawFeeBps] = useState<bigint>(BigInt(0));
-  const [tofBurnBps, setTofBurnBps] = useState<bigint>(BigInt(0));
   const [records, setRecords] = useState<EarningRecord[]>([]);
 
   const refreshData = useCallback(async () => {
     if (!nexus || !address) return;
 
-    const [account, levelValue, feeBpsValue, burnBpsValue] = await Promise.all([
-      nexus.accounts(address),
-      nexus.getUserLevel(address),
-      nexus.withdrawFeeBpsByLevel(await nexus.getUserLevel(address)),
-      nexus.tofBurnBps(),
-    ]);
+    const account = await nexus.accounts(address);
     setPendingTot(account.pendingTot);
     setClaimedTot(account.claimedTot);
-    setWithdrawnTot(account.withdrawnTot);
-    setUserLevel(Number(levelValue));
-    setWithdrawFeeBps(feeBpsValue);
-    setTofBurnBps(burnBpsValue);
-
-    const nftaIds = await nexus.getUserNftaNodes(address);
-    const todayPendings = await Promise.all(nftaIds.map((id: bigint) => nexus.pendingNftaYield(id)));
-    setTodayEstimate(todayPendings.reduce((s: bigint, x: bigint) => s + x, BigInt(0)));
 
     if (!provider) {
       setRecords([]);
@@ -168,19 +150,6 @@ export function EarningsPage() {
   const cumulativeIncome = useMemo(() => claimedTot, [claimedTot]);
   const withdrawableIncome = useMemo(() => pendingTot, [pendingTot]);
 
-  const withdrawPreview = useMemo(() => {
-    const tofFee = (withdrawableIncome * withdrawFeeBps) / BigInt(10000);
-    const burnFee = (tofFee * tofBurnBps) / BigInt(10000);
-    return {
-      level: userLevel,
-      feeBps: withdrawFeeBps,
-      totOut: withdrawableIncome,
-      tofFee,
-      burnFee,
-      treasuryTof: tofFee - burnFee,
-    };
-  }, [withdrawableIncome, userLevel, withdrawFeeBps, tofBurnBps]);
-
   const typeColors: Record<EarningRecord["type"], string> = {
     "NFTA Yield": "bg-primary/15 text-primary border-primary/30",
     "NFTB Dividend": "bg-accent/15 text-accent border-accent/30",
@@ -226,31 +195,6 @@ export function EarningsPage() {
           </div>
         </Card>
       </div>
-
-      <Card className="glass-panel p-5">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground">当前等级</p>
-            <p className="font-semibold">Lv.{withdrawPreview.level}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">提现费率</p>
-            <p className="font-semibold">{Number(withdrawPreview.feeBps) / 100}%</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">预计到账 TOT</p>
-            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.totOut, 18)).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">需支付 TOF</p>
-            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.tofFee, 18)).toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">其中销毁 TOF</p>
-            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.burnFee, 18)).toLocaleString()}</p>
-          </div>
-        </div>
-      </Card>
 
       <Card className="glass-panel">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
