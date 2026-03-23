@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
@@ -90,7 +91,7 @@ export function NodesPage() {
   const [selectedNftaTier, setSelectedNftaTier] = useState<number | null>(null);
   const [selectedNftbTier, setSelectedNftbTier] = useState<number | null>(null);
   const [nftbPayToken, setNftbPayToken] = useState<"USDT" | "TOF">("USDT");
-  const [referrer, setReferrer] = useState(ethers.ZeroAddress);
+  const [referrer, setReferrer] = useState("");
   const [nftaStage, setNftaStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const zeroValue = ethers.parseUnits("0", 0);
@@ -234,7 +235,9 @@ export function NodesPage() {
       }
 
       setNftaStage("purchasing");
-      const res = await execTx(nexus.buyNfta(BigInt(tier.id), referrer || ethers.ZeroAddress));
+      const parsedReferrer = referrer.trim();
+      const finalReferrer = ethers.isAddress(parsedReferrer) ? parsedReferrer : ethers.ZeroAddress;
+      const res = await execTx(nexus.buyNfta(BigInt(tier.id), finalReferrer));
       if (!res.success) {
         toast({ title: "购买 NFTA 失败", description: res.error, variant: "destructive" });
         return;
@@ -263,6 +266,8 @@ export function NodesPage() {
     setLoading(true);
     setNftbStage("checking");
     try {
+      const parsedReferrer = referrer.trim();
+      const finalReferrer = ethers.isAddress(parsedReferrer) ? parsedReferrer : ethers.ZeroAddress;
       if (nftbPayToken === "USDT") {
         if (tier.usdtRemaining <= 0n) {
           toast({ title: "购买 NFTB 失败", description: "USDT 配额已售罄", variant: "destructive" });
@@ -279,7 +284,7 @@ export function NodesPage() {
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(nexus.buyNftbWithUsdt(BigInt(tier.id), referrer || ethers.ZeroAddress));
+        const res = await execTx(nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer));
         if (!res.success) {
           toast({ title: "购买 NFTB 失败", description: res.error, variant: "destructive" });
           return;
@@ -302,7 +307,7 @@ export function NodesPage() {
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(nexus.buyNftbWithTof(BigInt(tier.id), referrer || ethers.ZeroAddress));
+        const res = await execTx(nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer));
         if (!res.success) {
           toast({ title: "购买 NFTB 失败", description: res.error, variant: "destructive" });
           return;
@@ -409,134 +414,261 @@ export function NodesPage() {
   }, [loading, isConnected, selectedNftbTier, selectedNftbTierData, nftbPayToken]);
 
   const showEmptyActionHint = totalNftaPending === 0n && totalNftbPending === 0n && nftaNodes.length === 0 && nftbNodes.length === 0;
+  const formatTot = (value: bigint) => Number(ethers.formatUnits(value, 18)).toFixed(4);
 
   return (
-    <div className="space-y-6 overflow-hidden">
+    <div className="space-y-5 overflow-hidden">
+      {/* ── 顶部概览卡 ── */}
       <Card className="glass-panel">
-        <CardHeader>
-          <CardTitle>NFTA / NFTB 链上节点</CardTitle>
-          <CardDescription>已接入合约实时读写</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">NFT 链上节点</CardTitle>
+          <CardDescription>链上数据实时同步，可在此完成购买与收益查看</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Input value={referrer} onChange={(e) => setReferrer(e.target.value || ethers.ZeroAddress)} placeholder="推荐人地址(可选)" />
-          <div className="text-sm rounded-md border border-border px-3 py-2">NFTA 待领取: {ethers.formatUnits(totalNftaPending, 18)} TOT</div>
-          <div className="text-sm rounded-md border border-border px-3 py-2">NFTB 待领取: {ethers.formatUnits(totalNftbPending, 18)} TOT</div>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border-l-4 border-l-primary border border-border bg-primary/5 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">NFT-A 收益待领</p>
+              <p className="text-lg font-semibold text-primary">{formatTot(totalNftaPending)}</p>
+              <p className="text-xs text-muted-foreground">TOT</p>
+            </div>
+            <div className="rounded-lg border-l-4 border-l-blue-500 border border-border bg-blue-500/5 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">NFT-B 分红待领</p>
+              <p className="text-lg font-semibold text-blue-500">{formatTot(totalNftbPending)}</p>
+              <p className="text-xs text-muted-foreground">TOT</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">推荐人地址（选填）</p>
+            <Input
+              value={referrer}
+              onChange={(e) => setReferrer(e.target.value)}
+              placeholder="0x... 不填则按系统默认"
+              className="h-9 text-sm"
+            />
+          </div>
         </CardContent>
         {showEmptyActionHint && (
           <CardContent className="pt-0">
-            <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-              当前暂无可领取收益。建议先选择档位购买 NFTA 或 NFTB 节点，完成后可在“我的节点”中查看并领取收益。
+            <div className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              当前暂无可领取收益。请先在 NFT-A 或 NFT-B 标签页选择档位完成购买，购买后即可在「我的节点」中查看并领取。
             </div>
           </CardContent>
         )}
       </Card>
 
-      <Tabs defaultValue="nfta" className="space-y-6">
-        <TabsList className="grid grid-cols-3 w-full max-w-md">
-          <TabsTrigger value="nfta">NFTA</TabsTrigger>
-          <TabsTrigger value="nftb">NFTB</TabsTrigger>
+      {/* ── 主 Tab 区 ── */}
+      <Tabs defaultValue="nfta" className="space-y-5">
+        <TabsList className="grid grid-cols-3 w-full">
+          <TabsTrigger value="nfta">NFT-A</TabsTrigger>
+          <TabsTrigger value="nftb">NFT-B</TabsTrigger>
           <TabsTrigger value="my">我的节点</TabsTrigger>
         </TabsList>
 
+        {/* ── NFT-A 购买 ── */}
         <TabsContent value="nfta" className="space-y-4">
           <Card className="glass-panel">
-            <CardHeader>
-              <CardTitle>购买 NFTA</CardTitle>
-              <CardDescription>单地址仅允许 1 张 NFTA</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">购买 NFT-A</CardTitle>
+              <CardDescription>收益型节点，每日产出 TOT · 每个地址限持 1 张</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {nftaTiers.map((tier) => (
-                  <button
-                    key={tier.id}
-                    className={`rounded-lg border p-3 text-left ${selectedNftaTier === tier.id ? "border-primary bg-primary/10" : "border-border"}`}
-                    onClick={() => setSelectedNftaTier(tier.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{getNftaTierName(tier.id)}</span>
-                      <Badge variant={tier.isActive ? "default" : "secondary"}>{tier.isActive ? "Active" : "Inactive"}</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-2">价格: {ethers.formatUnits(tier.price, 18)} USDT</div>
-                    <div className="text-xs text-muted-foreground">日产出: {ethers.formatUnits(tier.dailyYield, 18)} TOT</div>
-                    <div className="text-xs text-muted-foreground">剩余: {tier.remaining.toString()} / {tier.maxSupply.toString()}</div>
-                  </button>
-                ))}
-              </div>
+            <CardContent className="space-y-4">
               {nftaTiers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">当前链上未读取到 NFTA 档位，请联系管理员先配置档位。</p>
-              ) : null}
-              <Button onClick={buyNfta} disabled={!isConnected || loading || selectedNftaTier === null || !canBuySelectedNfta}>
-                {loading ? (nftaStageText || "处理中...") : "购买 NFTA"}
-              </Button>
-              {loading && nftaStageText ? <p className="text-xs text-primary">{nftaStageText}</p> : null}
-              {!canBuySelectedNfta || !isConnected || loading || selectedNftaTier === null ? (
-                <p className="text-xs text-muted-foreground">{nftaDisabledReason}</p>
-              ) : null}
+                <p className="text-sm text-muted-foreground py-4 text-center">链上暂无 NFT-A 档位，请联系管理员配置。</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {nftaTiers.map((tier) => (
+                    <button
+                      key={tier.id}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors hover:bg-muted/30 ${
+                        selectedNftaTier === tier.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card"
+                      }`}
+                      onClick={() => setSelectedNftaTier(tier.id)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-semibold text-sm">{getNftaTierName(tier.id)}</span>
+                        <Badge variant={tier.isActive ? "default" : "secondary"} className="text-xs">
+                          {tier.isActive ? "已启用" : "未启用"}
+                        </Badge>
+                      </div>
+                      <Separator className="mb-3" />
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">价格</span>
+                          <span className="font-medium">{ethers.formatUnits(tier.price, 18)} USDT</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">日产出</span>
+                          <span className="font-medium text-primary">{ethers.formatUnits(tier.dailyYield, 18)} TOT</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">剩余名额</span>
+                          <span className="font-medium">{tier.remaining.toString()} / {tier.maxSupply.toString()}</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2 pt-1">
+                <Button
+                  onClick={buyNfta}
+                  disabled={!isConnected || loading || selectedNftaTier === null || !canBuySelectedNfta}
+                  className="w-full"
+                >
+                  {loading ? (nftaStageText || "处理中...") : "购买 NFT-A"}
+                </Button>
+                {loading && nftaStageText && (
+                  <p className="text-xs text-primary text-center">{nftaStageText}</p>
+                )}
+                {(!canBuySelectedNfta || !isConnected || selectedNftaTier === null) && !loading && (
+                  <p className="text-xs text-muted-foreground text-center">{nftaDisabledReason}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ── NFT-B 购买 ── */}
         <TabsContent value="nftb" className="space-y-4">
           <Card className="glass-panel">
-            <CardHeader>
-              <CardTitle>购买 NFTB</CardTitle>
-              <CardDescription>可用 USDT 或 TOF 支付</CardDescription>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">购买 NFT-B</CardTitle>
+              <CardDescription>分红型节点，按权重分享节点收益池</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Button variant={nftbPayToken === "USDT" ? "default" : "outline"} onClick={() => setNftbPayToken("USDT")}>USDT 支付</Button>
-                <Button variant={nftbPayToken === "TOF" ? "default" : "outline"} onClick={() => setNftbPayToken("TOF")}>TOF 支付</Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {nftbTiers.map((tier) => (
-                  <button
-                    key={tier.id}
-                    className={`rounded-lg border p-3 text-left ${selectedNftbTier === tier.id ? "border-primary bg-primary/10" : "border-border"}`}
-                    onClick={() => setSelectedNftbTier(tier.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{getNftbTierName(tier.id)}</span>
-                      <Badge variant={tier.isActive ? "default" : "secondary"}>{tier.isActive ? "Active" : "Inactive"}</Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-2">价格: {ethers.formatUnits(tier.price, 18)} {nftbPayToken}</div>
-                    <div className="text-xs text-muted-foreground">权重: {tier.weight.toString()}</div>
-                    <div className="text-xs text-muted-foreground">分红比例: {Number(tier.dividendBps) / 100}%</div>
-                    <div className="text-xs text-muted-foreground">USDT剩余: {tier.usdtRemaining.toString()} | TOF剩余: {tier.tofRemaining.toString()}</div>
-                  </button>
-                ))}
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1 w-fit">
+                <button
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                    nftbPayToken === "USDT"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setNftbPayToken("USDT")}
+                >
+                  USDT 支付
+                </button>
+                <button
+                  className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
+                    nftbPayToken === "TOF"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setNftbPayToken("TOF")}
+                >
+                  TOF 支付
+                </button>
               </div>
               {nftbTiers.length === 0 ? (
-                <p className="text-xs text-muted-foreground">当前链上未读取到 NFTB 档位，请联系管理员先配置档位。</p>
-              ) : null}
-
-              <Button onClick={buyNftb} disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}>
-                {loading ? (nftbStageText || "处理中...") : `购买 NFTB (${nftbPayToken})`}
-              </Button>
-              {loading && nftbStageText ? <p className="text-xs text-primary">{nftbStageText}</p> : null}
-              {!canBuySelectedNftb || !isConnected || loading || selectedNftbTier === null ? (
-                <p className="text-xs text-muted-foreground">{nftbDisabledReason}</p>
-              ) : null}
+                <p className="text-sm text-muted-foreground py-4 text-center">链上暂无 NFT-B 档位，请联系管理员配置。</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {nftbTiers.map((tier) => (
+                    <button
+                      key={tier.id}
+                      className={`rounded-xl border-2 p-4 text-left transition-colors hover:bg-muted/30 ${
+                        selectedNftbTier === tier.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-card"
+                      }`}
+                      onClick={() => setSelectedNftbTier(tier.id)}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-semibold text-sm">{getNftbTierName(tier.id)}</span>
+                        <Badge variant={tier.isActive ? "default" : "secondary"} className="text-xs">
+                          {tier.isActive ? "已启用" : "未启用"}
+                        </Badge>
+                      </div>
+                      <Separator className="mb-3" />
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">价格</span>
+                          <span className="font-medium">{ethers.formatUnits(tier.price, 18)} {nftbPayToken}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">权重</span>
+                          <span className="font-medium">{tier.weight.toString()}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">分红比例</span>
+                          <span className="font-medium text-blue-500">{Number(tier.dividendBps) / 100}%</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 pt-1 text-xs text-muted-foreground">
+                          <span>USDT 剩余: <span className="text-foreground">{tier.usdtRemaining.toString()}</span></span>
+                          <span>TOF 剩余: <span className="text-foreground">{tier.tofRemaining.toString()}</span></span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2 pt-1">
+                <Button
+                  onClick={buyNftb}
+                  disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}
+                  className="w-full"
+                >
+                  {loading ? (nftbStageText || "处理中...") : `购买 NFT-B (${nftbPayToken})`}
+                </Button>
+                {loading && nftbStageText && (
+                  <p className="text-xs text-primary text-center">{nftbStageText}</p>
+                )}
+                {(!canBuySelectedNftb || !isConnected || selectedNftbTier === null) && !loading && (
+                  <p className="text-xs text-muted-foreground text-center">{nftbDisabledReason}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* ── 我的节点 ── */}
         <TabsContent value="my" className="space-y-4">
           <Card className="glass-panel">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>我的 NFTA 节点</CardTitle>
-              <Button onClick={claimAllNfta} disabled={!isConnected || loading || nftaNodes.length === 0}>领取全部 NFTA</Button>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">我的 NFT-A</CardTitle>
+                  {nftaNodes.length > 0 && (
+                    <CardDescription className="mt-0.5">
+                      共 {nftaNodes.length} 张 · 待领取 <span className="text-primary font-medium">{formatTot(totalNftaPending)} TOT</span>
+                    </CardDescription>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={claimAllNfta}
+                  disabled={!isConnected || loading || nftaNodes.length === 0}
+                >
+                  领取 NFT-A 收益
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {nftaNodes.length === 0 ? (
-                <div className="text-sm text-muted-foreground">暂无 NFTA 节点，前往上方“购买 NFTA”完成首购后可在此管理。</div>
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+                  暂未持有 NFT-A 节点<br />
+                  <span className="text-xs">请前往「NFT-A」标签页选择档位购买</span>
+                </div>
               ) : (
                 nftaNodes.map((node) => (
-                  <div key={node.nodeId.toString()} className="rounded-lg border p-3">
-                    <div className="font-medium">Node #{node.nodeId.toString()} ({getNftaTierName(node.tierId)})</div>
-                    <div className="text-xs text-muted-foreground">日产出: {ethers.formatUnits(node.dailyYield, 18)} TOT</div>
-                    <div className="text-xs text-muted-foreground">待领取: {ethers.formatUnits(node.pending, 18)} TOT</div>
-                    <div className="text-xs text-muted-foreground">状态: {node.isActive ? "Active" : "Inactive"}</div>
+                  <div key={node.nodeId.toString()} className="rounded-xl border border-border hover:bg-muted/20 transition-colors p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">节点 #{node.nodeId.toString()} · {getNftaTierName(node.tierId)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${node.isActive ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"}`}>
+                        {node.isActive ? "运行中" : "已暂停"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">日产出 </span>
+                        <span className="font-medium">{formatTot(node.dailyYield)} TOT</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">待领取 </span>
+                        <span className="font-medium text-primary">{formatTot(node.pending)} TOT</span>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
@@ -544,20 +676,50 @@ export function NodesPage() {
           </Card>
 
           <Card className="glass-panel">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>我的 NFTB 节点</CardTitle>
-              <Button onClick={claimAllNftb} disabled={!isConnected || loading || nftbNodes.length === 0}>领取全部 NFTB</Button>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">我的 NFT-B</CardTitle>
+                  {nftbNodes.length > 0 && (
+                    <CardDescription className="mt-0.5">
+                      共 {nftbNodes.length} 张 · 待领取 <span className="text-blue-500 font-medium">{formatTot(totalNftbPending)} TOT</span>
+                    </CardDescription>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={claimAllNftb}
+                  disabled={!isConnected || loading || nftbNodes.length === 0}
+                >
+                  领取 NFT-B 分红
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {nftbNodes.length === 0 ? (
-                <div className="text-sm text-muted-foreground">暂无 NFTB 节点，前往上方“购买 NFTB”选择支付方式后即可创建。</div>
+                <div className="rounded-md border border-dashed border-border bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+                  暂未持有 NFT-B 节点<br />
+                  <span className="text-xs">请前往「NFT-B」标签页选择档位与支付方式完成购买</span>
+                </div>
               ) : (
                 nftbNodes.map((node) => (
-                  <div key={node.nodeId.toString()} className="rounded-lg border p-3">
-                    <div className="font-medium">Node #{node.nodeId.toString()} ({getNftbTierName(node.tierId)})</div>
-                    <div className="text-xs text-muted-foreground">权重: {node.weight.toString()}</div>
-                    <div className="text-xs text-muted-foreground">待领取: {ethers.formatUnits(node.pending, 18)} TOT</div>
-                    <div className="text-xs text-muted-foreground">状态: {node.isActive ? "Active" : "Inactive"}</div>
+                  <div key={node.nodeId.toString()} className="rounded-xl border border-border hover:bg-muted/20 transition-colors p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-sm">节点 #{node.nodeId.toString()} · {getNftbTierName(node.tierId)}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${node.isActive ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"}`}>
+                        {node.isActive ? "运行中" : "已暂停"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">权重 </span>
+                        <span className="font-medium">{node.weight.toString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">待领取 </span>
+                        <span className="font-medium text-blue-500">{formatTot(node.pending)} TOT</span>
+                      </div>
+                    </div>
                   </div>
                 ))
               )}
