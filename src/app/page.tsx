@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import {
-  LayoutDashboard,
   User,
   Bell,
   Link as LinkIcon,
@@ -184,14 +183,18 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border/50 bg-background/80 px-4 md:px-6 backdrop-blur-md">
+      <header className="sticky top-0 z-30 flex h-16 md:h-20 items-center gap-4 border-b border-border/50 bg-background/80 px-4 md:px-6 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground blue-glow">
-            <LayoutDashboard size={18} />
-          </div>
-          <h1 className="text-lg font-headline font-bold text-primary hidden sm:block">
-            {t("appName")} <span className="text-accent">{t("appNexus")}</span>
-          </h1>
+          <img
+            src="/truth-oracle-logo-light.svg"
+            alt="Truth Oracle"
+            className="h-14 md:h-16 w-auto object-contain dark:hidden"
+          />
+          <img
+            src="/truth-oracle-logo-dark.svg"
+            alt="Truth Oracle"
+            className="hidden dark:block h-14 md:h-16 w-auto object-contain"
+          />
         </div>
 
         {/* Desktop Nav */}
