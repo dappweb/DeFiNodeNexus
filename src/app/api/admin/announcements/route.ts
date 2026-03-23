@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeAnnouncementType } from "@/lib/announcement";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+export const runtime = "edge";
+
 type CreateAnnouncementPayload = {
   title?: string;
   content?: string;

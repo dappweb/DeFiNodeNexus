@@ -3,6 +3,8 @@ import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { normalizeAnnouncementType } from "@/lib/announcement";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 
+export const runtime = "edge";
+
 type DbAnnouncementRow = {
   id: string;
   title: string;
