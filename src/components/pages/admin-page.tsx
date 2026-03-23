@@ -6,11 +6,14 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Settings, ShieldCheck, Activity, Wallet } from "lucide-react";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
+import { AnnouncementItem, ANNOUNCEMENT_TYPES, AnnouncementType } from "@/lib/announcement";
 
 type OperationLogItem = {
   id: number;
@@ -67,6 +70,13 @@ export function AdminPage() {
   const [addLpUsdt, setAddLpUsdt] = useState("");
   const [currentAction, setCurrentAction] = useState("");
   const [operationLogs, setOperationLogs] = useState<OperationLogItem[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementType, setAnnouncementType] = useState<AnnouncementType>("update");
+  const [announcementContent, setAnnouncementContent] = useState("");
+  const [announcementToken, setAnnouncementToken] = useState("");
+  const [isPublishingAnnouncement, setIsPublishingAnnouncement] = useState(false);
+  const [isAnnouncementLoading, setIsAnnouncementLoading] = useState(false);
 
   const toUnits = (value: string) => ethers.parseUnits(value || "0", 18);
 
@@ -141,6 +151,78 @@ export function AdminPage() {
     }
   };
 
+  const loadAnnouncements = async () => {
+    setIsAnnouncementLoading(true);
+    try {
+      const response = await fetch("/api/announcements", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        toast({ title: "公告读取失败", description: "无法加载公告列表", variant: "destructive" });
+        return;
+      }
+
+      const payload = (await response.json()) as { data?: AnnouncementItem[] };
+      if (Array.isArray(payload.data)) {
+        setAnnouncements(payload.data);
+      }
+    } catch {
+      toast({ title: "公告读取失败", description: "网络异常", variant: "destructive" });
+    } finally {
+      setIsAnnouncementLoading(false);
+    }
+  };
+
+  const publishAnnouncement = async () => {
+    if (!isOwner) {
+      toast({ title: "无权限", description: "仅 Owner 可发布公告", variant: "destructive" });
+      return;
+    }
+
+    const title = announcementTitle.trim();
+    const content = announcementContent.trim();
+    if (!title || !content) {
+      toast({ title: "参数无效", description: "标题和正文不能为空", variant: "destructive" });
+      return;
+    }
+
+    setIsPublishingAnnouncement(true);
+    try {
+      const response = await fetch("/api/admin/announcements", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(announcementToken.trim() ? { "x-admin-token": announcementToken.trim() } : {}),
+        },
+        body: JSON.stringify({
+          title,
+          type: announcementType,
+          content,
+        }),
+      });
+
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        toast({ title: "发布失败", description: payload.message || "请求失败", variant: "destructive" });
+        pushOperationLog("发布公告", "error", payload.message || "请求失败");
+        return;
+      }
+
+      toast({ title: "发布成功", description: "公告已发布" });
+      pushOperationLog("发布公告", "success", title.slice(0, 40));
+      setAnnouncementTitle("");
+      setAnnouncementContent("");
+      await loadAnnouncements();
+    } catch {
+      toast({ title: "发布失败", description: "网络异常", variant: "destructive" });
+      pushOperationLog("发布公告", "error", "网络异常");
+    } finally {
+      setIsPublishingAnnouncement(false);
+    }
+  };
+
   const refreshData = async () => {
     if (!nexus) return;
     try {
@@ -196,6 +278,10 @@ export function AdminPage() {
   useEffect(() => {
     refreshData();
   }, [nexus, swap, address]);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
 
   return (
     <div className="space-y-6 overflow-hidden">
@@ -256,11 +342,12 @@ export function AdminPage() {
       </div>
 
       <Tabs defaultValue="nexus" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-lg">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="nexus" className="text-xs gap-1"><Settings size={14} /><span>Nexus</span></TabsTrigger>
           <TabsTrigger value="tiers" className="text-xs gap-1"><ShieldCheck size={14} /><span>Tiers</span></TabsTrigger>
           <TabsTrigger value="swap" className="text-xs gap-1"><Wallet size={14} /><span>Swap</span></TabsTrigger>
           <TabsTrigger value="ops" className="text-xs gap-1"><Activity size={14} /><span>Ops</span></TabsTrigger>
+          <TabsTrigger value="announcement" className="text-xs gap-1"><span>公告</span></TabsTrigger>
         </TabsList>
 
         <TabsContent value="nexus">
@@ -625,6 +712,85 @@ export function AdminPage() {
 
               <div className="flex justify-end">
                 <Button variant="outline" onClick={refreshData} disabled={loading}>刷新链上状态</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="announcement">
+          <Card className="glass-panel">
+            <CardHeader>
+              <CardTitle>公告发布</CardTitle>
+              <CardDescription>Owner 在后台发布公告，首页将自动读取最新列表</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  value={announcementTitle}
+                  onChange={(e) => setAnnouncementTitle(e.target.value)}
+                  placeholder="公告标题"
+                />
+                <Select value={announcementType} onValueChange={(value) => setAnnouncementType(value as AnnouncementType)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="公告类型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ANNOUNCEMENT_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Textarea
+                value={announcementContent}
+                onChange={(e) => setAnnouncementContent(e.target.value)}
+                placeholder="公告正文"
+                className="min-h-[140px]"
+              />
+
+              <Input
+                value={announcementToken}
+                onChange={(e) => setAnnouncementToken(e.target.value)}
+                placeholder="后台发布令牌（可选，对应 ANNOUNCEMENT_ADMIN_TOKEN）"
+                type="password"
+              />
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  disabled={!isOwner || isPublishingAnnouncement}
+                  onClick={publishAnnouncement}
+                >
+                  {isPublishingAnnouncement ? "发布中..." : "发布公告"}
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={isAnnouncementLoading}
+                  onClick={loadAnnouncements}
+                >
+                  刷新公告
+                </Button>
+              </div>
+
+              <div className="rounded-md border border-border/60">
+                <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/60">最近公告</div>
+                {announcements.length === 0 ? (
+                  <p className="px-3 py-4 text-sm text-muted-foreground">暂无公告</p>
+                ) : (
+                  <div className="max-h-72 overflow-auto">
+                    {announcements.map((item) => (
+                      <div key={item.id} className="px-3 py-3 border-b border-border/40 last:border-b-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium truncate">{item.title}</p>
+                          <p className="text-[11px] text-muted-foreground shrink-0">{item.date}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{item.type}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

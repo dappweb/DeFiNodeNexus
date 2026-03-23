@@ -40,6 +40,18 @@ git push -u origin main
 
 在 GitHub Secrets 或 Cloudflare 控制面板中，请务必设置以下变量：
 - `GEMINI_API_KEY`: 你的 Google AI API 密钥。
+- `SUPABASE_URL`: Supabase 项目 URL。
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key（仅服务端）。
+- `ANNOUNCEMENT_ADMIN_TOKEN`: 可选，后台发布公告令牌。
+
+## Supabase 公告功能初始化
+
+1. 在 Supabase SQL Editor 执行 [docs/supabase-announcements.sql](docs/supabase-announcements.sql)。
+2. 在 `.env.local` 填写 `SUPABASE_URL` 和 `SUPABASE_SERVICE_ROLE_KEY`。
+3. （可选）设置 `ANNOUNCEMENT_ADMIN_TOKEN`，并在 Admin 页发布公告时填写同一个令牌。
+4. 启动项目后：
+	- 首页通过 `/api/announcements` 拉取公告。
+	- Admin 页通过 `/api/admin/announcements` 发布公告。
 
 ## 本地开发
 

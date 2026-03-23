@@ -1,15 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Megaphone, TrendingUp, TrendingDown, Coins, Database, Layers } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useLanguage } from "@/components/language-provider";
 import { StatCard } from "@/components/dashboard/stat-card";
+import { AnnouncementItem } from "@/lib/announcement";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export function HomePage() {
   const { t } = useLanguage();
-  const { announcements, prices, balances } = MOCK_USER_DATA;
+  const { prices, balances } = MOCK_USER_DATA;
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(MOCK_USER_DATA.announcements);
+  const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | number | null>(null);
 
   const typeColors: Record<string, string> = {
     update: "bg-blue-500/15 text-blue-500 border-blue-500/30",
@@ -25,6 +36,36 @@ export function HomePage() {
     event: () => t('event'),
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAnnouncements = async () => {
+      try {
+        const response = await fetch("/api/announcements", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!response.ok) return;
+
+        const payload = (await response.json()) as { data?: AnnouncementItem[] };
+        if (!cancelled && Array.isArray(payload.data) && payload.data.length > 0) {
+          setAnnouncements(payload.data);
+        }
+      } catch {
+        // fallback to mock data
+      }
+    };
+
+    loadAnnouncements();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedAnnouncement = announcements.find((item) => item.id === selectedAnnouncementId) ?? null;
+
   return (
     <div className="space-y-6">
       {/* Announcements */}
@@ -38,7 +79,12 @@ export function HomePage() {
         <CardContent>
           <div className="space-y-3">
             {announcements.map((item) => (
-              <div key={item.id} className="p-4 rounded-lg border border-border/30 bg-muted/10 hover:bg-muted/20 transition-colors">
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedAnnouncementId(item.id)}
+                className="w-full text-left p-4 rounded-lg border border-border/30 bg-muted/10 hover:bg-muted/20 transition-colors"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1.5">
@@ -49,11 +95,30 @@ export function HomePage() {
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{item.content}</p>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(selectedAnnouncement)} onOpenChange={(open) => !open && setSelectedAnnouncementId(null)}>
+        <DialogContent className="sm:max-w-lg">
+          {selectedAnnouncement && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Badge className={typeColors[selectedAnnouncement.type]}>{typeLabels[selectedAnnouncement.type]()}</Badge>
+                  <span className="text-sm font-semibold">{selectedAnnouncement.title}</span>
+                </DialogTitle>
+                <DialogDescription className="text-xs">{selectedAnnouncement.date}</DialogDescription>
+              </DialogHeader>
+              <p className="text-sm leading-6 text-foreground whitespace-pre-wrap">
+                {selectedAnnouncement.content}
+              </p>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Asset Overview */}
       <section>
