@@ -252,7 +252,7 @@ export function AdminPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">TOT Reserve</div><div className="text-lg font-semibold">{Number(swapTotReserve).toLocaleString()}</div></CardContent></Card>
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">USDT Reserve</div><div className="text-lg font-semibold">{Number(swapUsdtReserve).toLocaleString()}</div></CardContent></Card>
-        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">NFTB 分红池(TOT)</div><div className="text-lg font-semibold">{Number(swapDividendPool).toLocaleString()}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">NFT-B 分红池(TOT)</div><div className="text-lg font-semibold">{Number(swapDividendPool).toLocaleString()}</div></CardContent></Card>
       </div>
 
       <Tabs defaultValue="nexus" className="space-y-6">
@@ -361,7 +361,7 @@ export function AdminPage() {
         <TabsContent value="tiers">
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle>NFTA Tier 配置</CardTitle>
+              <CardTitle>NFT-A Tier 配置</CardTitle>
               <CardDescription>创建或更新卡牌档位（tierId=0 代表新增）</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -374,9 +374,9 @@ export function AdminPage() {
               </div>
               <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("保存 NFTA Tier", async () => {
                 if (!nexus) return;
-                if (!validatePositiveAmount("NFTA price", nftaPrice)) return;
-                if (!validatePositiveAmount("NFTA dailyYield", nftaYield)) return;
-                if (!validatePositiveAmount("NFTA maxSupply", nftaSupply)) return;
+                if (!validatePositiveAmount("NFT-A price", nftaPrice)) return;
+                if (!validatePositiveAmount("NFT-A dailyYield", nftaYield)) return;
+                if (!validatePositiveAmount("NFT-A maxSupply", nftaSupply)) return;
                 setLoading(true);
                 const r = await execTx(
                   nexus.configureNftaTier(
@@ -388,11 +388,11 @@ export function AdminPage() {
                   )
                 );
                 setLoading(false);
-                notifyTx(r.success, r.hash, r.error, "保存 NFTA Tier");
-              }, "确认保存 NFTA 档位配置？")}>保存 NFTA Tier</Button>
+                notifyTx(r.success, r.hash, r.error, "保存 NFT-A Tier");
+              }, "确认保存 NFT-A 档位配置？")}>保存 NFT-A Tier</Button>
 
               <div className="rounded-md border border-dashed border-border p-3 space-y-2">
-                <p className="text-sm font-medium">NFTB 档位快速初始化</p>
+                <p className="text-sm font-medium">NFT-B 档位快速初始化</p>
                 <p className="text-xs text-muted-foreground">
                   将按固定参数写入：初级·普通权杖（500）、中级·稀有王冠（1000）、高级·传说神座（2000）；
                   权重 1/2/3、分红 20%/30%/40%、每档 2000 张，状态启用。
@@ -424,18 +424,18 @@ export function AdminPage() {
 
                       if (!result.success) {
                         setLoading(false);
-                        notifyTx(false, undefined, `Tier ${preset.tierId.toString()} 初始化失败: ${result.error || "未知错误"}`, "一键初始化 NFTB 三档");
+                        notifyTx(false, undefined, `Tier ${preset.tierId.toString()} 初始化失败: ${result.error || "未知错误"}`, "一键初始化 NFT-B 三档");
                         return;
                       }
                     }
 
                     setLoading(false);
-                    toast({ title: "初始化成功", description: "NFTB 三档已完成配置" });
-                    pushOperationLog("一键初始化 NFTB 三档", "success", "Tier 1/2/3 初始化完成");
+                    toast({ title: "初始化成功", description: "NFT-B 三档已完成配置" });
+                    pushOperationLog("一键初始化 NFT-B 三档", "success", "Tier 1/2/3 初始化完成");
                     refreshData();
-                  }, "确认按预设写入 NFTB 1/2/3 档位？")}
+                  }, "确认按预设写入 NFT-B 1/2/3 档位？")}
                 >
-                  一键初始化 NFTB 三档
+                  一键初始化 NFT-B 三档
                 </Button>
               </div>
             </CardContent>

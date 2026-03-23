@@ -348,7 +348,7 @@ export function NodesPage() {
         toast({ title: "领取失败", description: res.error, variant: "destructive" });
         return;
       }
-      toast({ title: "NFTA 收益已领取", description: res.hash?.slice(0, 10) + "..." });
+      toast({ title: "NFT-A 收益已领取", description: res.hash?.slice(0, 10) + "..." });
       await refreshData();
     } finally {
       setLoading(false);
@@ -364,7 +364,7 @@ export function NodesPage() {
         toast({ title: "领取失败", description: res.error, variant: "destructive" });
         return;
       }
-      toast({ title: "NFTB 分红已领取", description: res.hash?.slice(0, 10) + "..." });
+      toast({ title: "NFT-B 分红已领取", description: res.hash?.slice(0, 10) + "..." });
       await refreshData();
     } finally {
       setLoading(false);
