@@ -44,9 +44,11 @@ export default function DashboardPage() {
 
   // Referral binding state
   const [referrerBound, setReferrerBound] = useState(false);
+  const [referrerStatusLoaded, setReferrerStatusLoaded] = useState(false);
   const [referrerAddress, setReferrerAddress] = useState("");
   const [isBindingReferrer, setIsBindingReferrer] = useState(false);
   const [referrerError, setReferrerError] = useState("");
+  const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -57,8 +59,13 @@ export default function DashboardPage() {
     let cancelled = false;
 
     const checkBoundStatus = async () => {
+      if (!cancelled) setReferrerStatusLoaded(false);
+
       if (!address || !nexus) {
-        if (!cancelled) setReferrerBound(false);
+        if (!cancelled) {
+          setReferrerBound(false);
+          setReferrerStatusLoaded(false);
+        }
         return;
       }
 
@@ -67,9 +74,13 @@ export default function DashboardPage() {
         const referrer = accountInfo.referrer as string;
         if (!cancelled) {
           setReferrerBound(Boolean(referrer) && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase());
+          setReferrerStatusLoaded(true);
         }
       } catch {
-        if (!cancelled) setReferrerBound(false);
+        if (!cancelled) {
+          setReferrerBound(false);
+          setReferrerStatusLoaded(true);
+        }
       }
     };
 
@@ -83,15 +94,26 @@ export default function DashboardPage() {
   useEffect(() => {
     let cancelled = false;
     const loadOwner = async () => {
+      if (!cancelled) setOwnerStatusLoaded(false);
+
       if (!nexus) {
-        if (!cancelled) setOwnerAddress(null);
+        if (!cancelled) {
+          setOwnerAddress(null);
+          setOwnerStatusLoaded(false);
+        }
         return;
       }
       try {
         const owner = await nexus.owner();
-        if (!cancelled) setOwnerAddress(owner);
+        if (!cancelled) {
+          setOwnerAddress(owner);
+          setOwnerStatusLoaded(true);
+        }
       } catch {
-        if (!cancelled) setOwnerAddress(null);
+        if (!cancelled) {
+          setOwnerAddress(null);
+          setOwnerStatusLoaded(true);
+        }
       }
     };
     loadOwner();
@@ -109,8 +131,21 @@ export default function DashboardPage() {
     ? ownerAddress !== null && address.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
+  const shouldShowAdmin = isConnected;
+
   // Referral binding required: connected + not owner + not yet bound
-  const needsReferralBinding = isConnected && !isOwner && !referrerBound;
+  const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
+
+  useEffect(() => {
+    if (isOwner && activeTab !== "admin") {
+      setActiveTab("admin");
+      return;
+    }
+
+    if (!shouldShowAdmin && activeTab === "admin") {
+      setActiveTab("home");
+    }
+  }, [isOwner, shouldShowAdmin, activeTab]);
 
   useEffect(() => {
     if (!needsReferralBinding) return;
@@ -177,7 +212,7 @@ export default function DashboardPage() {
     { key: "swap", icon: ArrowDownUp, label: t("navSwap") },
     { key: "earnings", icon: TrendingUp, label: t("navEarnings") },
     { key: "team", icon: Users, label: t("navTeam") },
-    ...(isOwner ? [{ key: "admin" as PageTab, icon: ShieldCheck, label: t("navAdmin") }] : []),
+    ...(shouldShowAdmin ? [{ key: "admin" as PageTab, icon: ShieldCheck, label: t("navAdmin") }] : []),
   ];
 
   const pageContent: Record<PageTab, React.ReactNode> = {
@@ -271,9 +306,11 @@ export default function DashboardPage() {
               <span className={
                 !isConnected || isOwner || referrerBound
                   ? "text-primary font-medium"
+                  : !referrerStatusLoaded
+                    ? "text-muted-foreground font-medium"
                   : "text-amber-600 dark:text-amber-400 font-medium"
               }>
-                {!isConnected ? "待连接钱包" : isOwner || referrerBound ? "已完成" : "待绑定"}
+                {!isConnected ? "待连接钱包" : isOwner || referrerBound ? "已完成" : !referrerStatusLoaded ? "检查中" : "待绑定"}
               </span>
             </div>
           </div>
