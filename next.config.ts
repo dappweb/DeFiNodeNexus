@@ -6,6 +6,12 @@ const nextConfig: NextConfig = {
     'http://localhost:9002',
     'http://127.0.0.1:9002',
     'http://192.168.50.118:9002',
+    'localhost:9002',
+    '127.0.0.1:9002',
+    'http://localhost',
+    'http://127.0.0.1',
+    'localhost',
+    '127.0.0.1',
   ],
   typescript: {
     ignoreBuildErrors: true,

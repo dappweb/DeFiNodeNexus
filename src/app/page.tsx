@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ethers } from "ethers";
 import {
   LayoutDashboard,
   User,
@@ -21,7 +22,7 @@ import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useWeb3 } from "@/lib/web3-provider";
-import { useNexusContract } from "@/hooks/use-contract";
+import { execTx, useNexusContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 
@@ -53,19 +54,33 @@ export default function DashboardPage() {
     setMounted(true);
   }, []);
 
-  // Check localStorage for existing referrer binding when address changes
+  // Check on-chain referrer binding when address changes
   useEffect(() => {
-    if (address) {
-      const stored = localStorage.getItem(`referrer_${address.toLowerCase()}`);
-      if (stored) {
-        setReferrerBound(true);
-      } else {
-        setReferrerBound(false);
+    let cancelled = false;
+
+    const checkBoundStatus = async () => {
+      if (!address || !nexus) {
+        if (!cancelled) setReferrerBound(false);
+        return;
       }
-    } else {
-      setReferrerBound(false);
-    }
-  }, [address]);
+
+      try {
+        const accountInfo = await nexus.accounts(address);
+        const referrer = accountInfo.referrer as string;
+        if (!cancelled) {
+          setReferrerBound(Boolean(referrer) && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase());
+        }
+      } catch {
+        if (!cancelled) setReferrerBound(false);
+      }
+    };
+
+    checkBoundStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, nexus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,8 +102,6 @@ export default function DashboardPage() {
     };
   }, [nexus]);
 
-  if (!mounted) return null;
-
   const displayAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : MOCK_USER_DATA.walletAddress;
@@ -108,7 +121,9 @@ export default function DashboardPage() {
     setReferrerAddress(ownerAddress);
   }, [needsReferralBinding, ownerAddress, referrerAddress]);
 
-  const handleBindReferrer = () => {
+  if (!mounted) return null;
+
+  const handleBindReferrer = async () => {
     setReferrerError("");
     const trimmed = referrerAddress.trim();
     const fallbackOwner = ownerAddress?.trim() ?? "";
@@ -125,17 +140,27 @@ export default function DashboardPage() {
       return;
     }
 
+    if (!nexus || !address) {
+      setReferrerError(t('referralInvalidAddress'));
+      return;
+    }
+
     setIsBindingReferrer(true);
-    // Simulate on-chain binding
-    setTimeout(() => {
-      setIsBindingReferrer(false);
-      localStorage.setItem(`referrer_${address!.toLowerCase()}`, finalReferrer.toLowerCase());
+    try {
+      const res = await execTx(nexus.bindReferrer(finalReferrer));
+      if (!res.success) {
+        setReferrerError(res.error || t('referralInvalidAddress'));
+        return;
+      }
+
       setReferrerBound(true);
       toast({
         title: t('referralSuccess'),
         description: t('referralSuccessDesc'),
       });
-    }, 2000);
+    } finally {
+      setIsBindingReferrer(false);
+    }
   };
 
   const navItems: { key: PageTab; icon: typeof Home; label: string }[] = [

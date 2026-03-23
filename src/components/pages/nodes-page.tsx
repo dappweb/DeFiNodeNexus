@@ -169,6 +169,10 @@ export function NodesPage() {
 
     const tier = nftaTiers.find((t) => t.id === selectedNftaTier);
     if (!tier || !usdt) return;
+    if (!tier.isActive || tier.remaining <= 0n) {
+      toast({ title: "购买 NFTA 失败", description: "该层级未激活或已售罄", variant: "destructive" });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -199,10 +203,18 @@ export function NodesPage() {
 
     const tier = nftbTiers.find((t) => t.id === selectedNftbTier);
     if (!tier) return;
+    if (!tier.isActive) {
+      toast({ title: "购买 NFTB 失败", description: "该层级未激活", variant: "destructive" });
+      return;
+    }
 
     setLoading(true);
     try {
       if (nftbPayToken === "USDT") {
+        if (tier.usdtRemaining <= 0n) {
+          toast({ title: "购买 NFTB 失败", description: "USDT 配额已售罄", variant: "destructive" });
+          return;
+        }
         if (!usdt) return;
         const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
@@ -219,6 +231,10 @@ export function NodesPage() {
         }
         toast({ title: "购买 NFTB 成功", description: res.hash?.slice(0, 10) + "..." });
       } else {
+        if (tier.tofRemaining <= 0n) {
+          toast({ title: "购买 NFTB 失败", description: "TOF 配额已售罄", variant: "destructive" });
+          return;
+        }
         if (!tof) return;
         const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
@@ -276,6 +292,24 @@ export function NodesPage() {
 
   const totalNftaPending = useMemo(() => nftaNodes.reduce((s, n) => s + n.pending, zeroValue), [nftaNodes, zeroValue]);
   const totalNftbPending = useMemo(() => nftbNodes.reduce((s, n) => s + n.pending, zeroValue), [nftbNodes, zeroValue]);
+  const selectedNftaTierData = useMemo(
+    () => nftaTiers.find((tier) => tier.id === selectedNftaTier) || null,
+    [nftaTiers, selectedNftaTier]
+  );
+  const selectedNftbTierData = useMemo(
+    () => nftbTiers.find((tier) => tier.id === selectedNftbTier) || null,
+    [nftbTiers, selectedNftbTier]
+  );
+  const canBuySelectedNfta = Boolean(
+    selectedNftaTierData && selectedNftaTierData.isActive && selectedNftaTierData.remaining > 0n
+  );
+  const canBuySelectedNftb = useMemo(() => {
+    if (!selectedNftbTierData || !selectedNftbTierData.isActive) return false;
+    const remaining = nftbPayToken === "USDT"
+      ? selectedNftbTierData.usdtRemaining
+      : selectedNftbTierData.tofRemaining;
+    return remaining > 0n;
+  }, [selectedNftbTierData, nftbPayToken]);
 
   return (
     <div className="space-y-6 overflow-hidden">
@@ -322,7 +356,7 @@ export function NodesPage() {
                   </button>
                 ))}
               </div>
-              <Button onClick={buyNfta} disabled={!isConnected || loading || selectedNftaTier === null}>
+              <Button onClick={buyNfta} disabled={!isConnected || loading || selectedNftaTier === null || !canBuySelectedNfta}>
                 {loading ? "处理中..." : "购买 NFTA"}
               </Button>
             </CardContent>
@@ -360,7 +394,7 @@ export function NodesPage() {
                 ))}
               </div>
 
-              <Button onClick={buyNftb} disabled={!isConnected || loading || selectedNftbTier === null}>
+              <Button onClick={buyNftb} disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}>
                 {loading ? "处理中..." : `购买 NFTB (${nftbPayToken})`}
               </Button>
             </CardContent>
