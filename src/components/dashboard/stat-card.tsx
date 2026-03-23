@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { LucideIcon } from "lucide-react";
+import { useLanguage } from "@/components/language-provider";
 
 interface StatCardProps {
   title: string;
@@ -15,6 +16,7 @@ interface StatCardProps {
 }
 
 export function StatCard({ title, value, icon: Icon, description, trend, className }: StatCardProps) {
+  const { t } = useLanguage();
   return (
     <Card className={cn("p-6 glass-panel flex flex-col gap-2 relative overflow-hidden group hover:border-primary/50 transition-all duration-300", className)}>
       <div className="absolute -right-4 -top-4 text-primary/5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -30,7 +32,7 @@ export function StatCard({ title, value, icon: Icon, description, trend, classNa
         <h3 className="text-2xl font-bold font-headline">{value}</h3>
         {trend && (
           <p className={cn("text-xs mt-1", trend.positive ? "text-accent" : "text-destructive")}>
-            {trend.positive ? "+" : "-"}{trend.value} from last month
+            {trend.positive ? "+" : "-"}{trend.value} {t("fromLastMonth")}
           </p>
         )}
         {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}

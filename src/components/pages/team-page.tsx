@@ -132,22 +132,22 @@ export function TeamPage() {
       <div className="grid grid-cols-2 gap-4">
         <Card className="glass-panel p-4 text-center">
           <Users className="h-6 w-6 text-primary mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">直推人数</p>
+          <p className="text-[10px] text-muted-foreground">{t("directCount")}</p>
           <p className="text-2xl font-bold font-headline">{directReferrals.toString()}</p>
         </Card>
         <Card className="glass-panel p-4 text-center">
           <UserPlus className="h-6 w-6 text-accent mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">团队人数</p>
+          <p className="text-[10px] text-muted-foreground">{t("teamCount")}</p>
           <p className="text-2xl font-bold font-headline">{teamMemberCount}</p>
         </Card>
         <Card className="glass-panel p-4 text-center">
           <Coins className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">直推入金总额 (USDT)</p>
+          <p className="text-[10px] text-muted-foreground">{t("directDepositTotal")}</p>
           <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(directDepositTotal, 18)).toLocaleString()}</p>
         </Card>
         <Card className="glass-panel p-4 text-center">
           <Coins className="h-6 w-6 text-purple-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">团队入金总额 (USDT)</p>
+          <p className="text-[10px] text-muted-foreground">{t("teamDepositTotal")}</p>
           <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(teamDepositTotal, 18)).toLocaleString()}</p>
         </Card>
       </div>
@@ -160,7 +160,7 @@ export function TeamPage() {
                 <Link2 className="h-4 w-4 text-primary" />
                 {t("inviteLink")}
               </h3>
-              <p className="text-xs text-muted-foreground">链上绑定推荐关系后永久生效</p>
+              <p className="text-xs text-muted-foreground">{t("onChainBindPermanent")}</p>
             </div>
             <div className="flex gap-2 flex-1">
               <Input value={inviteUrl} readOnly className="font-mono text-xs bg-muted/30" />
@@ -176,25 +176,25 @@ export function TeamPage() {
       <Card className="glass-panel overflow-hidden">
         <CardHeader className="flex flex-row items-center gap-2">
           <Users className="text-primary" />
-          <CardTitle>直推成员</CardTitle>
+          <CardTitle>{t("directMembersTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {members.length === 0 ? (
-            <div className="text-sm text-muted-foreground">暂无链上直推成员</div>
+            <div className="text-sm text-muted-foreground">{t("noDirectMembers")}</div>
           ) : (
             members.map((member) => (
               <div key={member.address} className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs text-muted-foreground">{member.address}</span>
-                  <span className="text-xs text-muted-foreground">直推成员</span>
+                  <span className="text-xs text-muted-foreground">{t("directMemberLabel")}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Total Nodes</p>
+                    <p className="text-[10px] text-muted-foreground">{t("totalNodesLabel")}</p>
                     <p className="font-medium text-sm">{member.totalNodes.toString()}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Pending TOT</p>
+                    <p className="text-[10px] text-muted-foreground">{t("pendingTotLabel")}</p>
                     <p className="font-medium text-sm">{Number(ethers.formatUnits(member.pendingTot, 18)).toLocaleString()}</p>
                   </div>
                 </div>

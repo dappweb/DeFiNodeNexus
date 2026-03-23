@@ -290,19 +290,19 @@ export default function DashboardPage() {
         <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="flex items-center justify-start gap-2">
-              <span className="text-muted-foreground">网络</span>
+              <span className="text-muted-foreground">{t("networkLabel")}</span>
               <span className={chainId === 11155111 ? "text-primary font-medium" : "text-destructive font-medium"}>
-                {chainId === 11155111 ? "Sepolia" : "非测试网"}
+                {chainId === 11155111 ? "Sepolia" : t("notTestnet")}
               </span>
             </div>
             <div className="flex items-center justify-start gap-2">
-              <span className="text-muted-foreground">钱包</span>
+              <span className="text-muted-foreground">{t("walletLabel")}</span>
               <span className={isConnected ? "text-primary font-medium" : "text-muted-foreground"}>
-                {isConnected ? "已连接" : isConnecting ? "连接中" : "未连接"}
+                {isConnected ? t("connected") : isConnecting ? t("connecting") : t("notConnected")}
               </span>
             </div>
             <div className="flex items-center justify-start gap-2">
-              <span className="text-muted-foreground">推荐绑定</span>
+              <span className="text-muted-foreground">{t("referralBindLabel")}</span>
               <span className={
                 !isConnected || isOwner || referrerBound
                   ? "text-primary font-medium"
@@ -310,7 +310,7 @@ export default function DashboardPage() {
                     ? "text-muted-foreground font-medium"
                   : "text-amber-600 dark:text-amber-400 font-medium"
               }>
-                {!isConnected ? "待连接钱包" : isOwner || referrerBound ? "已完成" : !referrerStatusLoaded ? "检查中" : "待绑定"}
+                {!isConnected ? t("waitConnect") : isOwner || referrerBound ? t("bindDone") : !referrerStatusLoaded ? t("checking") : t("waitBind")}
               </span>
             </div>
           </div>

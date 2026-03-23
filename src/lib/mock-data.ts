@@ -7,10 +7,10 @@ export const MOCK_USER_DATA = {
   },
   // --- Home: Announcements ---
   announcements: [
-    { id: 1, title: "NFTA Node V2 Upgrade Live", date: "2026-03-20", type: "update" as const, content: "All NFTA nodes have been upgraded to V2 with 15% higher yield." },
-    { id: 2, title: "TOT Listing on Major Exchange", date: "2026-03-18", type: "news" as const, content: "TOT token is now listed on a top-5 centralized exchange." },
-    { id: 3, title: "Scheduled Maintenance Mar 25", date: "2026-03-15", type: "maintenance" as const, content: "Platform maintenance scheduled for March 25, 02:00-04:00 UTC." },
-    { id: 4, title: "NFTB Gold Tier Bonus Event", date: "2026-03-12", type: "event" as const, content: "Gold tier NFTB holders receive 2x dividends this month." },
+    { id: 1, title: "NFTA 节点 V2 升级上线", date: "2026-03-20", type: "update" as const, content: "所有 NFTA 节点已升级至 V2，收益提升 15%。" },
+    { id: 2, title: "TOT 登陆主流交易所", date: "2026-03-18", type: "news" as const, content: "TOT 代币已上线 Top 5 中心化交易所。" },
+    { id: 3, title: "3月25日计划维护", date: "2026-03-15", type: "maintenance" as const, content: "平台将于 3 月 25 日 02:00-04:00 UTC 进行维护。" },
+    { id: 4, title: "NFTB 黄金档位奖励活动", date: "2026-03-12", type: "event" as const, content: "黄金档位 NFTB 持有者本月可获得双倍分红。" },
   ],
   // --- Home: Prices ---
   prices: [
@@ -21,9 +21,9 @@ export const MOCK_USER_DATA = {
   ],
   // --- Nodes ---
   nftaNodes: [
-    { nodeId: "A-001", status: "Active", yieldPerDay: 45.5, startDate: "2024-01-15", uptime: "99.9%", tier: "Pro" },
-    { nodeId: "A-012", status: "Active", yieldPerDay: 42.0, startDate: "2024-02-01", uptime: "98.5%", tier: "Pro" },
-    { nodeId: "A-045", status: "Standby", yieldPerDay: 0, startDate: "2024-02-10", uptime: "0%", tier: "Basic" },
+    { nodeId: "A-001", status: "运行中", yieldPerDay: 45.5, startDate: "2024-01-15", uptime: "99.9%", tier: "Pro" },
+    { nodeId: "A-012", status: "运行中", yieldPerDay: 42.0, startDate: "2024-02-01", uptime: "98.5%", tier: "Pro" },
+    { nodeId: "A-045", status: "待机", yieldPerDay: 0, startDate: "2024-02-10", uptime: "0%", tier: "Basic" },
   ],
   nftbNodes: [
     {
@@ -53,14 +53,14 @@ export const MOCK_USER_DATA = {
     }
   ],
   nftaTiers: [
-    { tier: "Basic", price: 500, currency: "USDT", dailyYield: 25, description: "Entry-level mining node" },
-    { tier: "Pro", price: 2000, currency: "USDT", dailyYield: 55, description: "High-performance node" },
-    { tier: "Elite", price: 5000, currency: "USDT", dailyYield: 150, description: "Maximum yield enterprise node" },
+    { tier: "Basic", price: 500, currency: "USDT", dailyYield: 25, description: "入门级挖矿节点" },
+    { tier: "Pro", price: 2000, currency: "USDT", dailyYield: 55, description: "高性能节点" },
+    { tier: "Elite", price: 5000, currency: "USDT", dailyYield: 150, description: "最大收益企业级节点" },
   ],
   nftbTiers: [
-    { tier: "Junior", tierZh: "初级", name: "Ordinary Scepter", nameZh: "普通权杖", price: 500, currency: "USDT/TOF", level: 1, weight: 1, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 20, predictionFlow: 0.4, description: "Junior shareholder node – 20% dividend share" },
-    { tier: "Intermediate", tierZh: "中级", name: "Rare Crown", nameZh: "稀有王冠", price: 1000, currency: "USDT/TOF", level: 2, weight: 2, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 30, predictionFlow: 0.5, description: "Intermediate shareholder node – 30% dividend share" },
-    { tier: "Advanced", tierZh: "高级", name: "Legendary Throne", nameZh: "传说神座", price: 2000, currency: "USDT/TOF", level: 3, weight: 4, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 40, predictionFlow: 0.6, description: "Advanced shareholder node – 40% dividend share" },
+    { tier: "Junior", tierZh: "初级", name: "Ordinary Scepter", nameZh: "普通权杖", price: 500, currency: "USDT/TOF", level: 1, weight: 1, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 20, predictionFlow: 0.4, description: "初级股东节点 – 20% 分红比例" },
+    { tier: "Intermediate", tierZh: "中级", name: "Rare Crown", nameZh: "稀有王冠", price: 1000, currency: "USDT/TOF", level: 2, weight: 2, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 30, predictionFlow: 0.5, description: "中级股东节点 – 30% 分红比例" },
+    { tier: "Advanced", tierZh: "高级", name: "Legendary Throne", nameZh: "传说神座", price: 2000, currency: "USDT/TOF", level: 3, weight: 4, maxSupply: 2000, usdtQuota: 1000, tofQuota: 1000, dividendShare: 40, predictionFlow: 0.6, description: "高级股东节点 – 40% 分红比例" },
   ],
   // --- Purchase Records ---
   purchaseRecords: [
@@ -120,13 +120,13 @@ export const MOCK_USER_DATA = {
     tot: {
       totalSupply: 1000000000,
       circulatingSupply: 450000000,
-      burnRate: "1.2% / mo",
+      burnRate: "1.2% / 月",
       transactionFee: "2%",
     },
     tof: {
       totalSupply: 10000000,
       circulatingSupply: 2500000,
-      burnRate: "5% per withdrawal",
+      burnRate: "每次提现 5%",
       transactionFee: "0.5%",
     }
   },
@@ -148,12 +148,12 @@ export const MOCK_USER_DATA = {
       { address: "0xF8d...1a34", nodesCount: 4, teamSize: 15, totalInvested: 8800, status: "enabled" as const },
     ],
     recentTransactions: [
-      { from: "0xA3f...8b21", action: "Buy NFTA Pro", amount: 2000, time: "2 min ago" },
-      { from: "0xB7c...2d45", action: "Withdraw TOT", amount: 450, time: "8 min ago" },
-      { from: "0xD4a...3c89", action: "Buy NFTB Advanced", amount: 2000, time: "15 min ago" },
-      { from: "0xC1e...9f67", action: "Swap TOT→USDT", amount: 1200, time: "22 min ago" },
-      { from: "0xF8d...1a34", action: "Buy NFTA Elite", amount: 5000, time: "35 min ago" },
-      { from: "0xA3f...8b21", action: "Claim Dividends", amount: 320, time: "1 hr ago" },
+      { from: "0xA3f...8b21", action: "购买 NFTA Pro", amount: 2000, time: "2 分钟前" },
+      { from: "0xB7c...2d45", action: "提取 TOT", amount: 450, time: "8 分钟前" },
+      { from: "0xD4a...3c89", action: "购买 NFTB 高级", amount: 2000, time: "15 分钟前" },
+      { from: "0xC1e...9f67", action: "兑换 TOT→USDT", amount: 1200, time: "22 分钟前" },
+      { from: "0xF8d...1a34", action: "购买 NFTA Elite", amount: 5000, time: "35 分钟前" },
+      { from: "0xA3f...8b21", action: "领取分红", amount: 320, time: "1 小时前" },
     ],
     settings: {
       withdrawFeeRate: "5%",

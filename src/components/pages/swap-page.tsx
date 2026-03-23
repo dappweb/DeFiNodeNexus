@@ -133,7 +133,7 @@ export function SwapPage() {
       return;
     }
     if (!swap || !tot || !usdt) {
-      toast({ title: "合约未配置", description: "请检查 NEXT_PUBLIC 合约地址", variant: "destructive" });
+      toast({ title: t("toastContractMissing"), description: t("toastContractMissingDesc"), variant: "destructive" });
       return;
     }
 
@@ -147,7 +147,7 @@ export function SwapPage() {
         if (allowance < input) {
           const approveRes = await execTx(usdt.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
-            toast({ title: "授权失败", description: approveRes.error, variant: "destructive" });
+            toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
             return;
           }
@@ -157,18 +157,18 @@ export function SwapPage() {
         const minTotOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         const txRes = await execTx(swap.buyTot(input, minTotOut));
         if (!txRes.success) {
-          toast({ title: "买入失败", description: txRes.error, variant: "destructive" });
+          toast({ title: t("toastBuyFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
           return;
         }
 
-        toast({ title: "买入成功", description: txRes.hash?.slice(0, 10) + "..." });
+        toast({ title: t("toastBuySuccess"), description: txRes.hash?.slice(0, 10) + "..." });
       } else {
         const allowance = await tot.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           const approveRes = await execTx(tot.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
-            toast({ title: "授权失败", description: approveRes.error, variant: "destructive" });
+            toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
             return;
           }
@@ -178,12 +178,12 @@ export function SwapPage() {
         const minUsdtOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         const txRes = await execTx(swap.sellTot(input, minUsdtOut));
         if (!txRes.success) {
-          toast({ title: "卖出失败", description: txRes.error, variant: "destructive" });
+          toast({ title: t("toastSellFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
           return;
         }
 
-        toast({ title: "卖出成功", description: txRes.hash?.slice(0, 10) + "..." });
+        toast({ title: t("toastSellSuccess"), description: txRes.hash?.slice(0, 10) + "..." });
       }
 
       setAmountIn("");
@@ -197,7 +197,7 @@ export function SwapPage() {
   const fromBalance = useMemo(() => (side === "BUY" ? usdtBalance : totBalance), [side, usdtBalance, totBalance]);
 
   const formatCountdown = (seconds: number) => {
-    if (seconds <= 0) return "可触发";
+    if (seconds <= 0) return t("canTrigger");
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     return `${h}h ${m}m`;
@@ -210,29 +210,29 @@ export function SwapPage() {
         <CardContent className="pt-5 pb-4">
           <div className="flex items-center gap-2 mb-3">
             <TrendingUp className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">市场信息</span>
+            <span className="text-sm font-medium">{t("marketInfo")}</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
-              <p className="text-[10px] text-muted-foreground">当前价格</p>
+              <p className="text-[10px] text-muted-foreground">{t("currentPriceLabel")}</p>
               <p className="text-sm font-bold">{Number(currentPrice).toFixed(6)} USDT</p>
             </div>
             <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
-              <p className="text-[10px] text-muted-foreground">我的均价</p>
+              <p className="text-[10px] text-muted-foreground">{t("myAvgPrice")}</p>
               <p className="text-sm font-bold">{Number(avgPrice) > 0 ? `${Number(avgPrice).toFixed(6)} USDT` : "-"}</p>
             </div>
             <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
-              <p className="text-[10px] text-muted-foreground">今日已买 / 上限</p>
+              <p className="text-[10px] text-muted-foreground">{t("dailyBoughtLimit")}</p>
               <p className="text-sm font-bold">{Number(dailyBought).toLocaleString()} / {Number(maxDailyBuy).toLocaleString()} TOT</p>
             </div>
             <div className="p-2 rounded-lg bg-muted/20 border border-border/30">
-              <p className="text-[10px] text-muted-foreground">单笔最大可卖</p>
+              <p className="text-[10px] text-muted-foreground">{t("maxSellPerTx")}</p>
               <p className="text-sm font-bold">{Number(maxSellAmount).toLocaleString()} TOT</p>
             </div>
           </div>
           <div className="flex items-center justify-between mt-3 px-1 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Clock size={11} />通缩倒计时: {formatCountdown(deflationCountdown)}</span>
-            <span className="flex items-center gap-1"><ShieldAlert size={11} />利润税: {Number(profitTaxBps) / 100}%</span>
+            <span className="flex items-center gap-1"><Clock size={11} />{t("deflationCountdownLabel")} {formatCountdown(deflationCountdown)}</span>
+            <span className="flex items-center gap-1"><ShieldAlert size={11} />{t("profitTaxLabel")} {Number(profitTaxBps) / 100}%</span>
           </div>
         </CardContent>
       </Card>
@@ -243,7 +243,7 @@ export function SwapPage() {
             <ArrowDownUp className="h-5 w-5 text-primary" />
             {t("swapTitle")}
           </CardTitle>
-          <p className="text-xs text-muted-foreground">实时链上兑换（TOT/USDT）</p>
+          <p className="text-xs text-muted-foreground">{t("liveSwapDesc")}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -286,17 +286,17 @@ export function SwapPage() {
 
           <div className="space-y-2 p-3 rounded-lg bg-muted/20 border border-border/30">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground flex items-center gap-1"><Info size={12} />链上手续费</span>
+              <span className="text-muted-foreground flex items-center gap-1"><Info size={12} />{t("onChainFee")}</span>
               <span className="font-medium">{side === "BUY" ? `${Number(buyFeeBps) / 100}%` : `${Number(sellFeeBps) / 100}%`}</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">滑点保护</span>
+              <span className="text-muted-foreground">{t("slippageProtection")}</span>
               <span className="font-medium">0.5%</span>
             </div>
           </div>
 
           <Button className="w-full bg-primary hover:bg-primary/90 text-lg py-6" onClick={handleSwap} disabled={loading || !isConnected || !amountIn || Number(amountIn) <= 0}>
-            {loading ? t("swapping") : side === "BUY" ? "买入 TOT" : "卖出 TOT"}
+            {loading ? t("swapping") : side === "BUY" ? t("buyTot") : t("sellTot")}
           </Button>
         </CardContent>
       </Card>

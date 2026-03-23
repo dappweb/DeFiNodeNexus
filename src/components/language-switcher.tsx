@@ -5,14 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Languages } from "lucide-react";
 
 export function LanguageSwitcher() {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   const toggle = () => setLanguage(language === "en" ? "zh" : "en");
 
   return (
     <Button variant="ghost" size="icon" className="rounded-full" onClick={toggle}>
       <Languages className="h-[1.2rem] w-[1.2rem]" />
-      <span className="sr-only">Toggle language</span>
+      <span className="sr-only">{t("toggleLanguage")}</span>
     </Button>
   );
 }

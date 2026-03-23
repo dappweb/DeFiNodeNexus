@@ -158,10 +158,10 @@ export function EarningsPage() {
   };
 
   const typeLabels: Record<EarningRecord["type"], string> = {
-    "NFTA Yield": "NFT-A 收益",
-    "NFTB Dividend": "NFT-B 分红",
-    "Team Bonus": "团队奖励",
-    Withdraw: "提现",
+    "NFTA Yield": t("typeNftaYield"),
+    "NFTB Dividend": t("typeNftbDividend"),
+    "Team Bonus": t("typeTeamBonus"),
+    Withdraw: t("typeWithdraw"),
   };
 
   return (
@@ -171,7 +171,7 @@ export function EarningsPage() {
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10"><Wallet className="h-5 w-5 text-primary" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">可提取收益 (TOT)</p>
+              <p className="text-xs text-muted-foreground">{t("withdrawableEarnings")}</p>
               <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(withdrawableIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
@@ -180,7 +180,7 @@ export function EarningsPage() {
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-accent/10"><Coins className="h-5 w-5 text-accent" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">累计收益 (TOT)</p>
+              <p className="text-xs text-muted-foreground">{t("cumulativeEarnings")}</p>
               <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(cumulativeIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
@@ -189,7 +189,7 @@ export function EarningsPage() {
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-green-500/10"><CalendarDays className="h-5 w-5 text-green-500" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">今日收益 (TOT)</p>
+              <p className="text-xs text-muted-foreground">{t("todayEarningsLabel")}</p>
               <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(todayIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
@@ -205,9 +205,9 @@ export function EarningsPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Tabs value={range} onValueChange={(value) => setRange(value as "7d" | "30d" | "all")}>
               <TabsList className="h-8">
-                <TabsTrigger value="7d" className="text-xs px-2 sm:px-3 h-7">最近7天</TabsTrigger>
-                <TabsTrigger value="30d" className="text-xs px-2 sm:px-3 h-7">最近30天</TabsTrigger>
-                <TabsTrigger value="all" className="text-xs px-2 sm:px-3 h-7">全部</TabsTrigger>
+                <TabsTrigger value="7d" className="text-xs px-2 sm:px-3 h-7">{t("last7Days")}</TabsTrigger>
+                <TabsTrigger value="30d" className="text-xs px-2 sm:px-3 h-7">{t("last30Days")}</TabsTrigger>
+                <TabsTrigger value="all" className="text-xs px-2 sm:px-3 h-7">{t("allTime")}</TabsTrigger>
               </TabsList>
             </Tabs>
             <Tabs value={filter} onValueChange={setFilter}>
@@ -222,14 +222,14 @@ export function EarningsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">当前筛选条件下暂无链上收益记录</p>
+            <p className="text-sm text-muted-foreground">{t("noEarningsRecord")}</p>
           ) : (
             filtered.map((item) => (
               <div key={item.key} className="rounded-lg border border-border/50 p-4 flex items-center justify-between gap-3">
                 <div>
                   <Badge className={typeColors[item.type]}>{typeLabels[item.type]}</Badge>
                   <p className="text-xs text-muted-foreground mt-2">Block #{item.block}</p>
-                  <p className="text-xs text-muted-foreground">时间: {item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : "-"}</p>
+                  <p className="text-xs text-muted-foreground">{t("timeLabel")} {item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : "-"}</p>
                   <p className="text-xs text-muted-foreground">Tx: {item.txHash.slice(0, 10)}...{item.txHash.slice(-6)}</p>
                 </div>
                 <div className="text-right">

@@ -375,10 +375,10 @@ export function AdminPage() {
 
       <Tabs defaultValue="nexus" className="space-y-6">
         <TabsList className="grid grid-cols-5 w-full max-w-2xl">
-          <TabsTrigger value="nexus" className="text-xs gap-1"><Settings size={14} /><span>Nexus</span></TabsTrigger>
-          <TabsTrigger value="tiers" className="text-xs gap-1"><ShieldCheck size={14} /><span>Tiers</span></TabsTrigger>
-          <TabsTrigger value="swap" className="text-xs gap-1"><Wallet size={14} /><span>Swap</span></TabsTrigger>
-          <TabsTrigger value="ops" className="text-xs gap-1"><Activity size={14} /><span>Ops</span></TabsTrigger>
+          <TabsTrigger value="nexus" className="text-xs gap-1"><Settings size={14} /><span>基础设置</span></TabsTrigger>
+          <TabsTrigger value="tiers" className="text-xs gap-1"><ShieldCheck size={14} /><span>档位</span></TabsTrigger>
+          <TabsTrigger value="swap" className="text-xs gap-1"><Wallet size={14} /><span>兑换</span></TabsTrigger>
+          <TabsTrigger value="ops" className="text-xs gap-1"><Activity size={14} /><span>运营</span></TabsTrigger>
           <TabsTrigger value="announcement" className="text-xs gap-1"><span>公告</span></TabsTrigger>
         </TabsList>
 
@@ -390,10 +390,10 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="Treasury address" />
+                <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="财库地址" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Treasury", async () => {
                   if (!nexus) return;
-                  if (!validateAddressField("Treasury", treasury)) return;
+                  if (!validateAddressField("财库地址", treasury)) return;
                   setLoading(true);
                   const r = await execTx(nexus.setTreasury(treasury));
                   setLoading(false);
@@ -422,12 +422,12 @@ export function AdminPage() {
               }, "确认更新 4 个分账钱包地址？")}>设置 4 钱包</Button>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF burn bps" type="number" />
-                <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF claim bps" type="number" />
+                <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 销毁比例 (bps)" type="number" />
+                <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF 领取费率 (bps)" type="number" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("更新 TOF 参数", async () => {
                   if (!nexus) return;
-                  if (!validateBpsField("TOF burn bps", tofBurnBps)) return;
-                  if (!validateBpsField("TOF claim bps", tofClaimFeeBps)) return;
+                  if (!validateBpsField("TOF 销毁比例", tofBurnBps)) return;
+                  if (!validateBpsField("TOF 领取费率", tofClaimFeeBps)) return;
                   setLoading(true);
                   const r1 = await execTx(nexus.setTofBurnBps(BigInt(tofBurnBps || "0")));
                   if (!r1.success) {
@@ -443,8 +443,8 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={withdrawLevel} onChange={(e) => setWithdrawLevel(e.target.value)} placeholder="level 0-5" type="number" />
-                <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="withdraw fee bps" type="number" />
+                <Input value={withdrawLevel} onChange={(e) => setWithdrawLevel(e.target.value)} placeholder="等级 0-5" type="number" />
+                <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="提现费率 (bps)" type="number" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置提现费率", async () => {
                   if (!nexus) return;
                   const level = Number(withdrawLevel || "0");
@@ -453,7 +453,7 @@ export function AdminPage() {
                     pushOperationLog("设置提现费率", "error", "level 越界");
                     return;
                   }
-                  if (!validateBpsField("withdraw fee bps", withdrawFeeBps)) return;
+                  if (!validateBpsField("提现费率", withdrawFeeBps)) return;
                   setLoading(true);
                   const r = await execTx(nexus.setWithdrawFeeBps(level, BigInt(withdrawFeeBps || "0")));
                   setLoading(false);
@@ -462,11 +462,11 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="Distributor address" />
+                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="分发器地址" />
                 <div className="flex items-center gap-2 px-2"><Switch checked={distributorStatus} onCheckedChange={setDistributorStatus} /><span className="text-sm">{distributorStatus ? "授权" : "取消授权"}</span></div>
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Distributor", async () => {
                   if (!nexus) return;
-                  if (!validateAddressField("Distributor", distributorAddr)) return;
+                  if (!validateAddressField("分发器地址", distributorAddr)) return;
                   setLoading(true);
                   const r = await execTx(nexus.setDistributor(distributorAddr, distributorStatus));
                   setLoading(false);
@@ -485,17 +485,17 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="tierId" type="number" />
-                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="price (18 decimals)" />
-                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="dailyYield (18 decimals)" />
-                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="maxSupply" type="number" />
+                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="档位 ID" type="number" />
+                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (18位精度)" />
+                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="日产出 (18位精度)" />
+                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="最大供应量" type="number" />
                 <div className="flex items-center gap-2 px-2"><Switch checked={nftaActive} onCheckedChange={setNftaActive} /><span className="text-sm">{nftaActive ? "启用" : "停用"}</span></div>
               </div>
               <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("保存 NFTA Tier", async () => {
                 if (!nexus) return;
-                if (!validatePositiveAmount("NFT-A price", nftaPrice)) return;
-                if (!validatePositiveAmount("NFT-A dailyYield", nftaYield)) return;
-                if (!validatePositiveAmount("NFT-A maxSupply", nftaSupply)) return;
+                if (!validatePositiveAmount("NFT-A 价格", nftaPrice)) return;
+                if (!validatePositiveAmount("NFT-A 日产出", nftaYield)) return;
+                if (!validatePositiveAmount("NFT-A 最大供应量", nftaSupply)) return;
                 setLoading(true);
                 const r = await execTx(
                   nexus.configureNftaTier(
@@ -572,17 +572,17 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">买入手续费 (buyFeeBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，100 = 1%</p>
-                  <Input value={swapBuyFeeBps} onChange={(e) => setSwapBuyFeeBps(e.target.value)} placeholder="buyFeeBps" type="number" />
+                  <Input value={swapBuyFeeBps} onChange={(e) => setSwapBuyFeeBps(e.target.value)} placeholder="买入手续费 bps" type="number" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">卖出手续费 (sellFeeBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，500 = 5%</p>
-                  <Input value={swapSellFeeBps} onChange={(e) => setSwapSellFeeBps(e.target.value)} placeholder="sellFeeBps" type="number" />
+                  <Input value={swapSellFeeBps} onChange={(e) => setSwapSellFeeBps(e.target.value)} placeholder="卖出手续费 bps" type="number" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">盈利税 (profitTaxBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，仅对盈利卖出部分生效</p>
-                  <Input value={swapProfitTaxBps} onChange={(e) => setSwapProfitTaxBps(e.target.value)} placeholder="profitTaxBps" type="number" />
+                  <Input value={swapProfitTaxBps} onChange={(e) => setSwapProfitTaxBps(e.target.value)} placeholder="盈利税 bps" type="number" />
                 </div>
               </div>
 
@@ -590,17 +590,17 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">分红触发阈值 (distributionThreshold)</p>
                   <p className="text-[11px] text-muted-foreground">单位 TOT，达到后触发分红流程</p>
-                  <Input value={swapDistributionThreshold} onChange={(e) => setSwapDistributionThreshold(e.target.value)} placeholder="distributionThreshold (TOT)" />
+                  <Input value={swapDistributionThreshold} onChange={(e) => setSwapDistributionThreshold(e.target.value)} placeholder="分红触发阈值 (TOT)" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">单地址日买入上限 (maxDailyBuy)</p>
                   <p className="text-[11px] text-muted-foreground">单位 TOT</p>
-                  <Input value={swapMaxDailyBuy} onChange={(e) => setSwapMaxDailyBuy(e.target.value)} placeholder="maxDailyBuy (TOT)" />
+                  <Input value={swapMaxDailyBuy} onChange={(e) => setSwapMaxDailyBuy(e.target.value)} placeholder="日买入上限 (TOT)" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">单次卖出上限 (maxSellBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，基于用户持仓比例限制</p>
-                  <Input value={swapMaxSellBps} onChange={(e) => setSwapMaxSellBps(e.target.value)} placeholder="maxSellBps" type="number" />
+                  <Input value={swapMaxSellBps} onChange={(e) => setSwapMaxSellBps(e.target.value)} placeholder="单次卖出上限 bps" type="number" />
                 </div>
               </div>
 
@@ -608,17 +608,17 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">通缩比例 (deflationBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，用于定时通缩销毁</p>
-                  <Input value={swapDeflationBps} onChange={(e) => setSwapDeflationBps(e.target.value)} placeholder="deflationBps" type="number" />
+                  <Input value={swapDeflationBps} onChange={(e) => setSwapDeflationBps(e.target.value)} placeholder="通缩比例 bps" type="number" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("保存 Swap 参数", async () => {
                   if (!swap) return;
-                  if (!validateBpsField("buyFeeBps", swapBuyFeeBps)) return;
-                  if (!validateBpsField("sellFeeBps", swapSellFeeBps)) return;
-                  if (!validateBpsField("profitTaxBps", swapProfitTaxBps)) return;
-                  if (!validateBpsField("maxSellBps", swapMaxSellBps)) return;
-                  if (!validateBpsField("deflationBps", swapDeflationBps)) return;
-                  if (!validatePositiveAmount("distributionThreshold", swapDistributionThreshold)) return;
-                  if (!validatePositiveAmount("maxDailyBuy", swapMaxDailyBuy)) return;
+                  if (!validateBpsField("买入手续费", swapBuyFeeBps)) return;
+                  if (!validateBpsField("卖出手续费", swapSellFeeBps)) return;
+                  if (!validateBpsField("盈利税", swapProfitTaxBps)) return;
+                  if (!validateBpsField("卖出上限", swapMaxSellBps)) return;
+                  if (!validateBpsField("通缩比例", swapDeflationBps)) return;
+                  if (!validatePositiveAmount("分红触发阈值", swapDistributionThreshold)) return;
+                  if (!validatePositiveAmount("日买入上限", swapMaxDailyBuy)) return;
 
                   setLoading(true);
                   const r1 = await execTx(swap.setBuyFeeBps(BigInt(swapBuyFeeBps || "0")));
@@ -668,12 +668,12 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">注入 TOT 数量</p>
                   <p className="text-[11px] text-muted-foreground">与 USDT 一起用于补充流动性</p>
-                  <Input value={addLpTot} onChange={(e) => setAddLpTot(e.target.value)} placeholder="add TOT amount" />
+                  <Input value={addLpTot} onChange={(e) => setAddLpTot(e.target.value)} placeholder="注入 TOT 数量" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">注入 USDT 数量</p>
                   <p className="text-[11px] text-muted-foreground">与 TOT 按目标池子比例注入</p>
-                  <Input value={addLpUsdt} onChange={(e) => setAddLpUsdt(e.target.value)} placeholder="add USDT amount" />
+                  <Input value={addLpUsdt} onChange={(e) => setAddLpUsdt(e.target.value)} placeholder="注入 USDT 数量" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("注入流动性", async () => {
                   if (!swap) return;
@@ -685,6 +685,69 @@ export function AdminPage() {
                   notifyTx(r.success, r.hash, r.error, "注入流动性");
                   if (r.success) refreshData();
                 }, "确认向 Swap 注入流动性？")}>注入流动性</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium">移除 TOT 数量</p>
+                  <p className="text-[11px] text-muted-foreground">从池中取出 TOT</p>
+                  <Input value={removeLpTot} onChange={(e) => setRemoveLpTot(e.target.value)} placeholder="移除 TOT 数量" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium">移除 USDT 数量</p>
+                  <p className="text-[11px] text-muted-foreground">从池中取出 USDT</p>
+                  <Input value={removeLpUsdt} onChange={(e) => setRemoveLpUsdt(e.target.value)} placeholder="移除 USDT 数量" />
+                </div>
+                <Button disabled={!isOwner || !swap || loading} variant="destructive" onClick={() => runAction("移除流动性", async () => {
+                  if (!swap) return;
+                  if (!validatePositiveAmount("TOT 移除量", removeLpTot)) return;
+                  if (!validatePositiveAmount("USDT 移除量", removeLpUsdt)) return;
+                  setLoading(true);
+                  const r = await execTx(swap.removeLiquidity(toUnits(removeLpTot), toUnits(removeLpUsdt)));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error, "移除流动性");
+                  if (r.success) refreshData();
+                }, "⚠️ 确认从 Swap 池移除流动性？此操作将影响池深度。")}>移除流动性</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium">更新 Nexus 地址</p>
+                  <p className="text-[11px] text-muted-foreground">修改 Swap 关联的 DeFiNodeNexus 合约</p>
+                  <Input value={swapNexusAddr} onChange={(e) => setSwapNexusAddr(e.target.value)} placeholder="Nexus 合约地址" />
+                </div>
+                <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("设置 Nexus 地址", async () => {
+                  if (!swap) return;
+                  if (!validateAddressField("Nexus 地址", swapNexusAddr)) return;
+                  setLoading(true);
+                  const r = await execTx(swap.setNexus(swapNexusAddr));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error, "设置 Nexus 地址");
+                  if (r.success) refreshData();
+                }, `确认更新 Nexus 地址为\n${swapNexusAddr} ?`)}>设置 Nexus 地址</Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-destructive">紧急提取代币</p>
+                  <p className="text-[11px] text-muted-foreground">提取卡在合约中的任意 ERC20 代币</p>
+                  <Input value={emergencyToken} onChange={(e) => setEmergencyToken(e.target.value)} placeholder="代币地址" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-destructive">提取数量</p>
+                  <p className="text-[11px] text-muted-foreground">18 位精度</p>
+                  <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="数量" />
+                </div>
+                <Button disabled={!isOwner || !swap || loading} variant="destructive" onClick={() => runAction("紧急提取", async () => {
+                  if (!swap) return;
+                  if (!validateAddressField("Token 地址", emergencyToken)) return;
+                  if (!validatePositiveAmount("提取数量", emergencyAmount)) return;
+                  setLoading(true);
+                  const r = await execTx(swap.emergencyWithdraw(emergencyToken, toUnits(emergencyAmount)));
+                  setLoading(false);
+                  notifyTx(r.success, r.hash, r.error, "紧急提取");
+                  if (r.success) refreshData();
+                }, "⚠️ 紧急提取操作！确认执行？")}>紧急提取</Button>
               </div>
             </CardContent>
           </Card>
@@ -700,7 +763,7 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="fundRewardPool TOT amount" />
+                <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="奖励池注入 TOT 数量" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("注入奖励池", async () => {
                   if (!nexus) return;
                   if (!validatePositiveAmount("奖励池注入量", rewardFundAmount)) return;
@@ -712,7 +775,7 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="distributeNftbDividends TOT amount" />
+                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="NFTB 分红 TOT 数量" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("手动分红 NFTB", async () => {
                   if (!nexus) return;
                   if (!validatePositiveAmount("分红金额", dividendAmount)) return;
