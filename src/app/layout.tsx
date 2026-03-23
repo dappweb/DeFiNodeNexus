@@ -6,8 +6,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'DeFi Node Nexus',
-  description: 'Precision DeFi node management and yield optimization platform.',
+  title: 'Truth Oracle',
+  description: 'Truth Oracle blockchain analytics and yield platform.',
 };
 
 export default function RootLayout({

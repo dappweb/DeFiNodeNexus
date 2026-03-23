@@ -410,11 +410,11 @@ contract DeFiNodeNexus is Ownable {
 
     function getUserLevel(address user) public view returns (uint8) {
         Account memory a = accounts[user];
-        if (a.directReferrals >= 50 && a.teamNodes >= 100) return 5;
-        if (a.directReferrals >= 30 && a.teamNodes >= 60)  return 4;
-        if (a.directReferrals >= 15 && a.teamNodes >= 30)  return 3;
-        if (a.directReferrals >= 8  && a.teamNodes >= 15)  return 2;
-        if (a.directReferrals >= 3  && a.teamNodes >= 5)   return 1;
+        if (a.directReferrals >= 50) return 5;
+        if (a.directReferrals >= 30) return 4;
+        if (a.directReferrals >= 15) return 3;
+        if (a.directReferrals >= 8)  return 2;
+        if (a.directReferrals >= 3)  return 1;
         return 0;
     }
 

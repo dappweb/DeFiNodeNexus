@@ -16,7 +16,6 @@ type TeamMember = {
   address: string;
   level: number;
   totalNodes: bigint;
-  teamNodes: bigint;
   pendingTot: bigint;
 };
 
@@ -28,7 +27,6 @@ export function TeamPage() {
 
   const [level, setLevel] = useState(0);
   const [directReferrals, setDirectReferrals] = useState<bigint>(BigInt(0));
-  const [teamNodes, setTeamNodes] = useState<bigint>(BigInt(0));
   const [teamCommissionEarned, setTeamCommissionEarned] = useState<bigint>(BigInt(0));
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [inviteUrl, setInviteUrl] = useState("");
@@ -43,7 +41,6 @@ export function TeamPage() {
 
     setLevel(Number(lv));
     setDirectReferrals(account.directReferrals);
-    setTeamNodes(account.teamNodes);
     setTeamCommissionEarned(account.teamCommissionEarned);
 
     if (!provider) {
@@ -67,7 +64,6 @@ export function TeamPage() {
         address: memberAddr,
         level: Number(memberLevel),
         totalNodes: memberAccount.totalNodes,
-        teamNodes: memberAccount.teamNodes,
         pendingTot: memberAccount.pendingTot,
       } as TeamMember;
     });
@@ -95,7 +91,7 @@ export function TeamPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="glass-panel p-4 text-center">
           <Users className="h-6 w-6 text-primary mx-auto mb-2" />
           <p className="text-[10px] text-muted-foreground">Direct Members</p>
@@ -111,11 +107,6 @@ export function TeamPage() {
           <p className="text-[10px] text-muted-foreground">{t("teamLevel")}</p>
           <p className="text-2xl font-bold font-headline">Lv.{level}</p>
         </Card>
-        <Card className="glass-panel p-4 text-center">
-          <Coins className="h-6 w-6 text-green-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">Team Nodes</p>
-          <p className="text-2xl font-bold font-headline">{teamNodes.toString()}</p>
-        </Card>
         <Card className="glass-panel p-4 text-center col-span-2 md:col-span-1">
           <Trophy className="h-6 w-6 text-purple-500 mx-auto mb-2" />
           <p className="text-[10px] text-muted-foreground">Team Commission (USDT)</p>
@@ -129,11 +120,11 @@ export function TeamPage() {
           <CardTitle className="text-base">Level Rules (on-chain)</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div>Lv1: 直推≥3 且 团队节点≥5</div>
-          <div>Lv2: 直推≥8 且 团队节点≥15</div>
-          <div>Lv3: 直推≥15 且 团队节点≥30</div>
-          <div>Lv4: 直推≥30 且 团队节点≥60</div>
-          <div>Lv5: 直推≥50 且 团队节点≥100</div>
+          <div>Lv1: 直推≥3</div>
+          <div>Lv2: 直推≥8</div>
+          <div>Lv3: 直推≥15</div>
+          <div>Lv4: 直推≥30</div>
+          <div>Lv5: 直推≥50</div>
         </CardContent>
       </Card>
 
@@ -173,14 +164,10 @@ export function TeamPage() {
                   <span className="font-mono text-xs text-muted-foreground">{member.address}</span>
                   <Badge variant="outline" className="text-xs">Lv.{member.level}</Badge>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
                     <p className="text-[10px] text-muted-foreground">Total Nodes</p>
                     <p className="font-medium text-sm">{member.totalNodes.toString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Team Nodes</p>
-                    <p className="font-medium text-sm">{member.teamNodes.toString()}</p>
                   </div>
                   <div>
                     <p className="text-[10px] text-muted-foreground">Pending TOT</p>

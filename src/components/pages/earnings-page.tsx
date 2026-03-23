@@ -16,6 +16,7 @@ type EarningRecord = {
   amount: bigint;
   block: number;
   txHash: string;
+  timestamp: number;
 };
 
 export function EarningsPage() {
@@ -24,19 +25,31 @@ export function EarningsPage() {
   const nexus = useNexusContract();
 
   const [filter, setFilter] = useState("all");
+  const [range, setRange] = useState<"7d" | "30d" | "all">("7d");
   const [pendingTot, setPendingTot] = useState<bigint>(BigInt(0));
   const [claimedTot, setClaimedTot] = useState<bigint>(BigInt(0));
   const [withdrawnTot, setWithdrawnTot] = useState<bigint>(BigInt(0));
   const [todayEstimate, setTodayEstimate] = useState<bigint>(BigInt(0));
+  const [userLevel, setUserLevel] = useState(0);
+  const [withdrawFeeBps, setWithdrawFeeBps] = useState<bigint>(BigInt(0));
+  const [tofBurnBps, setTofBurnBps] = useState<bigint>(BigInt(0));
   const [records, setRecords] = useState<EarningRecord[]>([]);
 
   const refreshData = useCallback(async () => {
     if (!nexus || !address) return;
 
-    const account = await nexus.accounts(address);
+    const [account, levelValue, feeBpsValue, burnBpsValue] = await Promise.all([
+      nexus.accounts(address),
+      nexus.getUserLevel(address),
+      nexus.withdrawFeeBpsByLevel(await nexus.getUserLevel(address)),
+      nexus.tofBurnBps(),
+    ]);
     setPendingTot(account.pendingTot);
     setClaimedTot(account.claimedTot);
     setWithdrawnTot(account.withdrawnTot);
+    setUserLevel(Number(levelValue));
+    setWithdrawFeeBps(feeBpsValue);
+    setTofBurnBps(burnBpsValue);
 
     const nftaIds = await nexus.getUserNftaNodes(address);
     const todayPendings = await Promise.all(nftaIds.map((id: bigint) => nexus.pendingNftaYield(id)));
@@ -58,48 +71,67 @@ export function EarningsPage() {
     ]);
 
     const mapped: EarningRecord[] = [];
+    const blockTimestamps = new Map<number, number>();
+
+    const getBlockTimestamp = async (blockNumber: number) => {
+      if (blockTimestamps.has(blockNumber)) {
+        return blockTimestamps.get(blockNumber)!;
+      }
+      const block = await provider.getBlock(blockNumber);
+      const ts = block?.timestamp ?? 0;
+      blockTimestamps.set(blockNumber, ts);
+      return ts;
+    };
 
     for (const ev of yieldEvents) {
       const args = (ev as any).args;
+      const timestamp = await getBlockTimestamp(ev.blockNumber);
       mapped.push({
         key: `${ev.transactionHash}-yield`,
         type: "NFTA Yield",
         amount: args.totAmount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
+        timestamp,
       });
     }
 
     for (const ev of divEvents) {
       const args = (ev as any).args;
+      const timestamp = await getBlockTimestamp(ev.blockNumber);
       mapped.push({
         key: `${ev.transactionHash}-div`,
         type: "NFTB Dividend",
         amount: args.amount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
+        timestamp,
       });
     }
 
     for (const ev of teamEvents) {
       const args = (ev as any).args;
+      const timestamp = await getBlockTimestamp(ev.blockNumber);
       mapped.push({
         key: `${ev.transactionHash}-team`,
         type: "Team Bonus",
         amount: args.amount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
+        timestamp,
       });
     }
 
     for (const ev of wdEvents) {
       const args = (ev as any).args;
+      const timestamp = await getBlockTimestamp(ev.blockNumber);
       mapped.push({
         key: `${ev.transactionHash}-wd`,
         type: "Withdraw",
         amount: args.totAmount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
+        timestamp,
       });
     }
 
@@ -112,12 +144,42 @@ export function EarningsPage() {
   }, [refreshData]);
 
   const filtered = useMemo(() => {
-    if (filter === "all") return records;
-    if (filter === "nfta") return records.filter((r) => r.type === "NFTA Yield");
-    if (filter === "nftb") return records.filter((r) => r.type === "NFTB Dividend");
-    if (filter === "team") return records.filter((r) => r.type === "Team Bonus");
-    return records;
-  }, [records, filter]);
+    const now = Math.floor(Date.now() / 1000);
+    const ranged = records.filter((item) => {
+      if (range === "all") return true;
+      const days = range === "7d" ? 7 : 30;
+      return item.timestamp >= now - days * 24 * 60 * 60;
+    });
+
+    if (filter === "all") return ranged;
+    if (filter === "nfta") return ranged.filter((r) => r.type === "NFTA Yield");
+    if (filter === "nftb") return ranged.filter((r) => r.type === "NFTB Dividend");
+    if (filter === "team") return ranged.filter((r) => r.type === "Team Bonus");
+    return ranged;
+  }, [records, filter, range]);
+
+  const todayIncome = useMemo(() => {
+    const now = Math.floor(Date.now() / 1000);
+    return records
+      .filter((item) => item.type !== "Withdraw" && item.timestamp >= now - 24 * 60 * 60)
+      .reduce((sum, item) => sum + item.amount, BigInt(0));
+  }, [records]);
+
+  const cumulativeIncome = useMemo(() => claimedTot, [claimedTot]);
+  const withdrawableIncome = useMemo(() => pendingTot, [pendingTot]);
+
+  const withdrawPreview = useMemo(() => {
+    const tofFee = (withdrawableIncome * withdrawFeeBps) / BigInt(10000);
+    const burnFee = (tofFee * tofBurnBps) / BigInt(10000);
+    return {
+      level: userLevel,
+      feeBps: withdrawFeeBps,
+      totOut: withdrawableIncome,
+      tofFee,
+      burnFee,
+      treasuryTof: tofFee - burnFee,
+    };
+  }, [withdrawableIncome, userLevel, withdrawFeeBps, tofBurnBps]);
 
   const typeColors: Record<EarningRecord["type"], string> = {
     "NFTA Yield": "bg-primary/15 text-primary border-primary/30",
@@ -128,13 +190,13 @@ export function EarningsPage() {
 
   return (
     <div className="space-y-6 overflow-hidden">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="glass-panel p-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10"><Wallet className="h-5 w-5 text-primary" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">Pending TOT</p>
-              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(pendingTot, 18)).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">可提取收益 (TOT)</p>
+              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(withdrawableIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
         </Card>
@@ -142,8 +204,8 @@ export function EarningsPage() {
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-accent/10"><Coins className="h-5 w-5 text-accent" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">Claimed TOT</p>
-              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(claimedTot, 18)).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">累计收益 (TOT)</p>
+              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(cumulativeIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
         </Card>
@@ -151,21 +213,37 @@ export function EarningsPage() {
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-green-500/10"><CalendarDays className="h-5 w-5 text-green-500" /></div>
             <div>
-              <p className="text-xs text-muted-foreground">Withdrawn TOT</p>
-              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(withdrawnTot, 18)).toLocaleString()}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="glass-panel p-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-blue-500/10"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Today Estimate</p>
-              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(todayEstimate, 18)).toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">今日收益 (TOT)</p>
+              <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(todayIncome, 18)).toLocaleString()}</p>
             </div>
           </div>
         </Card>
       </div>
+
+      <Card className="glass-panel p-5">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">当前等级</p>
+            <p className="font-semibold">Lv.{withdrawPreview.level}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">提现费率</p>
+            <p className="font-semibold">{Number(withdrawPreview.feeBps) / 100}%</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">预计到账 TOT</p>
+            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.totOut, 18)).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">需支付 TOF</p>
+            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.tofFee, 18)).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">其中销毁 TOF</p>
+            <p className="font-semibold">{Number(ethers.formatUnits(withdrawPreview.burnFee, 18)).toLocaleString()}</p>
+          </div>
+        </div>
+      </Card>
 
       <Card className="glass-panel">
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
@@ -173,24 +251,34 @@ export function EarningsPage() {
             <TrendingUp className="h-5 w-5 text-primary" />
             {t("earningsTitle")}
           </CardTitle>
-          <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList className="h-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <Tabs value={range} onValueChange={(value) => setRange(value as "7d" | "30d" | "all")}>
+              <TabsList className="h-8">
+                <TabsTrigger value="7d" className="text-xs px-2 sm:px-3 h-7">最近7天</TabsTrigger>
+                <TabsTrigger value="30d" className="text-xs px-2 sm:px-3 h-7">最近30天</TabsTrigger>
+                <TabsTrigger value="all" className="text-xs px-2 sm:px-3 h-7">全部</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs value={filter} onValueChange={setFilter}>
+              <TabsList className="h-8">
               <TabsTrigger value="all" className="text-xs px-2 sm:px-3 h-7">{t("allTypes")}</TabsTrigger>
               <TabsTrigger value="nfta" className="text-xs px-2 sm:px-3 h-7">NFTA</TabsTrigger>
               <TabsTrigger value="nftb" className="text-xs px-2 sm:px-3 h-7">NFTB</TabsTrigger>
               <TabsTrigger value="team" className="text-xs px-2 sm:px-3 h-7">{t("teamBonus")}</TabsTrigger>
-            </TabsList>
-          </Tabs>
+              </TabsList>
+            </Tabs>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           {filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无链上收益记录</p>
+            <p className="text-sm text-muted-foreground">当前筛选条件下暂无链上收益记录</p>
           ) : (
             filtered.map((item) => (
               <div key={item.key} className="rounded-lg border border-border/50 p-4 flex items-center justify-between gap-3">
                 <div>
                   <Badge className={typeColors[item.type]}>{item.type}</Badge>
                   <p className="text-xs text-muted-foreground mt-2">Block #{item.block}</p>
+                  <p className="text-xs text-muted-foreground">时间: {item.timestamp ? new Date(item.timestamp * 1000).toLocaleString() : "-"}</p>
                   <p className="text-xs text-muted-foreground">Tx: {item.txHash.slice(0, 10)}...{item.txHash.slice(-6)}</p>
                 </div>
                 <div className="text-right">

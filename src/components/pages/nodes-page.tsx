@@ -91,6 +91,8 @@ export function NodesPage() {
   const [selectedNftbTier, setSelectedNftbTier] = useState<number | null>(null);
   const [nftbPayToken, setNftbPayToken] = useState<"USDT" | "TOF">("USDT");
   const [referrer, setReferrer] = useState(ethers.ZeroAddress);
+  const [nftaStage, setNftaStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
+  const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const zeroValue = ethers.parseUnits("0", 0);
   const MAX_TIER_SCAN = 20;
 
@@ -219,9 +221,11 @@ export function NodesPage() {
     }
 
     setLoading(true);
+    setNftaStage("checking");
     try {
       const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
       if (allowance < tier.price) {
+        setNftaStage("approving");
         const approveRes = await execTx(usdt.approve(CONTRACTS.NEXUS, tier.price));
         if (!approveRes.success) {
           toast({ title: "USDT 授权失败", description: approveRes.error, variant: "destructive" });
@@ -229,15 +233,19 @@ export function NodesPage() {
         }
       }
 
+      setNftaStage("purchasing");
       const res = await execTx(nexus.buyNfta(BigInt(tier.id), referrer || ethers.ZeroAddress));
       if (!res.success) {
         toast({ title: "购买 NFTA 失败", description: res.error, variant: "destructive" });
         return;
       }
 
+      setNftaStage("confirming");
+
       toast({ title: "购买 NFTA 成功", description: res.hash?.slice(0, 10) + "..." });
       await refreshData();
     } finally {
+      setNftaStage("idle");
       setLoading(false);
     }
   };
@@ -253,6 +261,7 @@ export function NodesPage() {
     }
 
     setLoading(true);
+    setNftbStage("checking");
     try {
       if (nftbPayToken === "USDT") {
         if (tier.usdtRemaining <= 0n) {
@@ -262,17 +271,20 @@ export function NodesPage() {
         if (!usdt) return;
         const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
+          setNftbStage("approving");
           const approveRes = await execTx(usdt.approve(CONTRACTS.NEXUS, tier.price));
           if (!approveRes.success) {
             toast({ title: "USDT 授权失败", description: approveRes.error, variant: "destructive" });
             return;
           }
         }
+        setNftbStage("purchasing");
         const res = await execTx(nexus.buyNftbWithUsdt(BigInt(tier.id), referrer || ethers.ZeroAddress));
         if (!res.success) {
           toast({ title: "购买 NFTB 失败", description: res.error, variant: "destructive" });
           return;
         }
+        setNftbStage("confirming");
         toast({ title: "购买 NFTB 成功", description: res.hash?.slice(0, 10) + "..." });
       } else {
         if (tier.tofRemaining <= 0n) {
@@ -282,25 +294,45 @@ export function NodesPage() {
         if (!tof) return;
         const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
+          setNftbStage("approving");
           const approveRes = await execTx(tof.approve(CONTRACTS.NEXUS, tier.price));
           if (!approveRes.success) {
             toast({ title: "TOF 授权失败", description: approveRes.error, variant: "destructive" });
             return;
           }
         }
+        setNftbStage("purchasing");
         const res = await execTx(nexus.buyNftbWithTof(BigInt(tier.id), referrer || ethers.ZeroAddress));
         if (!res.success) {
           toast({ title: "购买 NFTB 失败", description: res.error, variant: "destructive" });
           return;
         }
+        setNftbStage("confirming");
         toast({ title: "购买 NFTB 成功", description: res.hash?.slice(0, 10) + "..." });
       }
 
       await refreshData();
     } finally {
+      setNftbStage("idle");
       setLoading(false);
     }
   };
+
+  const nftaStageText = useMemo(() => {
+    if (nftaStage === "checking") return "校验授权中...";
+    if (nftaStage === "approving") return "授权中，请在钱包确认...";
+    if (nftaStage === "purchasing") return "购买提交中，请在钱包确认...";
+    if (nftaStage === "confirming") return "链上确认中...";
+    return "";
+  }, [nftaStage]);
+
+  const nftbStageText = useMemo(() => {
+    if (nftbStage === "checking") return "校验授权中...";
+    if (nftbStage === "approving") return "授权中，请在钱包确认...";
+    if (nftbStage === "purchasing") return "购买提交中，请在钱包确认...";
+    if (nftbStage === "confirming") return "链上确认中...";
+    return "";
+  }, [nftbStage]);
 
   const claimAllNfta = async () => {
     if (!nexus) return;
@@ -434,8 +466,9 @@ export function NodesPage() {
                 <p className="text-xs text-muted-foreground">当前链上未读取到 NFTA 档位，请联系管理员先配置档位。</p>
               ) : null}
               <Button onClick={buyNfta} disabled={!isConnected || loading || selectedNftaTier === null || !canBuySelectedNfta}>
-                {loading ? "处理中..." : "购买 NFTA"}
+                {loading ? (nftaStageText || "处理中...") : "购买 NFTA"}
               </Button>
+              {loading && nftaStageText ? <p className="text-xs text-primary">{nftaStageText}</p> : null}
               {!canBuySelectedNfta || !isConnected || loading || selectedNftaTier === null ? (
                 <p className="text-xs text-muted-foreground">{nftaDisabledReason}</p>
               ) : null}
@@ -478,8 +511,9 @@ export function NodesPage() {
               ) : null}
 
               <Button onClick={buyNftb} disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}>
-                {loading ? "处理中..." : `购买 NFTB (${nftbPayToken})`}
+                {loading ? (nftbStageText || "处理中...") : `购买 NFTB (${nftbPayToken})`}
               </Button>
+              {loading && nftbStageText ? <p className="text-xs text-primary">{nftbStageText}</p> : null}
               {!canBuySelectedNftb || !isConnected || loading || selectedNftbTier === null ? (
                 <p className="text-xs text-muted-foreground">{nftbDisabledReason}</p>
               ) : null}
