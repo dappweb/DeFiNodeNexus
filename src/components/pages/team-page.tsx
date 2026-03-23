@@ -104,8 +104,8 @@ export function TeamPage() {
         </Card>
         <Card className="glass-panel p-4 text-center">
           <Star className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
-          <p className="text-[10px] text-muted-foreground">{t("teamLevel")}</p>
-          <p className="text-2xl font-bold font-headline">Lv.{level}</p>
+          <p className="text-[10px] text-muted-foreground">团队层级</p>
+          <p className="text-2xl font-bold font-headline">第 {level} 层</p>
         </Card>
         <Card className="glass-panel p-4 text-center col-span-2 md:col-span-1">
           <Trophy className="h-6 w-6 text-purple-500 mx-auto mb-2" />
@@ -117,14 +117,14 @@ export function TeamPage() {
       <Card className="glass-panel">
         <CardHeader className="flex flex-row items-center gap-2 pb-3">
           <ShieldCheck className="text-yellow-500" />
-          <CardTitle className="text-base">Level Rules (on-chain)</CardTitle>
+          <CardTitle className="text-base">层级规则（链上）</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <div>Lv1: 直推≥3</div>
-          <div>Lv2: 直推≥8</div>
-          <div>Lv3: 直推≥15</div>
-          <div>Lv4: 直推≥30</div>
-          <div>Lv5: 直推≥50</div>
+          <div>第1层：直推≥3</div>
+          <div>第2层：直推≥8</div>
+          <div>第3层：直推≥15</div>
+          <div>第4层：直推≥30</div>
+          <div>第5层：直推≥50</div>
         </CardContent>
       </Card>
 
