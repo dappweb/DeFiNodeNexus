@@ -115,9 +115,19 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!needsReferralBinding) return;
     if (!ownerAddress) return;
-    if (referrerAddress.trim()) return;
-    setReferrerAddress(ownerAddress);
-  }, [needsReferralBinding, ownerAddress, referrerAddress]);
+
+    setReferrerAddress((prev) => {
+      const trimmed = prev.trim();
+      const isSelf = Boolean(address) && trimmed.toLowerCase() === address.toLowerCase();
+      const isValid = ethers.isAddress(trimmed);
+
+      if (!trimmed || !isValid || isSelf) {
+        return ownerAddress;
+      }
+
+      return prev;
+    });
+  }, [needsReferralBinding, ownerAddress, address]);
 
   if (!mounted) return null;
 
