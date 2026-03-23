@@ -28,7 +28,11 @@ async function main() {
   console.log("USDT token:", usdtToken);
 
   const DeFiNodeNexus = await hre.ethers.getContractFactory("DeFiNodeNexus");
-  const contract = await DeFiNodeNexus.deploy(totToken, tofToken, usdtToken);
+  const contract = await hre.upgrades.deployProxy(
+    DeFiNodeNexus,
+    [totToken, tofToken, usdtToken, deployer.address],
+    { kind: "uups", initializer: "initialize" }
+  );
   await contract.waitForDeployment();
 
   const deployedAddress = await contract.getAddress();
@@ -78,7 +82,11 @@ async function main() {
   console.log("\n--- Deploying TOTSwap ---");
 
   const TOTSwap = await hre.ethers.getContractFactory("TOTSwap");
-  const swap = await TOTSwap.deploy(totToken, usdtToken);
+  const swap = await hre.upgrades.deployProxy(
+    TOTSwap,
+    [totToken, usdtToken, deployer.address],
+    { kind: "uups", initializer: "initialize" }
+  );
   await swap.waitForDeployment();
 
   const swapAddress = await swap.getAddress();

@@ -9,7 +9,11 @@ async function deployToken(name, symbol, maxSupplyRaw, initialSupplyRaw, ownerAd
   }
 
   const Token = await hre.ethers.getContractFactory("TOTToken");
-  const token = await Token.deploy(name, symbol, maxSupply, initialSupply, ownerAddress);
+  const token = await hre.upgrades.deployProxy(
+    Token,
+    [name, symbol, maxSupply, initialSupply, ownerAddress],
+    { kind: "uups", initializer: "initialize" }
+  );
   await token.waitForDeployment();
   return token.getAddress();
 }

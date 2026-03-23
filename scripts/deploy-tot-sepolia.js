@@ -34,7 +34,11 @@ async function main() {
   console.log("Initial supply:", initialSupplyRaw);
 
   const TOTToken = await hre.ethers.getContractFactory("TOTToken");
-  const token = await TOTToken.deploy(name, symbol, maxSupply, initialSupply, ownerAddress);
+  const token = await hre.upgrades.deployProxy(
+    TOTToken,
+    [name, symbol, maxSupply, initialSupply, ownerAddress],
+    { kind: "uups", initializer: "initialize" }
+  );
   await token.waitForDeployment();
 
   const tokenAddress = await token.getAddress();

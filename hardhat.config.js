@@ -1,5 +1,6 @@
 require("dotenv").config();
 require("@nomicfoundation/hardhat-ethers");
+require("@openzeppelin/hardhat-upgrades");
 
 const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL || "";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY || "";

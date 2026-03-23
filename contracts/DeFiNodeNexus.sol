@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -26,7 +28,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *   - Requires TOF fee based on user level (Lv0 10% → Lv5 3%)
  *   - Part of TOF fee is burned
  */
-contract DeFiNodeNexus is Ownable {
+contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     uint256 private constant ACC_PRECISION = 1e18;
@@ -83,9 +85,9 @@ contract DeFiNodeNexus is Ownable {
 
     // ======================== Tokens ========================
 
-    IERC20 public immutable totToken;
-    IERC20 public immutable tofToken;
-    IERC20 public immutable usdtToken;
+    IERC20 public totToken;
+    IERC20 public tofToken;
+    IERC20 public usdtToken;
 
     // ======================== Wallets ========================
 
@@ -98,13 +100,13 @@ contract DeFiNodeNexus is Ownable {
 
     // ======================== State ========================
 
-    uint256 public nextNftaTierId = 1;
-    uint256 public nextNftbTierId = 1;
-    uint256 public nextNodeId = 1;
+    uint256 public nextNftaTierId;
+    uint256 public nextNftbTierId;
+    uint256 public nextNodeId;
     mapping(uint256 => uint256) public totalWeightByTier;
     mapping(uint256 => uint256) public accDividendPerWeightByTier;
-    uint256 public tofBurnBps = 500;           // 5% of TOF fee is burned
-    uint256 public tofClaimFeeBps = 7000;      // 70% TOF fee when claiming NFTA yield
+    uint256 public tofBurnBps;           // 5% of TOF fee is burned
+    uint256 public tofClaimFeeBps;      // 70% TOF fee when claiming NFTA yield
 
     // ======================== Mappings ========================
 
@@ -140,21 +142,34 @@ contract DeFiNodeNexus is Ownable {
 
     // ======================== Constructor ========================
 
-    constructor(address _tot, address _tof, address _usdt) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _tot, address _tof, address _usdt, address initialOwner) public initializer {
         require(_tot != address(0), "TOT is zero");
         require(_tof != address(0), "TOF is zero");
         require(_usdt != address(0), "USDT is zero");
+        require(initialOwner != address(0), "Owner is zero");
+
+        __Ownable_init(initialOwner);
 
         totToken = IERC20(_tot);
         tofToken = IERC20(_tof);
         usdtToken = IERC20(_usdt);
 
-        treasury = msg.sender;
-        zeroLineWallet = msg.sender;
-        communityWallet = msg.sender;
-        foundationWallet = msg.sender;
-        institutionWallet = msg.sender;
-        projectWallet = msg.sender;
+        treasury = initialOwner;
+        zeroLineWallet = initialOwner;
+        communityWallet = initialOwner;
+        foundationWallet = initialOwner;
+        institutionWallet = initialOwner;
+        projectWallet = initialOwner;
+        nextNftaTierId = 1;
+        nextNftbTierId = 1;
+        nextNodeId = 1;
+        tofBurnBps = 500;
+        tofClaimFeeBps = 7000;
 
         // Withdraw fee by user level (TOF cost per TOT withdrawn)
         withdrawFeeBpsByLevel[0] = 1000;  // Lv0  10%
@@ -724,5 +739,9 @@ contract DeFiNodeNexus is Ownable {
             accounts[current].teamNodes += amount;
             current = accounts[current].referrer;
         }
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+        newImplementation;
     }
 }

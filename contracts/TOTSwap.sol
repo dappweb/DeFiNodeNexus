@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -28,7 +30,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *   - §2.4: Each sell ≤ 50% of sender's TOT balance.
  *   - §2.5: Each address can buy ≤ 100,000 TOT per 24 hours.
  */
-contract TOTSwap is Ownable {
+contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     uint256 private constant BASIS_POINTS = 10_000;
@@ -37,8 +39,8 @@ contract TOTSwap is Ownable {
 
     // ======================== Tokens ========================
 
-    IERC20 public immutable totToken;
-    IERC20 public immutable usdtToken;
+    IERC20 public totToken;
+    IERC20 public usdtToken;
 
     // ======================== AMM Reserves ========================
 
@@ -47,14 +49,14 @@ contract TOTSwap is Ownable {
 
     // ======================== Fee Config ========================
 
-    uint256 public buyFeeBps  = 100;    // 1%   buy fee
-    uint256 public sellFeeBps = 500;    // 5%   sell fee
-    uint256 public profitTaxBps = 1000; // 10%  profit tax (admin adjustable)
+    uint256 public buyFeeBps;    // 1%   buy fee
+    uint256 public sellFeeBps;   // 5%   sell fee
+    uint256 public profitTaxBps; // 10%  profit tax (admin adjustable)
 
     // ======================== NFTB Dividend Pool ========================
 
     uint256 public nftbDividendPool;
-    uint256 public distributionThreshold = 10_000e18; // 10,000 TOT triggers distribution
+    uint256 public distributionThreshold; // 10,000 TOT triggers distribution
 
     // ======================== External Contract ========================
 
@@ -64,7 +66,7 @@ contract TOTSwap is Ownable {
 
     uint256 public lastDeflationTime;
     uint256 public constant DEFLATION_INTERVAL = 4 hours;
-    uint256 public deflationBps = 80;       // 0.8% per 4-hour interval
+    uint256 public deflationBps;       // 0.8% per 4-hour interval
     uint256 public constant MAX_DEFLATION_CATCHUP = 6; // max 6 intervals (24h) per call
 
     // ======================== User Tracking ========================
@@ -75,10 +77,10 @@ contract TOTSwap is Ownable {
 
     /// @dev Daily buy limit tracking.
     mapping(address => mapping(uint256 => uint256)) public dailyBought;
-    uint256 public maxDailyBuy = 100_000e18; // §2.5: 100,000 TOT per 24h
+    uint256 public maxDailyBuy; // §2.5: 100,000 TOT per 24h
 
     /// @dev Sell limit: max percentage of balance per sell.
-    uint256 public maxSellBps = 5000; // §2.4: 50%
+    uint256 public maxSellBps; // §2.4: 50%
 
     // ======================== Events ========================
 
@@ -92,10 +94,26 @@ contract TOTSwap is Ownable {
 
     // ======================== Constructor ========================
 
-    constructor(address _tot, address _usdt) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _tot, address _usdt, address initialOwner) public initializer {
         require(_tot != address(0) && _usdt != address(0), "Zero address");
+        require(initialOwner != address(0), "Owner is zero");
+
+        __Ownable_init(initialOwner);
+
         totToken = IERC20(_tot);
         usdtToken = IERC20(_usdt);
+        buyFeeBps = 100;
+        sellFeeBps = 500;
+        profitTaxBps = 1000;
+        distributionThreshold = 10_000e18;
+        deflationBps = 80;
+        maxDailyBuy = 100_000e18;
+        maxSellBps = 5000;
         lastDeflationTime = block.timestamp;
     }
 
@@ -523,5 +541,9 @@ contract TOTSwap is Ownable {
     /// @notice Emergency withdraw tokens stuck in the contract.
     function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
         IERC20(token).safeTransfer(msg.sender, amount);
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+        newImplementation;
     }
 }
