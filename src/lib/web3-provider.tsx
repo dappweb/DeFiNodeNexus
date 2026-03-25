@@ -21,6 +21,7 @@ interface Web3ContextType {
   provider: ethers.BrowserProvider | null;
   signer: ethers.JsonRpcSigner | null;
   connect: () => Promise<void>;
+  addProjectTokens: () => Promise<void>;
   disconnect: () => void;
   chainId: number | null;
 }
@@ -160,6 +161,12 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
     }
   }, [ensureSepolia, hydrateConnection]);
 
+  const addProjectTokens = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.ethereum) return;
+    await ensureSepolia();
+    await addProjectTokensToWallet();
+  }, [ensureSepolia]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !window.ethereum) return;
 
@@ -220,7 +227,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   }, [ensureSepolia, hydrateConnection]);
 
   return (
-    <Web3Context.Provider value={{ address, isConnected, isConnecting, provider, signer, connect, disconnect, chainId }}>
+    <Web3Context.Provider value={{ address, isConnected, isConnecting, provider, signer, connect, addProjectTokens, disconnect, chainId }}>
       {children}
     </Web3Context.Provider>
   );

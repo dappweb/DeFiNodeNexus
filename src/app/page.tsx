@@ -256,10 +256,11 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-dvh flex-col bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-30 flex h-16 md:h-20 items-center gap-4 border-b border-border/50 bg-background/80 px-4 md:px-6 backdrop-blur-md">
-        <div className="flex shrink-0 items-center gap-2">
+      <header className="sticky top-0 z-30 border-b border-border/50 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-16 md:h-20 w-full max-w-7xl items-center gap-3 md:gap-4 px-3 sm:px-4 md:px-6">
+          <div className="flex shrink-0 items-center gap-2">
           <img
             src="/truth-oracle-logo-light.svg"
             alt="Truth Oracle"
@@ -270,10 +271,10 @@ export default function DashboardPage() {
             alt="Truth Oracle"
             className="hidden dark:block h-10 md:h-16 w-auto object-contain"
           />
-        </div>
+          </div>
 
         {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-1 ml-6">
+          <nav className="hidden md:flex items-center gap-1 ml-6">
           {navItems.map((item) => (
             <button
               key={item.key}
@@ -288,67 +289,70 @@ export default function DashboardPage() {
               {item.label}
             </button>
           ))}
-        </nav>
+          </nav>
 
-        <div className="flex-1" />
+          <div className="flex-1" />
 
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          <LanguageSwitcher />
-          <ThemeToggle />
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
+            <LanguageSwitcher />
+            <ThemeToggle />
 
-          {!isConnected ? (
-            <Button
-              onClick={connect}
-              disabled={isConnecting}
-              size="sm"
-              className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-4 font-semibold cyan-glow text-xs"
-            >
-              <LinkIcon size={14} className="mr-1.5" />
-              {isConnecting ? t("connecting") : t("connectWallet")}
-            </Button>
-          ) : (
-            <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20">
-              <button
-                onClick={disconnect}
-                className="flex items-center gap-2 px-2 rounded-full transition-opacity hover:opacity-80"
-                title={t("disconnect")}
-                aria-label={t("disconnect")}
-              >
-                <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-                <span className="text-xs font-mono text-accent">{displayAddress}</span>
-              </button>
+            {!isConnected ? (
               <Button
-                onClick={disconnect}
+                onClick={connect}
+                disabled={isConnecting}
                 size="sm"
-                variant="ghost"
-                className="hidden md:inline-flex h-7 px-2 text-xs rounded-full"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-3 sm:px-4 font-semibold cyan-glow text-xs"
               >
-                <LogOut size={14} className="mr-1" />
-                {t("disconnect")}
+                <LinkIcon size={14} className="mr-1.5" />
+                <span className="hidden sm:inline">{isConnecting ? t("connecting") : t("connectWallet")}</span>
+                <span className="sm:hidden">{isConnecting ? "..." : t("connectWallet")}</span>
               </Button>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20 max-w-[10.5rem] sm:max-w-none">
+                <button
+                  onClick={disconnect}
+                  className="flex items-center gap-2 px-2 rounded-full transition-opacity hover:opacity-80 min-w-0"
+                  title={t("disconnect")}
+                  aria-label={t("disconnect")}
+                >
+                  <div className="h-2 w-2 rounded-full bg-accent animate-pulse shrink-0" />
+                  <span className="text-xs font-mono text-accent truncate">{displayAddress}</span>
+                </button>
+                <Button
+                  onClick={disconnect}
+                  size="sm"
+                  variant="ghost"
+                  className="hidden md:inline-flex h-7 px-2 text-xs rounded-full"
+                >
+                  <LogOut size={14} className="mr-1" />
+                  {t("disconnect")}
+                </Button>
+              </div>
+            )}
 
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6">
-        <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-          <div className="grid grid-cols-3 gap-2 text-xs">
-            <div className="flex items-center justify-start gap-2">
+      <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6">
+        <div className="mx-auto w-full max-w-7xl">
+          <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <div className="flex items-center justify-between sm:justify-start gap-2">
               <span className="text-muted-foreground">{t("networkLabel")}</span>
               <span className={chainId === 11155111 ? "text-primary font-medium" : "text-destructive font-medium"}>
                 {chainId === 11155111 ? "Sepolia" : t("notTestnet")}
               </span>
             </div>
-            <div className="flex items-center justify-start gap-2">
+              <div className="flex items-center justify-between sm:justify-start gap-2">
               <span className="text-muted-foreground">{t("walletLabel")}</span>
               <span className={isConnected ? "text-primary font-medium" : "text-muted-foreground"}>
                 {isConnected ? t("connected") : isConnecting ? t("connecting") : t("notConnected")}
               </span>
             </div>
-            <div className="flex items-center justify-start gap-2">
+              <div className="flex items-center justify-between sm:justify-start gap-2">
               <span className="text-muted-foreground">{t("referralBindLabel")}</span>
               <span className={
                 !isConnected || isOwner || referrerBound
@@ -365,9 +369,9 @@ export default function DashboardPage() {
 
         {needsReferralBinding ? (
           /* ===== Referral Binding Overlay ===== */
-          <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+          <div className="flex items-center justify-center min-h-[calc(100dvh-12rem)] md:min-h-[calc(100vh-10rem)]">
             <div className="w-full max-w-md mx-auto">
-              <div className="rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl p-8 shadow-xl space-y-6">
+              <div className="rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl p-5 sm:p-8 shadow-xl space-y-6">
                 {/* Icon & Title */}
                 <div className="text-center space-y-3">
                   <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -423,6 +427,7 @@ export default function DashboardPage() {
         ) : (
           pageContent[activeTab]
         )}
+        </div>
       </main>
 
       {/* Footer */}

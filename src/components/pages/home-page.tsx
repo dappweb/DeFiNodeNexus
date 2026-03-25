@@ -11,6 +11,7 @@ import { useLanguage } from "@/components/language-provider";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AnnouncementItem } from "@/lib/announcement";
 import { useWeb3 } from "@/lib/web3-provider";
+import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
 import { useERC20Contract, useNexusContract, useSwapContract } from "@/hooks/use-contract";
 import {
@@ -23,7 +24,8 @@ import {
 
 export function HomePage() {
   const { t } = useLanguage();
-  const { address, isConnected } = useWeb3();
+  const { address, isConnected, addProjectTokens } = useWeb3();
+  const { toast } = useToast();
   const nexus = useNexusContract();
   const swap = useSwapContract();
   const tot = useERC20Contract(CONTRACTS.TOT);
@@ -37,6 +39,7 @@ export function HomePage() {
   const [nftbCount, setNftbCount] = useState(0);
   const [totPrice, setTotPrice] = useState("0");
   const [tofPrice, setTofPrice] = useState("0");
+  const [isAddingTokens, setIsAddingTokens] = useState(false);
 
   const typeColors: Record<string, string> = {
     update: "bg-blue-500/15 text-blue-500 border-blue-500/30",
@@ -140,6 +143,27 @@ export function HomePage() {
 
   const selectedAnnouncement = announcements.find((item) => item.id === selectedAnnouncementId) ?? null;
 
+  const handleAddProjectTokens = async () => {
+    if (!isConnected) {
+      toast({
+        title: t("connectWallet"),
+        description: t("connectWalletFirst"),
+      });
+      return;
+    }
+
+    setIsAddingTokens(true);
+    try {
+      await addProjectTokens();
+      toast({
+        title: t("addTokenToWallet"),
+        description: t("addTokenToWalletDesc"),
+      });
+    } finally {
+      setIsAddingTokens(false);
+    }
+  };
+
   const priceCards = [
     { symbol: "TOT", price: Number(totPrice), change24h: 0, volume: "-" },
     { symbol: "TOF", price: Number(tofPrice), change24h: 0, volume: "-" },
@@ -209,7 +233,7 @@ export function HomePage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p className="text-sm text-muted-foreground">{t("predictionEntryDesc")}</p>
-          <div>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               disabled={!predictionPlatformUrl}
               onClick={() => {
@@ -219,8 +243,15 @@ export function HomePage() {
             >
               {t("predictionEntryButton")}
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleAddProjectTokens}
+              disabled={isAddingTokens}
+            >
+              {isAddingTokens ? t("processing") : t("addTokenToWallet")}
+            </Button>
             {!predictionPlatformUrl ? (
-              <p className="mt-2 text-xs text-muted-foreground">{t("predictionEntryMissing")}</p>
+              <p className="w-full text-xs text-muted-foreground">{t("predictionEntryMissing")}</p>
             ) : null}
           </div>
         </CardContent>
