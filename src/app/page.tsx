@@ -229,16 +229,16 @@ export default function DashboardPage() {
     <div className="flex min-h-screen flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 flex h-16 md:h-20 items-center gap-4 border-b border-border/50 bg-background/80 px-4 md:px-6 backdrop-blur-md">
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <img
             src="/truth-oracle-logo-light.svg"
             alt="Truth Oracle"
-            className="h-14 md:h-16 w-auto object-contain dark:hidden"
+            className="h-10 md:h-16 w-auto object-contain dark:hidden"
           />
           <img
             src="/truth-oracle-logo-dark.svg"
             alt="Truth Oracle"
-            className="hidden dark:block h-14 md:h-16 w-auto object-contain"
+            className="hidden dark:block h-10 md:h-16 w-auto object-contain"
           />
         </div>
 
@@ -262,7 +262,7 @@ export default function DashboardPage() {
 
         <div className="flex-1" />
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
           <LanguageSwitcher />
           <ThemeToggle />
 
@@ -278,15 +278,20 @@ export default function DashboardPage() {
             </Button>
           ) : (
             <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20">
-              <div className="flex items-center gap-2 px-2">
+              <button
+                onClick={disconnect}
+                className="flex items-center gap-2 px-2 rounded-full transition-opacity hover:opacity-80"
+                title={t("disconnect")}
+                aria-label={t("disconnect")}
+              >
                 <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
                 <span className="text-xs font-mono text-accent">{displayAddress}</span>
-              </div>
+              </button>
               <Button
                 onClick={disconnect}
                 size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-xs rounded-full"
+                className="hidden md:inline-flex h-7 px-2 text-xs rounded-full"
               >
                 <LogOut size={14} className="mr-1" />
                 {t("disconnect")}
@@ -298,7 +303,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+      <main className="flex-1 overflow-auto p-4 md:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
           <div className="grid grid-cols-3 gap-2 text-xs">
             <div className="flex items-center justify-start gap-2">
@@ -396,8 +401,8 @@ export default function DashboardPage() {
       </footer>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-border/50 bg-background/95 backdrop-blur-md">
-        <div className="flex items-center justify-around h-16 px-2">
+      <nav className="md:hidden fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto flex w-full max-w-md items-center justify-around h-16 px-2 rounded-2xl border border-border/50 bg-background/95 backdrop-blur-md shadow-lg">
           {navItems.map((item) => (
             <button
               key={item.key}
