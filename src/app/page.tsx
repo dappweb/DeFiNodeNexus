@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserPlus,
   CheckCircle2,
+  LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,7 +39,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<PageTab>("home");
   const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
   const { t } = useLanguage();
-  const { address, isConnected, isConnecting, connect, chainId } = useWeb3();
+  const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWeb3();
   const nexus = useNexusContract();
   const { toast } = useToast();
 
@@ -276,9 +277,20 @@ export default function DashboardPage() {
               {isConnecting ? t("connecting") : t("connectWallet")}
             </Button>
           ) : (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/30 border border-accent/20">
-              <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-              <span className="text-xs font-mono text-accent">{displayAddress}</span>
+            <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20">
+              <div className="flex items-center gap-2 px-2">
+                <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                <span className="text-xs font-mono text-accent">{displayAddress}</span>
+              </div>
+              <Button
+                onClick={disconnect}
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs rounded-full"
+              >
+                <LogOut size={14} className="mr-1" />
+                {t("disconnect")}
+              </Button>
             </div>
           )}
 
