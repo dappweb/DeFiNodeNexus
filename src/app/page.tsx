@@ -47,12 +47,32 @@ export default function DashboardPage() {
   const [referrerBound, setReferrerBound] = useState(false);
   const [referrerStatusLoaded, setReferrerStatusLoaded] = useState(false);
   const [referrerAddress, setReferrerAddress] = useState("");
+  const [referrerFromUrl, setReferrerFromUrl] = useState<string | null>(null);
   const [isBindingReferrer, setIsBindingReferrer] = useState(false);
   const [referrerError, setReferrerError] = useState("");
   const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const search = new URLSearchParams(window.location.search);
+    const candidate = search.get("ref") || search.get("referrer") || search.get("invite");
+
+    if (!candidate) {
+      setReferrerFromUrl(null);
+      return;
+    }
+
+    if (ethers.isAddress(candidate)) {
+      setReferrerFromUrl(candidate);
+      return;
+    }
+
+    setReferrerFromUrl(null);
   }, []);
 
   // Check on-chain referrer binding when address changes
@@ -132,7 +152,7 @@ export default function DashboardPage() {
     ? ownerAddress !== null && address.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
-  const shouldShowAdmin = isConnected;
+  const shouldShowAdmin = isOwner;
 
   // Referral binding required: connected + not owner + not yet bound
   const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
@@ -150,20 +170,30 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!needsReferralBinding) return;
-    if (!ownerAddress) return;
 
     setReferrerAddress((prev) => {
       const trimmed = prev.trim();
       const isSelf = Boolean(address) && trimmed.toLowerCase() === address.toLowerCase();
       const isValid = ethers.isAddress(trimmed);
 
-      if (!trimmed || !isValid || isSelf) {
+      if (!trimmed && referrerFromUrl) {
+        const isUrlSelf = Boolean(address) && referrerFromUrl.toLowerCase() === address.toLowerCase();
+        if (!isUrlSelf) {
+          return referrerFromUrl;
+        }
+      }
+
+      if (!trimmed && ownerAddress) {
         return ownerAddress;
+      }
+
+      if (!trimmed || !isValid || isSelf) {
+        return ownerAddress ?? prev;
       }
 
       return prev;
     });
-  }, [needsReferralBinding, ownerAddress, address]);
+  }, [needsReferralBinding, ownerAddress, address, referrerFromUrl]);
 
   if (!mounted) return null;
 
