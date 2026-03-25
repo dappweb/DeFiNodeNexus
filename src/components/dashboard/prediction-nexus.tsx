@@ -3,9 +3,11 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Globe, ArrowUpRight, Trophy, Target } from "lucide-react";
+import { Globe, ArrowUpRight, Trophy, Target, ExternalLink } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useLanguage } from "@/components/language-provider";
+
+const PREDICTION_PLATFORM_URL = "https://deepseamonster.netlify.app/";
 
 export function PredictionNexus() {
   const history = MOCK_USER_DATA.predictionHistory;
@@ -18,9 +20,15 @@ export function PredictionNexus() {
           <Globe className="text-primary" />
           <CardTitle>{t('predictionNexus')}</CardTitle>
         </div>
-        <Badge className="bg-accent/20 text-accent hover:bg-accent/30 cursor-pointer transition-colors">
-          {t('liveStats')}
-        </Badge>
+        <a
+          href={PREDICTION_PLATFORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Badge className="bg-accent/20 text-accent hover:bg-accent/30 cursor-pointer transition-colors flex items-center gap-1">
+            {t('liveStats')} <ExternalLink size={10} />
+          </Badge>
+        </a>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -60,9 +68,13 @@ export function PredictionNexus() {
             </div>
           </div>
 
-          <Button className="w-full bg-secondary hover:bg-secondary/80 text-foreground border border-border">
-            {t('enterPortal')}
-          </Button>
+          <a href={PREDICTION_PLATFORM_URL} target="_blank" rel="noopener noreferrer" className="w-full block">
+            <Button className="w-full bg-secondary hover:bg-secondary/80 text-foreground border border-border">
+              <ExternalLink size={14} className="mr-2" />
+              {t('enterPortal')}
+            </Button>
+          </a>
+          <p className="text-center text-[10px] text-muted-foreground break-all">{PREDICTION_PLATFORM_URL}</p>
         </div>
       </CardContent>
     </Card>

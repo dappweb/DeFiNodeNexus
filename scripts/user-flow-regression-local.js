@@ -21,8 +21,8 @@ async function expectRevert(action, expectedMessage) {
   }
 }
 
-async function deployTokenProxy(name, symbol, owner, maxSupply = "1000000000", initialSupply = "5000000") {
-  const Factory = await ethers.getContractFactory("TOTToken");
+async function deployTokenProxy(contractName, name, symbol, owner, maxSupply = "1000000000", initialSupply = "5000000") {
+  const Factory = await ethers.getContractFactory(contractName);
   const proxy = await upgrades.deployProxy(
     Factory,
     [
@@ -48,9 +48,9 @@ async function main() {
 
   console.log("Running local user-flow regression with owner:", owner.address);
 
-  const tot = await deployTokenProxy("Truth Oracle Token", "TOT", owner);
-  const tof = await deployTokenProxy("Truth Oracle Fuel", "TOF", owner);
-  const usdt = await deployTokenProxy("Mock USDT", "USDT", owner);
+  const tot = await deployTokenProxy("TOTToken", "Truth Oracle Token", "TOT", owner);
+  const tof = await deployTokenProxy("TOFToken", "Truth Oracle Fuel", "TOF", owner, "10000000000", "5000000");
+  const usdt = await deployTokenProxy("TOTToken", "Mock USDT", "USDT", owner);
 
   const nexusFactory = await ethers.getContractFactory("DeFiNodeNexus");
   const nexus = await upgrades.deployProxy(
@@ -73,8 +73,12 @@ async function main() {
   await (await nexus.setTreasury(treasury.address)).wait();
   await (await nexus.setWallets(zeroLine.address, community.address, foundation.address, institution.address)).wait();
   await (await nexus.setProjectWallet(project.address)).wait();
-  await (await nexus.setDistributor(await swap.getAddress(), true)).wait();
-  await (await swap.setNexus(await nexus.getAddress())).wait();
+  const nexusAddress = await nexus.getAddress();
+  const swapAddress = await swap.getAddress();
+  await (await nexus.setDistributor(swapAddress, true)).wait();
+  await (await swap.setNexus(nexusAddress)).wait();
+  await (await tof.setWhitelisted(nexusAddress, true)).wait();
+  await (await tof.setWhitelisted(swapAddress, true)).wait();
   await (await swap.setDistributionThreshold(ethers.parseUnits("1", 18))).wait();
 
   await (
@@ -90,6 +94,7 @@ async function main() {
   await (
     await nexus.configureNftbTier(
       0,
+      ethers.parseUnits("500", 18),
       ethers.parseUnits("500", 18),
       1,
       100,

@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Megaphone, TrendingUp, TrendingDown, Coins, Database, Layers } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useLanguage } from "@/components/language-provider";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { AnnouncementItem } from "@/lib/announcement";
+import { useWeb3 } from "@/lib/web3-provider";
+import { CONTRACTS } from "@/lib/contracts";
+import { useERC20Contract, useNexusContract, useSwapContract } from "@/hooks/use-contract";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +23,20 @@ import {
 
 export function HomePage() {
   const { t } = useLanguage();
-  const { prices, balances } = MOCK_USER_DATA;
+  const { address, isConnected } = useWeb3();
+  const nexus = useNexusContract();
+  const swap = useSwapContract();
+  const tot = useERC20Contract(CONTRACTS.TOT);
+  const tof = useERC20Contract(CONTRACTS.TOF);
+  const predictionPlatformUrl = process.env.NEXT_PUBLIC_PREDICTION_PLATFORM_URL;
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>(MOCK_USER_DATA.announcements);
   const [selectedAnnouncementId, setSelectedAnnouncementId] = useState<string | number | null>(null);
+  const [totBalance, setTotBalance] = useState("0");
+  const [tofBalance, setTofBalance] = useState("0");
+  const [nftaCount, setNftaCount] = useState(0);
+  const [nftbCount, setNftbCount] = useState(0);
+  const [totPrice, setTotPrice] = useState("0");
+  const [tofPrice, setTofPrice] = useState("0");
 
   const typeColors: Record<string, string> = {
     update: "bg-blue-500/15 text-blue-500 border-blue-500/30",
@@ -64,7 +80,71 @@ export function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadOnChainOverview = async () => {
+      if (!isConnected || !address || !tot || !tof || !nexus || !swap) {
+        if (!cancelled) {
+          setTotBalance("0");
+          setTofBalance("0");
+          setNftaCount(0);
+          setNftbCount(0);
+          setTotPrice("0");
+          setTofPrice("0");
+        }
+        return;
+      }
+
+      try {
+        const [totDec, tofDec, totBal, tofBal, nftaNodes, nftbNodes, currentPrice, tofPerUsdt] = await Promise.all([
+          tot.decimals(),
+          tof.decimals(),
+          tot.balanceOf(address),
+          tof.balanceOf(address),
+          nexus.getUserNftaNodes(address),
+          nexus.getUserNftbNodes(address),
+          swap.getCurrentPrice(),
+          nexus.tofPerUsdt(),
+        ]);
+
+        if (cancelled) return;
+
+        setTotBalance(ethers.formatUnits(totBal, Number(totDec)));
+        setTofBalance(ethers.formatUnits(tofBal, Number(tofDec)));
+        setNftaCount(nftaNodes.length);
+        setNftbCount(nftbNodes.length);
+        setTotPrice(ethers.formatUnits(currentPrice, 18));
+
+        const tofPerUsdtNum = Number(ethers.formatUnits(tofPerUsdt, 18));
+        const usdtPerTof = tofPerUsdtNum > 0 ? (1 / tofPerUsdtNum) : 0;
+        setTofPrice(String(usdtPerTof));
+      } catch {
+        if (!cancelled) {
+          setTotBalance("0");
+          setTofBalance("0");
+          setNftaCount(0);
+          setNftbCount(0);
+          setTotPrice("0");
+          setTofPrice("0");
+        }
+      }
+    };
+
+    loadOnChainOverview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address, tot, tof, nexus, swap]);
+
   const selectedAnnouncement = announcements.find((item) => item.id === selectedAnnouncementId) ?? null;
+
+  const priceCards = [
+    { symbol: "TOT", price: Number(totPrice), change24h: 0, volume: "-" },
+    { symbol: "TOF", price: Number(tofPrice), change24h: 0, volume: "-" },
+    { symbol: "USDT", price: 1, change24h: 0, volume: "-" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -120,6 +200,32 @@ export function HomePage() {
         </DialogContent>
       </Dialog>
 
+      <Card className="glass-panel">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            {t("predictionEntryTitle")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">{t("predictionEntryDesc")}</p>
+          <div>
+            <Button
+              disabled={!predictionPlatformUrl}
+              onClick={() => {
+                if (!predictionPlatformUrl) return;
+                window.open(predictionPlatformUrl, "_blank", "noopener,noreferrer");
+              }}
+            >
+              {t("predictionEntryButton")}
+            </Button>
+            {!predictionPlatformUrl ? (
+              <p className="mt-2 text-xs text-muted-foreground">{t("predictionEntryMissing")}</p>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Asset Overview */}
       <section>
         <h2 className="text-lg font-headline font-semibold mb-4 flex items-center gap-2">
@@ -129,21 +235,19 @@ export function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <StatCard
             title={t('totalTotBalance')}
-            value={`${balances.tot.toLocaleString()} TOT`}
+            value={`${Number(totBalance).toLocaleString()} TOT`}
             icon={Coins}
-            trend={{ value: "12.4%", positive: true }}
           />
           <StatCard
             title={t('totalTofBalance')}
-            value={`${balances.tof.toLocaleString()} TOF`}
+            value={`${Number(tofBalance).toLocaleString()} TOF`}
             icon={Database}
-            trend={{ value: "3.1%", positive: false }}
           />
           <StatCard
             title={t('nftPortfolioValue')}
-            value={`$${(balances.usdt * 12).toLocaleString()}`}
+            value={`${nftaCount + nftbCount}`}
             icon={Layers}
-            description={t('secondaryMarketValue')}
+            description={`${t('totalNftaNodes')}: ${nftaCount} · ${t('totalNftbNodes')}: ${nftbCount}`}
           />
         </div>
       </section>
@@ -158,16 +262,16 @@ export function HomePage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {prices.map((token) => (
+            {priceCards.map((token) => (
               <div key={token.symbol} className="p-4 rounded-xl bg-muted/30 border border-border/50 hover:border-primary/30 transition-colors">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-headline font-bold text-sm">{token.symbol}</span>
                   <div className={`flex items-center gap-1 text-xs font-medium ${token.change24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                     {token.change24h >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                    {token.change24h >= 0 ? '+' : ''}{token.change24h}%
+                    {token.change24h >= 0 ? '+' : ''}{token.change24h.toFixed(2)}%
                   </div>
                 </div>
-                <p className="text-lg font-bold">${token.price.toLocaleString()}</p>
+                <p className="text-lg font-bold">${token.price.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
                 <p className="text-[10px] text-muted-foreground mt-1">{t('volume')}: ${token.volume}</p>
               </div>
             ))}

@@ -5,10 +5,25 @@ import { ethers } from "ethers";
 import { useWeb3 } from "@/lib/web3-provider";
 import { CONTRACTS, NEXUS_ABI, SWAP_ABI, ERC20_ABI } from "@/lib/contracts";
 
+declare global {
+  interface Window {
+    __E2E_CONTRACT_MOCK__?: {
+      getContract: (address: string) => unknown | null;
+    };
+  }
+}
+
+function getE2EContractMock(address: string) {
+  if (typeof window === "undefined") return null;
+  return window.__E2E_CONTRACT_MOCK__?.getContract(address) ?? null;
+}
+
 export function useNexusContract() {
   const { signer, provider } = useWeb3();
   return useMemo(() => {
     if (!CONTRACTS.NEXUS) return null;
+    const mock = getE2EContractMock(CONTRACTS.NEXUS);
+    if (mock) return mock as ethers.Contract;
     const signerOrProvider = signer || provider;
     if (!signerOrProvider) return null;
     return new ethers.Contract(CONTRACTS.NEXUS, NEXUS_ABI, signerOrProvider);
@@ -19,6 +34,8 @@ export function useSwapContract() {
   const { signer, provider } = useWeb3();
   return useMemo(() => {
     if (!CONTRACTS.SWAP) return null;
+    const mock = getE2EContractMock(CONTRACTS.SWAP);
+    if (mock) return mock as ethers.Contract;
     const signerOrProvider = signer || provider;
     if (!signerOrProvider) return null;
     return new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, signerOrProvider);
@@ -29,6 +46,8 @@ export function useERC20Contract(address: string | undefined) {
   const { signer, provider } = useWeb3();
   return useMemo(() => {
     if (!address) return null;
+    const mock = getE2EContractMock(address);
+    if (mock) return mock as ethers.Contract;
     const signerOrProvider = signer || provider;
     if (!signerOrProvider) return null;
     return new ethers.Contract(address, ERC20_ABI, signerOrProvider);

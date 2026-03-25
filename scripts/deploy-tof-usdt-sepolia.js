@@ -1,6 +1,6 @@
 const hre = require("hardhat");
 
-async function deployToken(name, symbol, maxSupplyRaw, initialSupplyRaw, ownerAddress) {
+async function deployToken(contractName, name, symbol, maxSupplyRaw, initialSupplyRaw, ownerAddress) {
   const maxSupply = hre.ethers.parseUnits(maxSupplyRaw, 18);
   const initialSupply = hre.ethers.parseUnits(initialSupplyRaw, 18);
 
@@ -8,7 +8,7 @@ async function deployToken(name, symbol, maxSupplyRaw, initialSupplyRaw, ownerAd
     throw new Error(`${symbol}: initial supply cannot exceed max supply`);
   }
 
-  const Token = await hre.ethers.getContractFactory("TOTToken");
+  const Token = await hre.ethers.getContractFactory(contractName);
   const token = await hre.upgrades.deployProxy(
     Token,
     [name, symbol, maxSupply, initialSupply, ownerAddress],
@@ -34,8 +34,8 @@ async function main() {
 
   const tofName = process.env.TOF_NAME || "TOF Token";
   const tofSymbol = process.env.TOF_SYMBOL || "TOF";
-  const tofMaxSupply = process.env.TOF_MAX_SUPPLY || "1000000000";
-  const tofInitialSupply = process.env.TOF_INITIAL_SUPPLY || tofMaxSupply;
+  const tofMaxSupply = process.env.TOF_MAX_SUPPLY || "10000000000";
+  const tofInitialSupply = process.env.TOF_INITIAL_SUPPLY || "0";
 
   const usdtName = process.env.USDT_NAME || "USDT Test";
   const usdtSymbol = process.env.USDT_SYMBOL || "USDT";
@@ -45,15 +45,22 @@ async function main() {
   console.log("Deploying TOF/USDT with account:", deployer.address);
   console.log("Token owner:", ownerAddress);
 
-  const tofAddress = await deployToken(tofName, tofSymbol, tofMaxSupply, tofInitialSupply, ownerAddress);
+  const tofAddress = await deployToken("TOFToken", tofName, tofSymbol, tofMaxSupply, tofInitialSupply, ownerAddress);
   console.log("TOF deployed to:", tofAddress);
 
-  const usdtAddress = await deployToken(usdtName, usdtSymbol, usdtMaxSupply, usdtInitialSupply, ownerAddress);
+  const predictionMinter = process.env.TOF_PREDICTION_MINTER || ownerAddress;
+  const tofContract = await hre.ethers.getContractAt("TOFToken", tofAddress);
+  const setMinterTx = await tofContract.setPredictionMinter(predictionMinter);
+  await setMinterTx.wait();
+  console.log("TOF prediction minter:", predictionMinter);
+
+  const usdtAddress = await deployToken("TOTToken", usdtName, usdtSymbol, usdtMaxSupply, usdtInitialSupply, ownerAddress);
   console.log("USDT deployed to:", usdtAddress);
 
   console.log("\nSet these in .env:");
   console.log(`TOF_TOKEN_ADDRESS=${tofAddress}`);
   console.log(`USDT_TOKEN_ADDRESS=${usdtAddress}`);
+  console.log(`TOF_PREDICTION_MINTER=${predictionMinter}`);
 }
 
 main().catch((error) => {

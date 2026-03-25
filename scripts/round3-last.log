@@ -1,0 +1,21 @@
+[dotenv@17.3.1] injecting env (9) from .env -- tip: 鈿欙笍  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 鈿★笍 secrets for agents: https://dotenvx.com/as2
+
+=== ROUND 3 START (SEPOLIA) ===
+Deployer: 0x744447d8580EB900b199e852C132F626247a36F7
+A: 0x9A95C190fbB687FcFEB58763155632529043FbE8
+B: 0x341C2AE8d1Dc6d92796A0DA8673e6EC504e06927
+C: 0xf60609A8F0Df33D807202358cbf7A01a1fB65188
+E(new): 0xB6Cc8995836e3c53fd69fcd2aCEe9a5E211Ddd36
+Pump wallets: 1
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:_tls_wrap:1684:19)
+    at TLSSocket.emit (node:events:520:35)
+    at endReadableNT (node:internal/streams/readable:1701:12)
+    at processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'ECONNRESET',
+  path: undefined,
+  host: 'sepolia.infura.io',
+  port: 443,
+  localAddress: null
+}

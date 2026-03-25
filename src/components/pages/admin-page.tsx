@@ -390,7 +390,7 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="财库地址" />
+                <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="财库地址" aria-label="财库地址" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Treasury", async () => {
                   if (!nexus) return;
                   if (!validateAddressField("财库地址", treasury)) return;
@@ -403,10 +403,10 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={zeroLine} onChange={(e) => setZeroLine(e.target.value)} placeholder="0号线钱包" />
-                <Input value={community} onChange={(e) => setCommunity(e.target.value)} placeholder="社区建设钱包" />
-                <Input value={foundation} onChange={(e) => setFoundation(e.target.value)} placeholder="基金会钱包" />
-                <Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="机构钱包" />
+                <Input value={zeroLine} onChange={(e) => setZeroLine(e.target.value)} placeholder="0号线钱包" aria-label="0号线钱包" />
+                <Input value={community} onChange={(e) => setCommunity(e.target.value)} placeholder="社区建设钱包" aria-label="社区建设钱包" />
+                <Input value={foundation} onChange={(e) => setFoundation(e.target.value)} placeholder="基金会钱包" aria-label="基金会钱包" />
+                <Input value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="机构钱包" aria-label="机构钱包" />
               </div>
               <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 4 钱包", async () => {
                 if (!nexus) return;
@@ -422,12 +422,15 @@ export function AdminPage() {
               }, "确认更新 4 个分账钱包地址？")}>设置 4 钱包</Button>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 销毁比例 (bps)" type="number" />
-                <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF 领取费率 (bps)" type="number" />
+                <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 销毁比例 (bps)" type="number" aria-label="TOF 销毁比例 (bps)" />
+                <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF 领取手续费 (bps)" type="number" aria-label="TOF 领取手续费 (bps)" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("更新 TOF 参数", async () => {
                   if (!nexus) return;
                   if (!validateBpsField("TOF 销毁比例", tofBurnBps)) return;
-                  if (!validateBpsField("TOF 领取费率", tofClaimFeeBps)) return;
+                  if (!validateBpsField("TOF 领取手续费", tofClaimFeeBps)) {
+                    pushOperationLog("更新 TOF 参数", "error", "TOF 领取手续费无效");
+                    return;
+                  }
                   setLoading(true);
                   const r1 = await execTx(nexus.setTofBurnBps(BigInt(tofBurnBps || "0")));
                   if (!r1.success) {
@@ -439,12 +442,12 @@ export function AdminPage() {
                   setLoading(false);
                   notifyTx(r2.success, r2.hash, r2.error, "更新 TOF 参数");
                   if (r2.success) refreshData();
-                }, "确认更新 TOF 销毁比例与领取手续费比例？")}>更新 TOF 参数</Button>
+                }, "确认更新 TOF 销毁比例与领取手续费？")}>更新 TOF 参数</Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={withdrawLevel} onChange={(e) => setWithdrawLevel(e.target.value)} placeholder="等级 0-5" type="number" />
-                <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="提现费率 (bps)" type="number" />
+                <Input value={withdrawLevel} onChange={(e) => setWithdrawLevel(e.target.value)} placeholder="等级 0-5" type="number" aria-label="提现等级 0-5" />
+                <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="提现费率 (bps)" type="number" aria-label="提现费率 (bps)" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置提现费率", async () => {
                   if (!nexus) return;
                   const level = Number(withdrawLevel || "0");
@@ -462,7 +465,7 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="分发器地址" />
+                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="分发器地址" aria-label="分发器地址" />
                 <div className="flex items-center gap-2 px-2"><Switch checked={distributorStatus} onCheckedChange={setDistributorStatus} /><span className="text-sm">{distributorStatus ? "授权" : "取消授权"}</span></div>
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Distributor", async () => {
                   if (!nexus) return;
@@ -485,10 +488,10 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="档位 ID" type="number" />
-                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (18位精度)" />
-                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="日产出 (18位精度)" />
-                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="最大供应量" type="number" />
+                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="档位 ID" type="number" aria-label="NFT-A 档位 ID" />
+                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (18位精度)" aria-label="NFT-A 价格" />
+                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="日产出 (18位精度)" aria-label="NFT-A 日产出" />
+                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="最大供应量" type="number" aria-label="NFT-A 最大供应量" />
                 <div className="flex items-center gap-2 px-2"><Switch checked={nftaActive} onCheckedChange={setNftaActive} /><span className="text-sm">{nftaActive ? "启用" : "停用"}</span></div>
               </div>
               <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("保存 NFTA Tier", async () => {
@@ -514,7 +517,7 @@ export function AdminPage() {
                 <p className="text-sm font-medium">NFT-B 档位快速初始化</p>
                 <p className="text-xs text-muted-foreground">
                   将按固定参数写入：初级·普通权杖（500）、中级·稀有王冠（1000）、高级·传说神座（2000）；
-                  权重 1/2/3、分红 20%/30%/40%、每档 2000 张，状态启用。
+                  TOF 价格 100000/200000/400000；权重 1/2/3、分红 20%/30%/40%、每档 2000 张，状态启用。
                 </p>
                 <Button
                   variant="secondary"
@@ -524,9 +527,9 @@ export function AdminPage() {
                     setLoading(true);
 
                     const presets = [
-                      { tierId: 1n, price: "500", weight: 1n, maxSupply: 2000n, dividendBps: 2000n },
-                      { tierId: 2n, price: "1000", weight: 2n, maxSupply: 2000n, dividendBps: 3000n },
-                      { tierId: 3n, price: "2000", weight: 3n, maxSupply: 2000n, dividendBps: 4000n },
+                      { tierId: BigInt(1), price: "500", tofPrice: "100000", weight: BigInt(1), maxSupply: BigInt(2000), dividendBps: BigInt(2000) },
+                      { tierId: BigInt(2), price: "1000", tofPrice: "200000", weight: BigInt(2), maxSupply: BigInt(2000), dividendBps: BigInt(3000) },
+                      { tierId: BigInt(3), price: "2000", tofPrice: "400000", weight: BigInt(3), maxSupply: BigInt(2000), dividendBps: BigInt(4000) },
                     ];
 
                     for (const preset of presets) {
@@ -534,6 +537,7 @@ export function AdminPage() {
                         nexus.configureNftbTier(
                           preset.tierId,
                           toUnits(preset.price),
+                          toUnits(preset.tofPrice),
                           preset.weight,
                           preset.maxSupply,
                           preset.dividendBps,
@@ -572,17 +576,17 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">买入手续费 (buyFeeBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，100 = 1%</p>
-                  <Input value={swapBuyFeeBps} onChange={(e) => setSwapBuyFeeBps(e.target.value)} placeholder="买入手续费 bps" type="number" />
+                  <Input value={swapBuyFeeBps} onChange={(e) => setSwapBuyFeeBps(e.target.value)} placeholder="买入手续费 bps" type="number" aria-label="买入手续费 bps" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">卖出手续费 (sellFeeBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，500 = 5%</p>
-                  <Input value={swapSellFeeBps} onChange={(e) => setSwapSellFeeBps(e.target.value)} placeholder="卖出手续费 bps" type="number" />
+                  <Input value={swapSellFeeBps} onChange={(e) => setSwapSellFeeBps(e.target.value)} placeholder="卖出手续费 bps" type="number" aria-label="卖出手续费 bps" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">盈利税 (profitTaxBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，仅对盈利卖出部分生效</p>
-                  <Input value={swapProfitTaxBps} onChange={(e) => setSwapProfitTaxBps(e.target.value)} placeholder="盈利税 bps" type="number" />
+                  <Input value={swapProfitTaxBps} onChange={(e) => setSwapProfitTaxBps(e.target.value)} placeholder="盈利税 bps" type="number" aria-label="盈利税 bps" />
                 </div>
               </div>
 
@@ -590,17 +594,17 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">分红触发阈值 (distributionThreshold)</p>
                   <p className="text-[11px] text-muted-foreground">单位 TOT，达到后触发分红流程</p>
-                  <Input value={swapDistributionThreshold} onChange={(e) => setSwapDistributionThreshold(e.target.value)} placeholder="分红触发阈值 (TOT)" />
+                  <Input value={swapDistributionThreshold} onChange={(e) => setSwapDistributionThreshold(e.target.value)} placeholder="分红触发阈值 (TOT)" aria-label="分红触发阈值" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">单地址日买入上限 (maxDailyBuy)</p>
                   <p className="text-[11px] text-muted-foreground">单位 TOT</p>
-                  <Input value={swapMaxDailyBuy} onChange={(e) => setSwapMaxDailyBuy(e.target.value)} placeholder="日买入上限 (TOT)" />
+                  <Input value={swapMaxDailyBuy} onChange={(e) => setSwapMaxDailyBuy(e.target.value)} placeholder="日买入上限 (TOT)" aria-label="日买入上限" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">单次卖出上限 (maxSellBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，基于用户持仓比例限制</p>
-                  <Input value={swapMaxSellBps} onChange={(e) => setSwapMaxSellBps(e.target.value)} placeholder="单次卖出上限 bps" type="number" />
+                  <Input value={swapMaxSellBps} onChange={(e) => setSwapMaxSellBps(e.target.value)} placeholder="单次卖出上限 bps" type="number" aria-label="单次卖出上限 bps" />
                 </div>
               </div>
 
@@ -608,7 +612,7 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">通缩比例 (deflationBps)</p>
                   <p className="text-[11px] text-muted-foreground">单位 bps，用于定时通缩销毁</p>
-                  <Input value={swapDeflationBps} onChange={(e) => setSwapDeflationBps(e.target.value)} placeholder="通缩比例 bps" type="number" />
+                  <Input value={swapDeflationBps} onChange={(e) => setSwapDeflationBps(e.target.value)} placeholder="通缩比例 bps" type="number" aria-label="通缩比例 bps" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("保存 Swap 参数", async () => {
                   if (!swap) return;
@@ -668,12 +672,12 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">注入 TOT 数量</p>
                   <p className="text-[11px] text-muted-foreground">与 USDT 一起用于补充流动性</p>
-                  <Input value={addLpTot} onChange={(e) => setAddLpTot(e.target.value)} placeholder="注入 TOT 数量" />
+                  <Input value={addLpTot} onChange={(e) => setAddLpTot(e.target.value)} placeholder="注入 TOT 数量" aria-label="注入 TOT 数量" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">注入 USDT 数量</p>
                   <p className="text-[11px] text-muted-foreground">与 TOT 按目标池子比例注入</p>
-                  <Input value={addLpUsdt} onChange={(e) => setAddLpUsdt(e.target.value)} placeholder="注入 USDT 数量" />
+                  <Input value={addLpUsdt} onChange={(e) => setAddLpUsdt(e.target.value)} placeholder="注入 USDT 数量" aria-label="注入 USDT 数量" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("注入流动性", async () => {
                   if (!swap) return;
@@ -691,12 +695,12 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">移除 TOT 数量</p>
                   <p className="text-[11px] text-muted-foreground">从池中取出 TOT</p>
-                  <Input value={removeLpTot} onChange={(e) => setRemoveLpTot(e.target.value)} placeholder="移除 TOT 数量" />
+                  <Input value={removeLpTot} onChange={(e) => setRemoveLpTot(e.target.value)} placeholder="移除 TOT 数量" aria-label="移除 TOT 数量" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium">移除 USDT 数量</p>
                   <p className="text-[11px] text-muted-foreground">从池中取出 USDT</p>
-                  <Input value={removeLpUsdt} onChange={(e) => setRemoveLpUsdt(e.target.value)} placeholder="移除 USDT 数量" />
+                  <Input value={removeLpUsdt} onChange={(e) => setRemoveLpUsdt(e.target.value)} placeholder="移除 USDT 数量" aria-label="移除 USDT 数量" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} variant="destructive" onClick={() => runAction("移除流动性", async () => {
                   if (!swap) return;
@@ -714,7 +718,7 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium">更新 Nexus 地址</p>
                   <p className="text-[11px] text-muted-foreground">修改 Swap 关联的 DeFiNodeNexus 合约</p>
-                  <Input value={swapNexusAddr} onChange={(e) => setSwapNexusAddr(e.target.value)} placeholder="Nexus 合约地址" />
+                  <Input value={swapNexusAddr} onChange={(e) => setSwapNexusAddr(e.target.value)} placeholder="Nexus 合约地址" aria-label="Nexus 合约地址" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("设置 Nexus 地址", async () => {
                   if (!swap) return;
@@ -731,12 +735,12 @@ export function AdminPage() {
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-destructive">紧急提取代币</p>
                   <p className="text-[11px] text-muted-foreground">提取卡在合约中的任意 ERC20 代币</p>
-                  <Input value={emergencyToken} onChange={(e) => setEmergencyToken(e.target.value)} placeholder="代币地址" />
+                  <Input value={emergencyToken} onChange={(e) => setEmergencyToken(e.target.value)} placeholder="代币地址" aria-label="紧急提取代币地址" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs font-medium text-destructive">提取数量</p>
                   <p className="text-[11px] text-muted-foreground">18 位精度</p>
-                  <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="数量" />
+                  <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="数量" aria-label="紧急提取数量" />
                 </div>
                 <Button disabled={!isOwner || !swap || loading} variant="destructive" onClick={() => runAction("紧急提取", async () => {
                   if (!swap) return;
@@ -763,7 +767,7 @@ export function AdminPage() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="奖励池注入 TOT 数量" />
+                <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="奖励池注入 TOT 数量" aria-label="奖励池注入 TOT 数量" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("注入奖励池", async () => {
                   if (!nexus) return;
                   if (!validatePositiveAmount("奖励池注入量", rewardFundAmount)) return;
@@ -775,7 +779,7 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="NFTB 分红 TOT 数量" />
+                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="NFTB 分红 TOT 数量" aria-label="NFTB 分红 TOT 数量" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("手动分红 NFTB", async () => {
                   if (!nexus) return;
                   if (!validatePositiveAmount("分红金额", dividendAmount)) return;
@@ -824,6 +828,7 @@ export function AdminPage() {
                   value={announcementTitle}
                   onChange={(e) => setAnnouncementTitle(e.target.value)}
                   placeholder="公告标题"
+                  aria-label="公告标题"
                 />
                 <Select value={announcementType} onValueChange={(value) => setAnnouncementType(value as AnnouncementType)}>
                   <SelectTrigger>
@@ -844,6 +849,7 @@ export function AdminPage() {
                 onChange={(e) => setAnnouncementContent(e.target.value)}
                 placeholder="公告正文"
                 className="min-h-[140px]"
+                aria-label="公告正文"
               />
 
               <Input
@@ -851,6 +857,7 @@ export function AdminPage() {
                 onChange={(e) => setAnnouncementToken(e.target.value)}
                 placeholder="后台发布令牌（可选，对应 ANNOUNCEMENT_ADMIN_TOKEN）"
                 type="password"
+                aria-label="公告发布令牌"
               />
 
               <div className="flex flex-wrap gap-3">

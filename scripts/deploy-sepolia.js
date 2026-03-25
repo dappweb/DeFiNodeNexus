@@ -38,6 +38,11 @@ async function main() {
   const deployedAddress = await contract.getAddress();
   console.log("DeFiNodeNexus deployed to:", deployedAddress);
 
+  const tofContract = await hre.ethers.getContractAt("TOFToken", tofToken);
+  const whitelistTx = await tofContract.setTransferWhitelist(deployedAddress, true);
+  await whitelistTx.wait();
+  console.log("TOF whitelist added for Nexus:", deployedAddress);
+
   // --- Post-deploy configuration ---
 
   // Set 4 project wallets if provided in .env
@@ -77,6 +82,21 @@ async function main() {
   await tx2.wait();
   console.log("NFTA Tier 2 configured: 1000U, 2.0%/day, max 5000");
 
+  // Configure default NFTB tiers (USDT + TOF dual pricing)
+  // TOF pricing defaults follow business requirement: 100k / 200k / 400k TOF
+  const nftbTier1Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER1_USDT_PRICE || "500", decimals);
+  const nftbTier2Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER2_USDT_PRICE || "1000", decimals);
+  const nftbTier3Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER3_USDT_PRICE || "2000", decimals);
+
+  const nftbTier1Tof = hre.ethers.parseUnits(process.env.NFTB_TIER1_TOF_PRICE || "100000", decimals);
+  const nftbTier2Tof = hre.ethers.parseUnits(process.env.NFTB_TIER2_TOF_PRICE || "200000", decimals);
+  const nftbTier3Tof = hre.ethers.parseUnits(process.env.NFTB_TIER3_TOF_PRICE || "400000", decimals);
+
+  await (await contract.configureNftbTier(0, nftbTier1Usdt, nftbTier1Tof, 1, 2000, 2000, true)).wait();
+  await (await contract.configureNftbTier(0, nftbTier2Usdt, nftbTier2Tof, 2, 2000, 3000, true)).wait();
+  await (await contract.configureNftbTier(0, nftbTier3Usdt, nftbTier3Tof, 3, 2000, 4000, true)).wait();
+  console.log("NFTB tiers configured (TOF: 100k/200k/400k, quotas 50/50 USDT-TOF)");
+
   // --- Deploy TOTSwap ---
 
   console.log("\n--- Deploying TOTSwap ---");
@@ -101,6 +121,12 @@ async function main() {
   const txDist = await contract.setDistributor(swapAddress, true);
   await txDist.wait();
   console.log("TOTSwap authorized as distributor on Nexus");
+
+  // Whitelist protocol contracts in TOF (required by non-transferable TOFToken)
+  const tof = await hre.ethers.getContractAt("TOFToken", tofToken);
+  await (await tof.setWhitelisted(deployedAddress, true)).wait();
+  await (await tof.setWhitelisted(swapAddress, true)).wait();
+  console.log("TOF whitelist updated: Nexus + TOTSwap");
 
   // Summary
   console.log("\n=== DEPLOYMENT SUMMARY ===");

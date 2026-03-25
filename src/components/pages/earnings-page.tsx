@@ -5,14 +5,18 @@ import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { TrendingUp, Wallet, CalendarDays, Coins } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useWeb3 } from "@/lib/web3-provider";
+import { useToast } from "@/hooks/use-toast";
+import { execTx } from "@/hooks/use-contract";
 import { useNexusContract } from "@/hooks/use-contract";
 
 type EarningRecord = {
   key: string;
-  type: "NFTA Yield" | "NFTB Dividend" | "Team Bonus" | "Withdraw";
+  type: "NFTA Yield" | "NFTB Dividend" | "NFTB USDT Dividend" | "Team Bonus" | "Withdraw";
+  unit: "TOT" | "USDT";
   amount: bigint;
   block: number;
   txHash: string;
@@ -23,12 +27,14 @@ export function EarningsPage() {
   const { t } = useLanguage();
   const { address, provider } = useWeb3();
   const nexus = useNexusContract();
+  const { toast } = useToast();
 
   const [filter, setFilter] = useState("all");
   const [range, setRange] = useState<"7d" | "30d" | "all">("7d");
   const [pendingTot, setPendingTot] = useState<bigint>(BigInt(0));
   const [claimedTot, setClaimedTot] = useState<bigint>(BigInt(0));
   const [records, setRecords] = useState<EarningRecord[]>([]);
+  const [withdrawing, setWithdrawing] = useState(false);
 
   const refreshData = useCallback(async () => {
     if (!nexus || !address) return;
@@ -45,9 +51,10 @@ export function EarningsPage() {
     const latestBlock = await provider.getBlockNumber();
     const fromBlock = Math.max(0, latestBlock - 80_000);
 
-    const [yieldEvents, divEvents, teamEvents, wdEvents] = await Promise.all([
+    const [yieldEvents, divEvents, usdtDivEvents, teamEvents, wdEvents] = await Promise.all([
       nexus.queryFilter(nexus.filters.NftaYieldClaimed(address), fromBlock, latestBlock),
       nexus.queryFilter(nexus.filters.NftbDividendClaimed(address), fromBlock, latestBlock),
+      nexus.queryFilter(nexus.filters.NftbUsdtDividendClaimed(address), fromBlock, latestBlock),
       nexus.queryFilter(nexus.filters.TeamCommissionPaid(address), fromBlock, latestBlock),
       nexus.queryFilter(nexus.filters.TotWithdrawn(address), fromBlock, latestBlock),
     ]);
@@ -71,6 +78,7 @@ export function EarningsPage() {
       mapped.push({
         key: `${ev.transactionHash}-yield`,
         type: "NFTA Yield",
+        unit: "TOT",
         amount: args.totAmount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
@@ -84,6 +92,21 @@ export function EarningsPage() {
       mapped.push({
         key: `${ev.transactionHash}-div`,
         type: "NFTB Dividend",
+        unit: "TOT",
+        amount: args.amount,
+        block: ev.blockNumber,
+        txHash: ev.transactionHash,
+        timestamp,
+      });
+    }
+
+    for (const ev of usdtDivEvents) {
+      const args = (ev as any).args;
+      const timestamp = await getBlockTimestamp(ev.blockNumber);
+      mapped.push({
+        key: `${ev.transactionHash}-usdt-div`,
+        type: "NFTB USDT Dividend",
+        unit: "USDT",
         amount: args.amount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
@@ -97,6 +120,7 @@ export function EarningsPage() {
       mapped.push({
         key: `${ev.transactionHash}-team`,
         type: "Team Bonus",
+        unit: "TOT",
         amount: args.amount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
@@ -110,6 +134,7 @@ export function EarningsPage() {
       mapped.push({
         key: `${ev.transactionHash}-wd`,
         type: "Withdraw",
+        unit: "TOT",
         amount: args.totAmount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
@@ -135,7 +160,7 @@ export function EarningsPage() {
 
     if (filter === "all") return ranged;
     if (filter === "nfta") return ranged.filter((r) => r.type === "NFTA Yield");
-    if (filter === "nftb") return ranged.filter((r) => r.type === "NFTB Dividend");
+    if (filter === "nftb") return ranged.filter((r) => r.type === "NFTB Dividend" || r.type === "NFTB USDT Dividend");
     if (filter === "team") return ranged.filter((r) => r.type === "Team Bonus");
     return ranged;
   }, [records, filter, range]);
@@ -143,16 +168,35 @@ export function EarningsPage() {
   const todayIncome = useMemo(() => {
     const now = Math.floor(Date.now() / 1000);
     return records
-      .filter((item) => item.type !== "Withdraw" && item.timestamp >= now - 24 * 60 * 60)
+      .filter((item) => item.type !== "Withdraw" && item.unit === "TOT" && item.timestamp >= now - 24 * 60 * 60)
       .reduce((sum, item) => sum + item.amount, BigInt(0));
   }, [records]);
 
   const cumulativeIncome = useMemo(() => claimedTot, [claimedTot]);
   const withdrawableIncome = useMemo(() => pendingTot, [pendingTot]);
 
+  const handleWithdrawAll = async () => {
+    if (!nexus || pendingTot <= 0n) return;
+
+    setWithdrawing(true);
+    try {
+      const res = await execTx(nexus.withdrawTot(pendingTot));
+      if (!res.success) {
+        toast({ title: t("toastWithdrawFailed"), description: res.error, variant: "destructive" });
+        return;
+      }
+
+      toast({ title: t("toastWithdrawSuccess"), description: res.hash?.slice(0, 10) + "..." });
+      await refreshData();
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const typeColors: Record<EarningRecord["type"], string> = {
     "NFTA Yield": "bg-primary/15 text-primary border-primary/30",
     "NFTB Dividend": "bg-accent/15 text-accent border-accent/30",
+    "NFTB USDT Dividend": "bg-cyan-500/15 text-cyan-500 border-cyan-500/30",
     "Team Bonus": "bg-purple-500/15 text-purple-500 border-purple-500/30",
     Withdraw: "bg-orange-500/15 text-orange-500 border-orange-500/30",
   };
@@ -160,6 +204,7 @@ export function EarningsPage() {
   const typeLabels: Record<EarningRecord["type"], string> = {
     "NFTA Yield": t("typeNftaYield"),
     "NFTB Dividend": t("typeNftbDividend"),
+    "NFTB USDT Dividend": t("typeNftbUsdtDividend"),
     "Team Bonus": t("typeTeamBonus"),
     Withdraw: t("typeWithdraw"),
   };
@@ -170,10 +215,17 @@ export function EarningsPage() {
         <Card className="glass-panel p-5">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-lg bg-primary/10"><Wallet className="h-5 w-5 text-primary" /></div>
-            <div>
+            <div className="flex-1">
               <p className="text-xs text-muted-foreground">{t("withdrawableEarnings")}</p>
               <p className="text-xl font-bold font-headline">{Number(ethers.formatUnits(withdrawableIncome, 18)).toLocaleString()}</p>
             </div>
+            <Button
+              size="sm"
+              onClick={handleWithdrawAll}
+              disabled={withdrawing || withdrawableIncome <= 0n || !nexus || !address}
+            >
+              {withdrawing ? t("processing") : t("withdrawAll")}
+            </Button>
           </div>
         </Card>
         <Card className="glass-panel p-5">
@@ -233,7 +285,7 @@ export function EarningsPage() {
                   <p className="text-xs text-muted-foreground">Tx: {item.txHash.slice(0, 10)}...{item.txHash.slice(-6)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold">{Number(ethers.formatUnits(item.amount, 18)).toLocaleString()} TOT</p>
+                  <p className="font-bold">{Number(ethers.formatUnits(item.amount, 18)).toLocaleString()} {item.unit}</p>
                 </div>
               </div>
             ))

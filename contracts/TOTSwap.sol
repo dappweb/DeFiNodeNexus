@@ -18,8 +18,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  * Fees:
  *   - Buy  TOT: 1% fee (in TOT) → NFTB dividend pool.
  *   - Sell TOT: 5% fee (in TOT) → NFTB dividend pool.
- *   - Profit tax on sell: 10% of profit portion (in TOT) → NFTB dividend pool.
- *   - Accumulated fees auto-distribute to NFTB holders every 10,000 TOT.
+ *   - Profit tax on sell: 10% of profit portion (in USDT) → NFTB USDT dividend pool.
+ *   - Accumulated fees auto-distribute to NFTB holders every 10,000 tokens.
  *
  * Deflation (§2.3):
  *   - Every 4 hours, 0.8% of TOT reserve is removed.
@@ -81,6 +81,8 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     /// @dev Sell limit: max percentage of balance per sell.
     uint256 public maxSellBps; // §2.4: 50%
+    uint256 public nftbUsdtDividendPool;
+    uint256 public usdtDistributionThreshold; // 10,000 USDT triggers distribution
 
     // ======================== Events ========================
 
@@ -88,6 +90,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event TotSold(address indexed seller, uint256 totIn, uint256 usdtOut, uint256 sellFee, uint256 profitTax);
     event Deflated(uint256 burned, uint256 toDividend, uint256 intervals, uint256 timestamp);
     event DividendsDistributed(uint256 amount);
+    event UsdtDividendsDistributed(uint256 amount);
     event LiquidityAdded(uint256 totAmount, uint256 usdtAmount);
     event LiquidityRemoved(uint256 totAmount, uint256 usdtAmount);
     event NexusUpdated(address indexed newNexus);
@@ -111,6 +114,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         sellFeeBps = 500;
         profitTaxBps = 1000;
         distributionThreshold = 10_000e18;
+        usdtDistributionThreshold = 10_000e18;
         deflationBps = 80;
         maxDailyBuy = 100_000e18;
         maxSellBps = 5000;
@@ -188,8 +192,8 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * Flow:
      *   1. Check sell ≤ 50% of sender's TOT balance.
      *   2. Deduct 5% sell fee (in TOT) → nftbDividendPool.
-     *   3. Calculate profit tax on gains (10% of profit in TOT).
-     *   4. Swap remaining TOT for USDT via AMM.
+    *   3. Calculate profit tax on gains (10% of profit in USDT).
+    *   4. Swap remaining TOT for USDT via AMM.
      *   5. Update user cost basis.
      *   6. Auto-trigger distribution & deflation if due.
      */
@@ -204,26 +208,29 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         // 5% sell fee in TOT
         uint256 sellFee = (totAmount * sellFeeBps) / BASIS_POINTS;
-        uint256 totAfterFee = totAmount - sellFee;
-
-        // Profit tax (§2.2): 10% of profit portion in TOT
-        uint256 profitTax = _calculateProfitTax(msg.sender, totAfterFee);
-        uint256 totToSwap = totAfterFee - profitTax;
+        uint256 totToSwap = totAmount - sellFee;
 
         // AMM: calculate USDT output
-        uint256 usdtOut = _getAmountOut(totToSwap, totReserve, usdtReserve);
-        require(usdtOut > 0, "Insufficient output");
+        uint256 grossUsdtOut = _getAmountOut(totToSwap, totReserve, usdtReserve);
+        require(grossUsdtOut > 0, "Insufficient output");
+
+        // Profit tax (§2.2): 10% of profit portion in USDT
+        uint256 profitTax = _calculateProfitTaxUsdt(msg.sender, grossUsdtOut);
+        require(grossUsdtOut > profitTax, "Tax exceeds output");
+
+        uint256 usdtOut = grossUsdtOut - profitTax;
         require(usdtOut >= minUsdtOut, "Slippage exceeded");
 
         // Pull TOT from seller
         totToken.safeTransferFrom(msg.sender, address(this), totAmount);
 
-        // Update reserves (only the swapped portion enters the pool)
+        // Update reserves (sell fee TOT stays outside AMM reserves; full gross USDT leaves the pool)
         totReserve += totToSwap;
-        usdtReserve -= usdtOut;
+        usdtReserve -= grossUsdtOut;
 
-        // Fees + profitTax to dividend pool
-        nftbDividendPool += sellFee + profitTax;
+        // TOT fee to TOT dividend pool; USDT profit tax to USDT dividend pool
+        nftbDividendPool += sellFee;
+        nftbUsdtDividendPool += profitTax;
 
         // Reduce user cost basis proportionally
         _reduceCostBasis(msg.sender, totAmount);
@@ -234,6 +241,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         // Auto maintenance
         _tryDeflate();
         _tryDistribute();
+        _tryDistributeUsdt();
 
         emit TotSold(msg.sender, totAmount, usdtOut, sellFee, profitTax);
     }
@@ -333,22 +341,59 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit DividendsDistributed(amount);
     }
 
-    /// @notice Force distribution even if below threshold (owner only).
-    function forceDistribute() external onlyOwner {
-        require(nftbDividendPool > 0, "Pool empty");
-        require(nexus != address(0), "Nexus not set");
+    function _tryDistributeUsdt() internal {
+        if (nftbUsdtDividendPool < usdtDistributionThreshold) return;
+        if (nexus == address(0)) return;
 
-        uint256 amount = nftbDividendPool;
-        nftbDividendPool = 0;
+        uint256 amount = nftbUsdtDividendPool;
+        nftbUsdtDividendPool = 0;
 
-        totToken.approve(nexus, amount);
+        usdtToken.approve(nexus, amount);
 
         (bool success,) = nexus.call(
-            abi.encodeWithSignature("distributeNftbDividends(uint256)", amount)
+            abi.encodeWithSignature("distributeNftbUsdtDividends(uint256)", amount)
         );
-        require(success, "Distribution failed");
 
-        emit DividendsDistributed(amount);
+        if (!success) {
+            nftbUsdtDividendPool += amount;
+            return;
+        }
+
+        emit UsdtDividendsDistributed(amount);
+    }
+
+    /// @notice Force distribution even if below threshold (owner only).
+    function forceDistribute() external onlyOwner {
+        require(nftbDividendPool > 0 || nftbUsdtDividendPool > 0, "Pool empty");
+        require(nexus != address(0), "Nexus not set");
+
+        if (nftbDividendPool > 0) {
+            uint256 amount = nftbDividendPool;
+            nftbDividendPool = 0;
+
+            totToken.approve(nexus, amount);
+
+            (bool successTot,) = nexus.call(
+                abi.encodeWithSignature("distributeNftbDividends(uint256)", amount)
+            );
+            require(successTot, "TOT distribution failed");
+
+            emit DividendsDistributed(amount);
+        }
+
+        if (nftbUsdtDividendPool > 0) {
+            uint256 usdtAmount = nftbUsdtDividendPool;
+            nftbUsdtDividendPool = 0;
+
+            usdtToken.approve(nexus, usdtAmount);
+
+            (bool successUsdt,) = nexus.call(
+                abi.encodeWithSignature("distributeNftbUsdtDividends(uint256)", usdtAmount)
+            );
+            require(successUsdt, "USDT distribution failed");
+
+            emit UsdtDividendsDistributed(usdtAmount);
+        }
     }
 
     // ================================================================
@@ -379,10 +424,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      *   5. profitTot = totAmount × profitRatio.
      *   6. tax = profitTot × profitTaxBps / 10000.
      */
-    function _calculateProfitTax(
-        address user,
-        uint256 totAmount
-    ) internal view returns (uint256) {
+    function _calculateProfitTaxUsdt(address user, uint256 grossUsdtOut) internal view returns (uint256) {
         if (userTotBought[user] == 0 || userTotCost[user] == 0) return 0;
 
         // avg buy price (USDT per TOT, scaled by PRICE_PRECISION)
@@ -397,11 +439,11 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         // profit ratio
         uint256 profitRatio = ((currentPrice - avgPrice) * PRICE_PRECISION) / currentPrice;
 
-        // profit portion of TOT being sold
-        uint256 profitTot = (totAmount * profitRatio) / PRICE_PRECISION;
+        // profit portion of USDT proceeds
+        uint256 profitUsdt = (grossUsdtOut * profitRatio) / PRICE_PRECISION;
 
-        // 10% tax on profit portion
-        return (profitTot * profitTaxBps) / BASIS_POINTS;
+        // tax on profit portion in USDT
+        return (profitUsdt * profitTaxBps) / BASIS_POINTS;
     }
 
     /// @dev Reduce user cost basis proportionally after a sell.
@@ -522,6 +564,11 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function setDistributionThreshold(uint256 threshold) external onlyOwner {
         require(threshold > 0, "Zero");
         distributionThreshold = threshold;
+    }
+
+    function setUsdtDistributionThreshold(uint256 threshold) external onlyOwner {
+        require(threshold > 0, "Zero");
+        usdtDistributionThreshold = threshold;
     }
 
     function setMaxDailyBuy(uint256 amount) external onlyOwner {
