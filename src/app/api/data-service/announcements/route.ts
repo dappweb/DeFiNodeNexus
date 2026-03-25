@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeAnnouncementType } from "@/lib/announcement";
-import { getMysqlPool } from "@/lib/mysql/server";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 type CreateAnnouncementPayload = {
   title?: string;
@@ -21,33 +20,60 @@ function isServiceAuthorized(request: NextRequest) {
   return token === expectedToken;
 }
 
+function getUpstreamBaseUrl() {
+  const baseUrl = process.env.ANNOUNCEMENT_DATA_SERVICE_URL?.trim();
+  if (!baseUrl) return null;
+  return baseUrl.replace(/\/$/, "");
+}
+
+function buildUpstreamHeaders() {
+  const token = process.env.ANNOUNCEMENT_DATA_SERVICE_TOKEN?.trim();
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export async function GET(request: NextRequest) {
   if (!isServiceAuthorized(request)) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const pool = getMysqlPool();
-  if (!pool) {
-    return NextResponse.json({ message: "MySQL is not configured" }, { status: 500 });
+  const upstream = getUpstreamBaseUrl();
+  if (!upstream) {
+    return NextResponse.json({ message: "Announcement upstream service is not configured" }, { status: 500 });
   }
 
   try {
-    const [rows] = await pool.query(
-      "SELECT id, title, content, type, created_at FROM announcements ORDER BY created_at DESC LIMIT 50"
-    );
+    const response = await fetch(`${upstream}/announcements`, {
+      method: "GET",
+      headers: buildUpstreamHeaders(),
+      cache: "no-store",
+    });
 
-    const data = (rows as Array<{ id: number; title: string; content: string; type: string; created_at: Date | string }>).map((row) => ({
+    if (!response.ok) {
+      const detail = await response.text();
+      return NextResponse.json({ message: "Failed to query announcements", detail }, { status: response.status });
+    }
+
+    const payload = (await response.json()) as {
+      data?: Array<{ id: number; title: string; content: string; type: string; created_at?: string; date?: string }>;
+      announcements?: Array<{ id: number; title: string; content: string; type: string; created_at?: string; date?: string }>;
+    };
+
+    const rows = payload.data ?? payload.announcements ?? [];
+    const data = rows.map((row) => ({
       id: row.id,
       title: row.title,
       content: row.content,
       type: normalizeAnnouncementType(row.type),
-      date: new Date(row.created_at).toISOString().slice(0, 10),
-      created_at: new Date(row.created_at).toISOString(),
+      date: (row.date || row.created_at || new Date().toISOString()).slice(0, 10),
+      created_at: row.created_at || new Date().toISOString(),
     }));
 
     return NextResponse.json({ data });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown database error";
+    const message = error instanceof Error ? error.message : "Unknown upstream error";
     return NextResponse.json({ message: "Failed to query announcements", detail: message }, { status: 500 });
   }
 }
@@ -57,9 +83,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  const pool = getMysqlPool();
-  if (!pool) {
-    return NextResponse.json({ message: "MySQL is not configured" }, { status: 500 });
+  const upstream = getUpstreamBaseUrl();
+  if (!upstream) {
+    return NextResponse.json({ message: "Announcement upstream service is not configured" }, { status: 500 });
   }
 
   const payload = (await request.json()) as CreateAnnouncementPayload;
@@ -72,34 +98,40 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const [insertResult] = await pool.query(
-      "INSERT INTO announcements (title, content, type) VALUES (?, ?, ?)",
-      [title, content, type]
-    );
+    const response = await fetch(`${upstream}/announcements`, {
+      method: "POST",
+      headers: buildUpstreamHeaders(),
+      body: JSON.stringify({ title, content, type }),
+      cache: "no-store",
+    });
 
-    const insertedId = Number((insertResult as { insertId?: number }).insertId || 0);
-    const [rows] = await pool.query(
-      "SELECT id, title, content, type, created_at FROM announcements WHERE id = ? LIMIT 1",
-      [insertedId]
-    );
-
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return NextResponse.json({ message: "Announcement created but failed to read back" }, { status: 500 });
+    if (!response.ok) {
+      const detail = await response.text();
+      return NextResponse.json({ message: "Failed to create announcement", detail }, { status: response.status });
     }
 
-    const row = rows[0] as { id: number; title: string; content: string; type: string; created_at: Date | string };
+    const payload = (await response.json()) as {
+      data?: { id: number; title: string; content: string; type: string; created_at?: string; date?: string };
+      announcement?: { id: number; title: string; content: string; type: string; created_at?: string; date?: string };
+    };
+
+    const row = payload.data ?? payload.announcement;
+    if (!row) {
+      return NextResponse.json({ message: "Announcement created but response payload missing" }, { status: 500 });
+    }
+
     return NextResponse.json({
       data: {
         id: row.id,
         title: row.title,
         content: row.content,
         type: normalizeAnnouncementType(row.type),
-        date: new Date(row.created_at).toISOString().slice(0, 10),
-        created_at: new Date(row.created_at).toISOString(),
+        date: (row.date || row.created_at || new Date().toISOString()).slice(0, 10),
+        created_at: row.created_at || new Date().toISOString(),
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown database error";
+    const message = error instanceof Error ? error.message : "Unknown upstream error";
     return NextResponse.json({ message: "Failed to create announcement", detail: message }, { status: 500 });
   }
 }

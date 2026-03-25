@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ethers } from "ethers";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 /**
  * POST /api/keeper?token=KEEPER_SECRET
