@@ -431,6 +431,8 @@
         }
         case "wallet_addEthereumChain":
           return null
+        case "wallet_watchAsset":
+          return true
         case "eth_chainId":
           return state.chainId
         case "net_version":

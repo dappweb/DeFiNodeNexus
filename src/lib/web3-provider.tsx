@@ -55,6 +55,38 @@ async function switchToSepolia() {
   }
 }
 
+/** Silently register TOT and TOF tokens so they appear in the user's wallet asset list. */
+async function addProjectTokensToWallet() {
+  if (!window.ethereum) return;
+
+  const totAddress = process.env.NEXT_PUBLIC_TOT_ADDRESS;
+  const tofAddress = process.env.NEXT_PUBLIC_TOF_ADDRESS;
+
+  const tokens: { address: string; symbol: string; decimals: number; name: string }[] = [];
+  if (totAddress) tokens.push({ address: totAddress, symbol: 'TOT', decimals: 18, name: 'Truth Oracle Token' });
+  if (tofAddress) tokens.push({ address: tofAddress, symbol: 'TOF', decimals: 18, name: 'Truth Oracle Fund' });
+
+  for (const token of tokens) {
+    try {
+      await window.ethereum.request({
+        method: 'wallet_watchAsset',
+        params: [{
+          type: 'ERC20',
+          options: {
+            address: token.address,
+            symbol: token.symbol,
+            decimals: token.decimals,
+            name: token.name,
+          },
+        }],
+      });
+    } catch (err) {
+      // Non-fatal — user may have dismissed or wallet may not support it
+      console.warn(`Failed to add ${token.symbol} to wallet`, err);
+    }
+  }
+}
+
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -111,6 +143,9 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       const result = await window.ethereum.request({ method: 'eth_requestAccounts' });
       const accounts = result as string[];
       await hydrateConnection(accounts);
+
+      // After connecting, register TOT & TOF in the wallet asset list
+      await addProjectTokensToWallet();
 
     } catch (error) {
       console.error("Connection failed", error);
