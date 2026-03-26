@@ -1,0 +1,17 @@
+[Unit]
+Description=DeFiNodeNexus Keeper One-shot Job
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=definode
+Group=definode
+WorkingDirectory=/opt/definode/DeFiNodeNexus
+EnvironmentFile=/etc/definode/keeper.env
+ExecStart=/usr/bin/env node scripts/keeper.js --once
+TimeoutStartSec=300
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

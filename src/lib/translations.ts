@@ -369,6 +369,9 @@ export const translations = {
     // Team page extra
     directCount: "Direct Referrals",
     teamCount: "Team Members",
+    myReferrer: "My Referrer",
+    myReferrerDesc: "Your current upstream referrer recorded on-chain.",
+    noReferrerBound: "No referrer bound yet",
     directDepositTotal: "Direct Deposit Total (USDT)",
     teamDepositTotal: "Team Deposit Total (USDT)",
     onChainBindPermanent: "On-chain referral binding is permanent once bound",
@@ -775,6 +778,9 @@ export const translations = {
     // Team page extra
     directCount: "直推人数",
     teamCount: "团队人数",
+    myReferrer: "我的推荐人",
+    myReferrerDesc: "当前链上记录的上级推荐人地址。",
+    noReferrerBound: "暂未绑定推荐人",
     directDepositTotal: "直推入金总额 (USDT)",
     teamDepositTotal: "团队入金总额 (USDT)",
     onChainBindPermanent: "链上绑定推荐关系后永久生效",

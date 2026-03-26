@@ -24,6 +24,7 @@
     "pages:build": "npx @cloudflare/next-on-pages",
     "keeper": "node scripts/keeper.js",
     "keeper:once": "node scripts/keeper.js --once",
+    "health:daily": "node scripts/daily-health-check.js",
     "mint:usdt:sepolia": "npx hardhat run scripts/mint-usdt-sepolia.js --network sepolia",
     "regression:full:local": "npx hardhat run scripts/full-business-regression-local.js"
   },

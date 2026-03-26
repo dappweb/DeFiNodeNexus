@@ -29,12 +29,15 @@ export function TeamPage() {
   const [teamDepositTotal, setTeamDepositTotal] = useState<bigint>(BigInt(0));
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [inviteUrl, setInviteUrl] = useState("");
+  const [myReferrer, setMyReferrer] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
     if (!nexus || !address) return;
 
     const account = await nexus.accounts(address);
     setDirectReferrals(account.directReferrals);
+    const referrer = String(account.referrer);
+    setMyReferrer(referrer && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase() ? referrer : null);
 
     if (!provider) {
       setMembers([]);
@@ -154,20 +157,33 @@ export function TeamPage() {
 
       <Card className="glass-panel border-primary/20">
         <CardContent className="p-5">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div className="flex-1">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <h3 className="font-headline font-bold flex items-center gap-2 mb-1">
+                <UserPlus className="h-4 w-4 text-primary" />
+                {t("myReferrer")}
+              </h3>
+              <p className="text-xs text-muted-foreground mb-3">{t("myReferrerDesc")}</p>
+              <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                <p className="font-mono text-xs break-all text-foreground">
+                  {myReferrer ?? t("noReferrerBound")}
+                </p>
+              </div>
+            </div>
+
+            <div>
               <h3 className="font-headline font-bold flex items-center gap-2 mb-1">
                 <Link2 className="h-4 w-4 text-primary" />
                 {t("inviteLink")}
               </h3>
-              <p className="text-xs text-muted-foreground">{t("onChainBindPermanent")}</p>
-            </div>
-            <div className="flex gap-2 flex-1">
-              <Input value={inviteUrl} readOnly className="font-mono text-xs bg-muted/30" />
-              <Button onClick={handleCopyLink} variant="outline" className="shrink-0 border-primary/30 hover:bg-primary/10">
-                <Copy className="h-4 w-4 mr-2" />
-                {t("copyLink")}
-              </Button>
+              <p className="text-xs text-muted-foreground mb-3">{t("onChainBindPermanent")}</p>
+              <div className="flex gap-2">
+                <Input value={inviteUrl} readOnly className="font-mono text-xs bg-muted/30" />
+                <Button onClick={handleCopyLink} variant="outline" className="shrink-0 border-primary/30 hover:bg-primary/10">
+                  <Copy className="h-4 w-4 mr-2" />
+                  {t("copyLink")}
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
