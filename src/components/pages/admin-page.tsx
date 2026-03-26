@@ -23,6 +23,29 @@ type OperationLogItem = {
   at: string;
 };
 
+type AdminNftaTierSnapshot = {
+  id: number;
+  price: bigint;
+  dailyYield: bigint;
+  maxSupply: bigint;
+  currentSupply: bigint;
+  isActive: boolean;
+};
+
+type AdminNftbTierSnapshot = {
+  id: number;
+  price: bigint;
+  weight: bigint;
+  maxSupply: bigint;
+  usdtMinted: bigint;
+  tofMinted: bigint;
+  dividendBps: bigint;
+  isActive: boolean;
+};
+
+const EXPECTED_NFTA_TIER_IDS = [1, 2];
+const EXPECTED_NFTB_TIER_IDS = [1, 2, 3];
+
 export function AdminPage() {
   const { address } = useWeb3();
   const nexus = useNexusContract();
@@ -44,11 +67,9 @@ export function AdminPage() {
   const [withdrawLevel, setWithdrawLevel] = useState("0");
   const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
 
-  const [nftaTierId, setNftaTierId] = useState("0");
-  const [nftaPrice, setNftaPrice] = useState("");
-  const [nftaYield, setNftaYield] = useState("");
-  const [nftaSupply, setNftaSupply] = useState("");
-  const [nftaActive, setNftaActive] = useState(true);
+  const [nftaTierSnapshot, setNftaTierSnapshot] = useState<AdminNftaTierSnapshot[]>([]);
+  const [nftbTierSnapshot, setNftbTierSnapshot] = useState<AdminNftbTierSnapshot[]>([]);
+  const [tierConfigStatus, setTierConfigStatus] = useState("检查中");
 
   const [rewardFundAmount, setRewardFundAmount] = useState("");
   const [dividendAmount, setDividendAmount] = useState("");
@@ -250,6 +271,55 @@ export function AdminPage() {
       setInstitution(i);
       setTofBurnBps(burn.toString());
       setTofClaimFeeBps(claim.toString());
+
+      const [nftaRows, nftbRows] = await Promise.all([
+        Promise.all(
+          EXPECTED_NFTA_TIER_IDS.map(async (id) => {
+            const tier = await nexus.nftaTiers(id);
+            return {
+              id,
+              price: tier.price,
+              dailyYield: tier.dailyYield,
+              maxSupply: tier.maxSupply,
+              currentSupply: tier.currentSupply,
+              isActive: tier.isActive,
+            } as AdminNftaTierSnapshot;
+          })
+        ),
+        Promise.all(
+          EXPECTED_NFTB_TIER_IDS.map(async (id) => {
+            const tier = await nexus.nftbTiers(id);
+            return {
+              id,
+              price: tier.price,
+              weight: tier.weight,
+              maxSupply: tier.maxSupply,
+              usdtMinted: tier.usdtMinted,
+              tofMinted: tier.tofMinted,
+              dividendBps: tier.dividendBps,
+              isActive: tier.isActive,
+            } as AdminNftbTierSnapshot;
+          })
+        ),
+      ]);
+
+      setNftaTierSnapshot(nftaRows);
+      setNftbTierSnapshot(nftbRows);
+
+      const missingNfta = nftaRows
+        .filter((tier) => tier.price === 0n && tier.maxSupply === 0n && !tier.isActive)
+        .map((tier) => tier.id);
+      const missingNftb = nftbRows
+        .filter((tier) => tier.price === 0n && tier.maxSupply === 0n && !tier.isActive)
+        .map((tier) => tier.id);
+
+      if (missingNfta.length === 0 && missingNftb.length === 0) {
+        setTierConfigStatus("固定档位完整（NFTA 2档 / NFTB 3档）");
+      } else {
+        setTierConfigStatus(
+          `固定档位缺失：${missingNfta.length > 0 ? `NFTA[${missingNfta.join(",")}]` : ""}${missingNfta.length > 0 && missingNftb.length > 0 ? "，" : ""}${missingNftb.length > 0 ? `NFTB[${missingNftb.join(",")}]` : ""}`
+        );
+      }
 
       if (swap) {
         const [totR, usdtR, pool, b, s, p, th, dBuy, mSell, def, price, lastDefl, deflCD, nexAddr, totTk, usdtTk] = await Promise.all([
@@ -483,83 +553,47 @@ export function AdminPage() {
         <TabsContent value="tiers">
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle>NFT-A Tier 配置</CardTitle>
-              <CardDescription>创建或更新卡牌档位（tierId=0 代表新增）</CardDescription>
+              <CardTitle>NFT 固定档位（只读）</CardTitle>
+              <CardDescription>档位由合约固定管理，后台仅展示链上快照与完整性状态</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="档位 ID" type="number" aria-label="NFT-A 档位 ID" />
-                <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (18位精度)" aria-label="NFT-A 价格" />
-                <Input value={nftaYield} onChange={(e) => setNftaYield(e.target.value)} placeholder="日产出 (18位精度)" aria-label="NFT-A 日产出" />
-                <Input value={nftaSupply} onChange={(e) => setNftaSupply(e.target.value)} placeholder="最大供应量" type="number" aria-label="NFT-A 最大供应量" />
-                <div className="flex items-center gap-2 px-2"><Switch checked={nftaActive} onCheckedChange={setNftaActive} /><span className="text-sm">{nftaActive ? "启用" : "停用"}</span></div>
-              </div>
-              <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("保存 NFTA Tier", async () => {
-                if (!nexus) return;
-                if (!validatePositiveAmount("NFT-A 价格", nftaPrice)) return;
-                if (!validatePositiveAmount("NFT-A 日产出", nftaYield)) return;
-                if (!validatePositiveAmount("NFT-A 最大供应量", nftaSupply)) return;
-                setLoading(true);
-                const r = await execTx(
-                  nexus.configureNftaTier(
-                    BigInt(nftaTierId || "0"),
-                    toUnits(nftaPrice),
-                    toUnits(nftaYield),
-                    BigInt(nftaSupply || "0"),
-                    nftaActive
-                  )
-                );
-                setLoading(false);
-                notifyTx(r.success, r.hash, r.error, "保存 NFT-A Tier");
-              }, "确认保存 NFT-A 档位配置？")}>保存 NFT-A Tier</Button>
-
-              <div className="rounded-md border border-dashed border-border p-3 space-y-2">
-                <p className="text-sm font-medium">NFT-B 档位快速初始化</p>
-                <p className="text-xs text-muted-foreground">
-                  将按固定参数写入：初级·普通权杖（500）、中级·稀有王冠（1000）、高级·传说神座（2000）；
-                  TOF 价格 100000/200000/400000；权重 1/2/3、分红 20%/30%/40%、每档 2000 张，状态启用。
+              <div className="rounded-md border border-border/60 px-3 py-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">固定档位完整性</p>
+                <p className={tierConfigStatus.includes("完整") ? "text-xs text-green-500 font-medium" : "text-xs text-yellow-600 dark:text-yellow-400 font-medium"}>
+                  {tierConfigStatus}
                 </p>
-                <Button
-                  variant="secondary"
-                  disabled={!isOwner || !nexus || loading}
-                  onClick={() => runAction("一键初始化 NFTB 三档", async () => {
-                    if (!nexus) return;
-                    setLoading(true);
+              </div>
 
-                    const presets = [
-                      { tierId: BigInt(1), price: "500", tofPrice: "100000", weight: BigInt(1), maxSupply: BigInt(2000), dividendBps: BigInt(2000) },
-                      { tierId: BigInt(2), price: "1000", tofPrice: "200000", weight: BigInt(2), maxSupply: BigInt(2000), dividendBps: BigInt(3000) },
-                      { tierId: BigInt(3), price: "2000", tofPrice: "400000", weight: BigInt(3), maxSupply: BigInt(2000), dividendBps: BigInt(4000) },
-                    ];
+              <div className="space-y-2">
+                <p className="text-sm font-medium">NFTA 固定档位</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {nftaTierSnapshot.map((tier) => (
+                    <div key={`nfta-${tier.id}`} className="rounded-md border border-border/60 bg-muted/20 px-3 py-3 text-xs space-y-1">
+                      <p className="font-medium">NFTA #{tier.id}</p>
+                      <p>状态：{tier.isActive ? "启用" : "停用"}</p>
+                      <p>价格：{Number(ethers.formatUnits(tier.price, 18)).toLocaleString()} USDT</p>
+                      <p>日产出：{Number(ethers.formatUnits(tier.dailyYield, 18)).toLocaleString()} TOT</p>
+                      <p>供应：{tier.currentSupply.toString()} / {tier.maxSupply.toString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-                    for (const preset of presets) {
-                      const result = await execTx(
-                        nexus.configureNftbTier(
-                          preset.tierId,
-                          toUnits(preset.price),
-                          toUnits(preset.tofPrice),
-                          preset.weight,
-                          preset.maxSupply,
-                          preset.dividendBps,
-                          true
-                        )
-                      );
-
-                      if (!result.success) {
-                        setLoading(false);
-                        notifyTx(false, undefined, `Tier ${preset.tierId.toString()} 初始化失败: ${result.error || "未知错误"}`, "一键初始化 NFT-B 三档");
-                        return;
-                      }
-                    }
-
-                    setLoading(false);
-                    toast({ title: "初始化成功", description: "NFT-B 三档已完成配置" });
-                    pushOperationLog("一键初始化 NFT-B 三档", "success", "Tier 1/2/3 初始化完成");
-                    refreshData();
-                  }, "确认按预设写入 NFT-B 1/2/3 档位？")}
-                >
-                  一键初始化 NFT-B 三档
-                </Button>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">NFTB 固定档位</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {nftbTierSnapshot.map((tier) => (
+                    <div key={`nftb-${tier.id}`} className="rounded-md border border-border/60 bg-muted/20 px-3 py-3 text-xs space-y-1">
+                      <p className="font-medium">NFTB #{tier.id}</p>
+                      <p>状态：{tier.isActive ? "启用" : "停用"}</p>
+                      <p>价格：{Number(ethers.formatUnits(tier.price, 18)).toLocaleString()} USDT</p>
+                      <p>权重：{tier.weight.toString()}</p>
+                      <p>分红：{Number(tier.dividendBps) / 100}%</p>
+                      <p>供应：{tier.maxSupply.toString()}</p>
+                      <p>已售（USDT/TOF）：{tier.usdtMinted.toString()} / {tier.tofMinted.toString()}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
