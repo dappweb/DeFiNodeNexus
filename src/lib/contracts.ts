@@ -1,13 +1,24 @@
 import { ethers } from "ethers";
 
 // ==================== CONTRACT ADDRESSES ====================
-// Update these after each deployment
+// Env vars are inlined at build time by Next.js (NEXT_PUBLIC_*) or next.config.ts.
+// Hardcoded fallbacks ensure Cloudflare Pages builds work even when the dashboard
+// env vars are not configured - these are public on-chain addresses, not secrets.
+// Update DEPLOYED values here after each new deployment.
+const DEPLOYED = {
+  NEXUS: "0x2cc1Ebf7185F4810C620e0A7D3300B1e381f3b44",
+  SWAP:  "0x018F73b493a0F8D0B8f7F85480Ec8E9c9d852ad6",
+  TOT:   "0x46f7729e2158Dd005DC6bdD28FaD457d6f036219",
+  TOF:   "0x2d764DF04FE2A086780ab3F1Edfb4b39E44C0c1B",
+  USDT:  "0x02ED3072eB83e4E0654d30250102aA58cE977789",
+} as const;
+
 export const CONTRACTS = {
-  NEXUS: process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "",
-  SWAP: process.env.NEXT_PUBLIC_SWAP_ADDRESS || "",
-  TOT: process.env.NEXT_PUBLIC_TOT_ADDRESS || "",
-  TOF: process.env.NEXT_PUBLIC_TOF_ADDRESS || "",
-  USDT: process.env.NEXT_PUBLIC_USDT_ADDRESS || "",
+  NEXUS: process.env.NEXT_PUBLIC_NEXUS_ADDRESS || DEPLOYED.NEXUS,
+  SWAP:  process.env.NEXT_PUBLIC_SWAP_ADDRESS  || DEPLOYED.SWAP,
+  TOT:   process.env.NEXT_PUBLIC_TOT_ADDRESS   || DEPLOYED.TOT,
+  TOF:   process.env.NEXT_PUBLIC_TOF_ADDRESS   || DEPLOYED.TOF,
+  USDT:  process.env.NEXT_PUBLIC_USDT_ADDRESS  || DEPLOYED.USDT,
 };
 
 export const NEXUS_ABI = [
