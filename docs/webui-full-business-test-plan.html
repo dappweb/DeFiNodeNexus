@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeFiNodeNexus WebUI 全业务测试方案</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --fg: #e8ecf3;
+      --muted: #a6b0c3;
+      --line: #2b3240;
+      --primary: #5aa2ff;
+      --ok: #32c97a;
+      --warn: #f7b955;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 18px;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--fg);
+      background: #fff;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      color: #101828;
+    }
+    h1, h2, h3 {
+      margin: 0 0 8px;
+      color: #0f172a;
+    }
+    h1 { font-size: 24px; }
+    h2 { font-size: 18px; margin-top: 18px; }
+    h3 { font-size: 15px; margin-top: 14px; }
+    p { margin: 6px 0; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 14px;
+    }
+    .meta div {
+      border: 1px solid #d0d7e2;
+      border-radius: 8px;
+      padding: 8px 10px;
+      background: #f8fafc;
+    }
+    .tag {
+      display: inline-block;
+      border: 1px solid #c9d3e0;
+      border-radius: 999px;
+      padding: 2px 9px;
+      margin-right: 5px;
+      margin-top: 4px;
+      font-size: 12px;
+      background: #f1f5f9;
+    }
+    ul { margin: 6px 0 10px 20px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin: 8px 0 14px;
+    }
+    th, td {
+      border: 1px solid #d0d7e2;
+      vertical-align: top;
+      padding: 7px 8px;
+      word-break: break-word;
+    }
+    th {
+      background: #eef2ff;
+      color: #0f172a;
+      font-weight: 600;
+      text-align: left;
+    }
+    .small { font-size: 12px; color: #334155; }
+    .ok { color: #047857; font-weight: 600; }
+    .warn { color: #b45309; font-weight: 600; }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .note {
+      border-left: 4px solid #3b82f6;
+      background: #eff6ff;
+      padding: 8px 10px;
+      margin: 8px 0;
+    }
+    .footer {
+      margin-top: 16px;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
+      font-size: 12px;
+      color: #475569;
+    }
+    @media print {
+      body { padding: 0; }
+      .page { max-width: 100%; }
+      h2, h3 { page-break-after: avoid; }
+      table, tr, td, th { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>DeFiNodeNexus 用户网页 WebUI 全业务测试方案（含预期结果）</h1>
+
+    <div class="meta">
+      <div><strong>文档版本</strong><br/>v1.0</div>
+      <div><strong>测试日期</strong><br/>2026-03-25</div>
+      <div><strong>适用环境</strong><br/>Local / Sepolia</div>
+    </div>
+
+    <p><strong>测试目标：</strong>覆盖用户在网页端可触达的全部核心业务逻辑，输出“业务对应关系 + 测试步骤 + 预期结果（页面表现与链上状态）”。</p>
+    <p><strong>覆盖页面：</strong>
+      <span class="tag">Home</span>
+      <span class="tag">Nodes</span>
+      <span class="tag">Swap</span>
+      <span class="tag">Earnings</span>
+      <span class="tag">Team</span>
+      <span class="tag">Admin</span>
+    </p>
+
+    <h2>1. 测试前置条件</h2>
+    <ul>
+      <li>钱包角色：Owner、用户A、用户B、用户C、交易员（至少5个地址）。</li>
+      <li>合约地址已配置：NEXUS、SWAP、TOT、TOF、USDT（前端环境变量可读）。</li>
+      <li>用户持有测试资产：USDT/TOF/TOT，且有足够 Sepolia ETH 支付 Gas。</li>
+      <li>至少配置 1 个 NFTA 档位、3 个 NFTB 档位；Swap 已注入流动性。</li>
+      <li>若要验证公告接口：/api/announcements 可返回列表，且 Admin 有发布权限。</li>
+    </ul>
+
+    <h2>2. 业务—页面覆盖映射</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 16%">业务域</th>
+          <th style="width: 20%">用户页面</th>
+          <th style="width: 34%">核心业务逻辑</th>
+          <th style="width: 30%">关键判定点</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>钱包与身份</td>
+          <td>全局 + Home</td>
+          <td>连接钱包、网络识别、Owner识别、推荐关系绑定入口</td>
+          <td>未连接禁止交易；Owner显示管理入口；推荐仅可首绑一次</td>
+        </tr>
+        <tr>
+          <td>NFTA 业务</td>
+          <td>Nodes、Earnings</td>
+          <td>购买、每日收益、批量领取、提现扣TOF手续费与燃烧</td>
+          <td>限购/售罄生效；收益按日更新；提现状态与账本一致</td>
+        </tr>
+        <tr>
+          <td>NFTB 业务</td>
+          <td>Nodes、Earnings</td>
+          <td>USDT/TOF双配额购买、TOT/USDT分红领取、轮次防重领</td>
+          <td>两种支付通道正常；分红可见且可领取；重复领取被拒绝</td>
+        </tr>
+        <tr>
+          <td>交易池业务</td>
+          <td>Swap</td>
+          <td>报价、买卖、日买入限额、单次卖出限制、利润税、通缩倒计时</td>
+          <td>报价与执行一致；限制条件触发时明确报错；储备与分红池变化正确</td>
+        </tr>
+        <tr>
+          <td>团队业务</td>
+          <td>Team</td>
+          <td>直推数、团队规模、业绩累计、邀请链接复制</td>
+          <td>链上事件统计与页面显示一致；复制成功反馈正确</td>
+        </tr>
+        <tr>
+          <td>后台治理</td>
+          <td>Admin</td>
+          <td>参数治理、钱包地址治理、分红/资金注入、公告发布</td>
+          <td>非Owner不可操作；参数边界生效；成功后页面刷新到最新链上状态</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. 详细测试用例（全业务）</h2>
+
+    <h3>3.1 全局与入口（连接、推荐、导航）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>G-01</td>
+          <td>钱包连接</td>
+          <td>钱包插件可用</td>
+          <td>点击 Connect Wallet，授权连接</td>
+          <td>地址显示成功；页面从“未连接提示”切换为业务数据视图</td>
+        </tr>
+        <tr>
+          <td>G-02</td>
+          <td>未连接拦截</td>
+          <td>断开钱包</td>
+          <td>在 Nodes/Swap 发起购买或兑换</td>
+          <td>显示“请先连接钱包”提示；不发送链上交易</td>
+        </tr>
+        <tr>
+          <td>G-03</td>
+          <td>推荐关系首绑</td>
+          <td>用户A未绑定推荐人</td>
+          <td>输入有效推荐地址并提交绑定</td>
+          <td>绑定成功；后续刷新后状态仍为已绑定；再次绑定被拒绝</td>
+        </tr>
+        <tr>
+          <td>G-04</td>
+          <td>推荐非法值拦截</td>
+          <td>用户A未绑定</td>
+          <td>分别输入空地址、自身地址、零地址</td>
+          <td>前端提示失败；链上状态不变；不会误进入成功态</td>
+        </tr>
+        <tr>
+          <td>G-05</td>
+          <td>Owner 管理入口</td>
+          <td>分别使用Owner和普通用户登录</td>
+          <td>检查导航栏</td>
+          <td>仅Owner可见 Admin 页签；普通用户不可见/不可用</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.2 Home 页（资产、公告、预测入口）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>H-01</td>
+          <td>资产总览读取</td>
+          <td>钱包已连接，合约地址有效</td>
+          <td>进入 Home，观察 TOT/TOF/NFTA/NFTB 数据</td>
+          <td>余额与节点数正常显示；切账号后自动刷新</td>
+        </tr>
+        <tr>
+          <td>H-02</td>
+          <td>价格信息展示</td>
+          <td>Swap 可访问</td>
+          <td>检查 TOT 价格、TOF价格（由 on-chain 数据推导）</td>
+          <td>价格非空且格式正确；合约不可用时显示 0 或降级态</td>
+        </tr>
+        <tr>
+          <td>H-03</td>
+          <td>公告列表加载</td>
+          <td>/api/announcements 正常</td>
+          <td>打开 Home 公告区域，点击某条公告</td>
+          <td>列表按接口返回展示；点击后弹窗显示完整内容</td>
+        </tr>
+        <tr>
+          <td>H-04</td>
+          <td>公告接口降级</td>
+          <td>人为让接口失败</td>
+          <td>刷新 Home</td>
+          <td>使用本地 mock 公告回退，不影响其他模块</td>
+        </tr>
+        <tr>
+          <td>H-05</td>
+          <td>预测平台外链</td>
+          <td>配置/未配置 NEXT_PUBLIC_PREDICTION_PLATFORM_URL</td>
+          <td>分别点击“Open Platform”</td>
+          <td>已配置时可跳转；未配置时展示“未配置链接”提示</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.3 Nodes 页 - NFTA（购买、收益、提现）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>NFTA-01</td>
+          <td>NFTA档位展示</td>
+          <td>已配置至少1个激活档位</td>
+          <td>进入 Nodes 的 NFTA 购买区</td>
+          <td>显示价格/日产出/总量/剩余量；非激活档位不可购买</td>
+        </tr>
+        <tr>
+          <td>NFTA-02</td>
+          <td>NFTA购买成功</td>
+          <td>用户A有足额USDT</td>
+          <td>选择档位并购买（含授权流程）</td>
+          <td>交易成功；节点列表新增记录；按钮状态从处理中恢复</td>
+        </tr>
+        <tr>
+          <td>NFTA-03</td>
+          <td>NFTA每地址限购</td>
+          <td>用户A已持有NFTA</td>
+          <td>再次购买任一NFTA档位</td>
+          <td>交易失败并提示；节点数量不变</td>
+        </tr>
+        <tr>
+          <td>NFTA-04</td>
+          <td>档位售罄拦截</td>
+          <td>某档位剩余=0</td>
+          <td>尝试购买该档位</td>
+          <td>提示配额不足/售罄；不会进入成功状态</td>
+        </tr>
+        <tr>
+          <td>NFTA-05</td>
+          <td>单节点收益领取</td>
+          <td>节点跨日产生收益</td>
+          <td>点击 Claim（单个节点）</td>
+          <td>领取成功；该节点 pending 归零（或减少）；账户 pendingTot 增加</td>
+        </tr>
+        <tr>
+          <td>NFTA-06</td>
+          <td>同日重复领取拦截</td>
+          <td>已领取当日收益</td>
+          <td>再次点击 Claim</td>
+          <td>交易回退；页面给出失败提示；数值不异常跳变</td>
+        </tr>
+        <tr>
+          <td>NFTA-07</td>
+          <td>批量领取收益</td>
+          <td>用户A有多个NFTA节点</td>
+          <td>点击 Claim All NFTA Yield</td>
+          <td>可领取节点统一处理；总待领取同步更新</td>
+        </tr>
+        <tr>
+          <td>NFTA-08</td>
+          <td>TOT提现成功</td>
+          <td>account.pendingTot &gt; 0，TOF足够</td>
+          <td>在收益页/节点页发起 withdrawTot</td>
+          <td>TOT到账；TOF手续费扣除；存在燃烧变化与提现事件</td>
+        </tr>
+        <tr>
+          <td>NFTA-09</td>
+          <td>TOT提现失败边界</td>
+          <td>pendingTot=0 或 TOF不足</td>
+          <td>发起提现</td>
+          <td>失败提示明确；余额与账本不发生错误变更</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.4 Nodes 页 - NFTB（双支付购买、TOT/USDT分红）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>NFTB-01</td>
+          <td>NFTB档位与配额显示</td>
+          <td>已配置NFTB档位</td>
+          <td>查看每档位 USDT/TOF 剩余配额</td>
+          <td>配额分开展示，且与链上 getNftbTierRemaining 一致</td>
+        </tr>
+        <tr>
+          <td>NFTB-02</td>
+          <td>USDT通道购买</td>
+          <td>用户B有足额USDT</td>
+          <td>支付方式选 USDT，完成购买</td>
+          <td>节点创建成功；对应USDT配额减少；TOF配额不变</td>
+        </tr>
+        <tr>
+          <td>NFTB-03</td>
+          <td>TOF通道购买</td>
+          <td>用户C有足额TOF</td>
+          <td>支付方式选 TOF，完成购买</td>
+          <td>节点创建成功；对应TOF配额减少；USDT配额不变</td>
+        </tr>
+        <tr>
+          <td>NFTB-04</td>
+          <td>配额售罄拦截</td>
+          <td>某档位某支付通道剩余为0</td>
+          <td>通过该通道继续购买</td>
+          <td>购买失败；页面提示售罄；不会误扣款</td>
+        </tr>
+        <tr>
+          <td>NFTB-05</td>
+          <td>TOT分红领取</td>
+          <td>管理员已分发TOT分红</td>
+          <td>用户点击 Claim NFTB Dividend</td>
+          <td>领取成功；pendingTot 增长；事件记录可在 Earnings 查询</td>
+        </tr>
+        <tr>
+          <td>NFTB-06</td>
+          <td>USDT分红领取</td>
+          <td>管理员已分发USDT分红</td>
+          <td>用户点击 Claim NFTB USDT Dividend</td>
+          <td>USDT到账；对应节点待领USDT分红归零或减少</td>
+        </tr>
+        <tr>
+          <td>NFTB-07</td>
+          <td>分红重复领取拦截</td>
+          <td>本轮已领取</td>
+          <td>同节点再次领取同轮分红</td>
+          <td>交易失败并提示；不会重复记账</td>
+        </tr>
+        <tr>
+          <td>NFTB-08</td>
+          <td>批量领取分红</td>
+          <td>用户持有多个NFTB节点</td>
+          <td>执行 Claim All</td>
+          <td>可领取节点全部处理完成；总待领取值同步下降</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.5 Swap 页（报价、买卖、限制、费率）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>SW-01</td>
+          <td>买/卖方向切换</td>
+          <td>已进入Swap页</td>
+          <td>点击方向切换按钮</td>
+          <td>From/To币种互换；输入框清空；quote重算</td>
+        </tr>
+        <tr>
+          <td>SW-02</td>
+          <td>买入报价</td>
+          <td>输入有效USDT数量</td>
+          <td>观察 quoteBuy 结果</td>
+          <td>输出TOT数量>0；与费率逻辑一致</td>
+        </tr>
+        <tr>
+          <td>SW-03</td>
+          <td>卖出报价</td>
+          <td>输入有效TOT数量</td>
+          <td>观察 quoteSell 结果</td>
+          <td>输出USDT数量>0；包含卖出费与利润税影响</td>
+        </tr>
+        <tr>
+          <td>SW-04</td>
+          <td>BUY授权+成交</td>
+          <td>USDT余额足够，授权不足</td>
+          <td>执行BUY</td>
+          <td>先触发approve再buy；成功后余额、日买额度发生变化</td>
+        </tr>
+        <tr>
+          <td>SW-05</td>
+          <td>SELL授权+成交</td>
+          <td>TOT余额足够，授权不足</td>
+          <td>执行SELL</td>
+          <td>先approve再sell；成功后用户均价与卖出上限刷新</td>
+        </tr>
+        <tr>
+          <td>SW-06</td>
+          <td>日买入限额</td>
+          <td>用户接近日限额</td>
+          <td>连续买入直至超限</td>
+          <td>超过 maxDailyBuy 时交易失败；前端提示原因</td>
+        </tr>
+        <tr>
+          <td>SW-07</td>
+          <td>单次卖出限制</td>
+          <td>用户持仓已知</td>
+          <td>尝试卖出超过可卖上限</td>
+          <td>交易被拒绝；可卖上限字段与链上 getMaxSellAmount 一致</td>
+        </tr>
+        <tr>
+          <td>SW-08</td>
+          <td>收益税逻辑</td>
+          <td>制造“低买高卖”场景</td>
+          <td>买入后涨价卖出</td>
+          <td>利润税生效，到账USDT小于无税理论值；页面费率显示正确</td>
+        </tr>
+        <tr>
+          <td>SW-09</td>
+          <td>通缩倒计时展示</td>
+          <td>Swap可读 timeUntilNextDeflation</td>
+          <td>观察倒计时变化</td>
+          <td>倒计时非负且递减；执行通缩后重置到下个周期</td>
+        </tr>
+        <tr>
+          <td>SW-10</td>
+          <td>池子/用户指标刷新</td>
+          <td>完成一笔买卖</td>
+          <td>留在页面等待刷新</td>
+          <td>currentPrice / avgPrice / dailyBought / maxSell 等指标同步更新</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.6 Earnings 页（收益汇总、过滤、提现）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>E-01</td>
+          <td>收益总览读取</td>
+          <td>账户已有收益记录</td>
+          <td>打开 Earnings 页</td>
+          <td>pendingTot、claimedTot 正确显示</td>
+        </tr>
+        <tr>
+          <td>E-02</td>
+          <td>事件聚合查询</td>
+          <td>近期有5类事件（Yield/Div/USDTDiv/Team/Withdraw）</td>
+          <td>刷新记录列表</td>
+          <td>按区块时间倒序展示，交易哈希可追溯</td>
+        </tr>
+        <tr>
+          <td>E-03</td>
+          <td>类型过滤</td>
+          <td>已有多类型收益</td>
+          <td>按类型筛选（all/NFTA/NFTB/Team/Withdraw）</td>
+          <td>列表仅显示命中类型；汇总数值口径一致</td>
+        </tr>
+        <tr>
+          <td>E-04</td>
+          <td>时间范围过滤</td>
+          <td>有7天前与7天内记录</td>
+          <td>切换 7d / 30d / all</td>
+          <td>记录条数和汇总随范围变化，逻辑正确</td>
+        </tr>
+        <tr>
+          <td>E-05</td>
+          <td>一键提现</td>
+          <td>pendingTot&gt;0 且 TOF足够</td>
+          <td>点击 Withdraw</td>
+          <td>提现成功；新增 Withdraw 记录；pendingTot 下降</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.7 Team 页（团队关系与业绩）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>T-01</td>
+          <td>直推人数显示</td>
+          <td>用户有ReferrerBound链上事件</td>
+          <td>进入 Team 页面</td>
+          <td>directReferrals 与账户链上字段一致</td>
+        </tr>
+        <tr>
+          <td>T-02</td>
+          <td>团队规模统计</td>
+          <td>存在多级下线关系</td>
+          <td>观察 teamMemberCount</td>
+          <td>采用BFS统计，不重复计数，结果稳定</td>
+        </tr>
+        <tr>
+          <td>T-03</td>
+          <td>团队业绩统计</td>
+          <td>下线存在NFTA/NFTB购买记录</td>
+          <td>查看 directDepositTotal / teamDepositTotal</td>
+          <td>金额汇总与购买事件 price 合计一致</td>
+        </tr>
+        <tr>
+          <td>T-04</td>
+          <td>直推成员列表</td>
+          <td>至少2名直推</td>
+          <td>查看成员地址、节点数、待领取</td>
+          <td>列表字段完整，地址点击或复制行为正常</td>
+        </tr>
+        <tr>
+          <td>T-05</td>
+          <td>邀请链接复制</td>
+          <td>浏览器支持 clipboard</td>
+          <td>点击 Copy Link</td>
+          <td>显示复制成功 toast；粘贴后链接含 ref 参数</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.8 Admin 页（权限、参数治理、分红与流动性、公告）</h3>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%">编号</th>
+          <th style="width: 18%">对应业务</th>
+          <th style="width: 20%">前置条件</th>
+          <th style="width: 24%">测试步骤</th>
+          <th style="width: 30%">预期结果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>A-01</td>
+          <td>Owner权限校验</td>
+          <td>普通用户进入Admin接口路径</td>
+          <td>执行任意管理操作</td>
+          <td>交易失败；页面提示权限不足；无状态变更</td>
+        </tr>
+        <tr>
+          <td>A-02</td>
+          <td>地址参数校验</td>
+          <td>Owner登录</td>
+          <td>输入非法地址更新 treasury/wallet</td>
+          <td>前端阻止提交并提示“地址无效”</td>
+        </tr>
+        <tr>
+          <td>A-03</td>
+          <td>BPS边界校验</td>
+          <td>Owner登录</td>
+          <td>设置超过上限的 bps</td>
+          <td>前端或链上拦截失败；合法值提交成功</td>
+        </tr>
+        <tr>
+          <td>A-04</td>
+          <td>配置NFTA档位</td>
+          <td>Owner登录</td>
+          <td>配置 tierId/price/yield/supply/active</td>
+          <td>成功写链；Nodes页可读到新档位</td>
+        </tr>
+        <tr>
+          <td>A-05</td>
+          <td>奖励池注资</td>
+          <td>Owner有TOT余额并授权</td>
+          <td>执行 fundRewardPool</td>
+          <td>交易成功；对应池子或账户状态变化</td>
+        </tr>
+        <tr>
+          <td>A-06</td>
+          <td>NFTB TOT分红发放</td>
+          <td>Owner登录，存在NFTB持有人</td>
+          <td>执行 distributeNftbDividends</td>
+          <td>节点待领TOT分红增加；用户可领取</td>
+        </tr>
+        <tr>
+          <td>A-07</td>
+          <td>NFTB USDT分红发放</td>
+          <td>Owner登录，USDT已准备</td>
+          <td>执行 distributeNftbUsdtDividends</td>
+          <td>节点待领USDT分红增加；用户可领取</td>
+        </tr>
+        <tr>
+          <td>A-08</td>
+          <td>设置分发员</td>
+          <td>Owner登录</td>
+          <td>setDistributor(addr,true/false)</td>
+          <td>状态切换成功；权限测试与预期一致</td>
+        </tr>
+        <tr>
+          <td>A-09</td>
+          <td>Swap费率治理</td>
+          <td>Owner登录</td>
+          <td>调整买卖费、利润税、通缩比例、阈值</td>
+          <td>Swap页费率字段实时更新，报价随参数变化</td>
+        </tr>
+        <tr>
+          <td>A-10</td>
+          <td>增减流动性</td>
+          <td>Owner持有TOT/USDT</td>
+          <td>addLiquidity / removeLiquidity</td>
+          <td>储备值变化正确；极值时有边界拦截</td>
+        </tr>
+        <tr>
+          <td>A-11</td>
+          <td>强制分红/紧急提币</td>
+          <td>Owner登录</td>
+          <td>forceDistribute / emergencyWithdraw</td>
+          <td>仅Owner成功；分红池归零或资产转移符合预期</td>
+        </tr>
+        <tr>
+          <td>A-12</td>
+          <td>公告发布与前台可见</td>
+          <td>Owner登录，公告API可写</td>
+          <td>Admin新增公告后切回Home</td>
+          <td>Home可见新公告；标题/类型/内容一致</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. 关键业务通过标准（验收）</h2>
+    <div class="split">
+      <div>
+        <h3>4.1 功能通过</h3>
+        <ul>
+          <li>上述 <strong>52个用例</strong> 全部执行，关键路径通过率 100%。</li>
+          <li>失败用例必须有可复现步骤、截图、交易哈希。</li>
+          <li>所有“限制类规则”（限购、配额、权限、费率边界）均触发并表现正确。</li>
+        </ul>
+      </div>
+      <div>
+        <h3>4.2 数据一致性</h3>
+        <ul>
+          <li>页面展示值与链上读取值一致（允许区块延迟导致的短暂滞后）。</li>
+          <li>收益与提现前后余额守恒，手续费与燃烧逻辑可解释。</li>
+          <li>公告、团队统计与交易记录可追溯到事件或接口返回。</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>5. 缺陷记录模板（执行时填写）</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 10%">缺陷ID</th>
+          <th style="width: 12%">关联用例</th>
+          <th style="width: 16%">模块</th>
+          <th style="width: 28%">现象</th>
+          <th style="width: 14%">严重级别</th>
+          <th style="width: 20%">证据</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>BUG-001</td>
+          <td>SW-06</td>
+          <td>Swap</td>
+          <td>超过日买入限额后提示文案不准确</td>
+          <td>中</td>
+          <td>截图+txHash</td>
+        </tr>
+        <tr>
+          <td>BUG-002</td>
+          <td>A-12</td>
+          <td>Admin/Home</td>
+          <td>公告发布成功但Home刷新不出现</td>
+          <td>高</td>
+          <td>接口返回+截图</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="note">
+      <strong>执行建议：</strong>按“全局 → Nodes → Swap → Earnings → Team → Admin → 回归复测”顺序执行，先主流程后边界，保证链上状态可解释且便于回放。
+    </div>
+
+    <div class="footer">
+      生成说明：本方案基于当前仓库 WebUI 与合约交互逻辑整理，适用于用户在网页端进行业务验收测试。<br/>
+      文档文件：docs/webui-full-business-test-plan.html / docs/webui-full-business-test-plan.pdf
+    </div>
+  </div>
+</body>
+</html>
