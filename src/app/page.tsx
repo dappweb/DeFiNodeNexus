@@ -50,7 +50,9 @@ export default function DashboardPage() {
   const [referrerFromUrl, setReferrerFromUrl] = useState<string | null>(null);
   const [isBindingReferrer, setIsBindingReferrer] = useState(false);
   const [referrerError, setReferrerError] = useState("");
+  const [referralPromptDismissed, setReferralPromptDismissed] = useState(false);
   const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
+  const [hasPurchasedNode, setHasPurchasedNode] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -156,6 +158,7 @@ export default function DashboardPage() {
 
   // Referral binding required: connected + not owner + not yet bound
   const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
+  const shouldBlockForReferral = needsReferralBinding && !referralPromptDismissed;
 
   useEffect(() => {
     if (!shouldShowAdmin && activeTab === "admin") {
@@ -190,6 +193,50 @@ export default function DashboardPage() {
     });
   }, [needsReferralBinding, ownerAddress, address, referrerFromUrl]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!address) {
+      setReferralPromptDismissed(false);
+      return;
+    }
+
+    const key = `referral-skip-${address.toLowerCase()}`;
+    setReferralPromptDismissed(window.localStorage.getItem(key) === "1");
+  }, [address]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadNodeOwnership = async () => {
+      if (!isConnected || !address || !nexus) {
+        if (!cancelled) {
+          setHasPurchasedNode(false);
+        }
+        return;
+      }
+
+      try {
+        const [nftaNodes, nftbNodes] = await Promise.all([
+          nexus.getUserNftaNodes(address),
+          nexus.getUserNftbNodes(address),
+        ]);
+        if (!cancelled) {
+          setHasPurchasedNode(nftaNodes.length + nftbNodes.length > 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setHasPurchasedNode(false);
+        }
+      }
+    };
+
+    loadNodeOwnership();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address, nexus]);
+
   if (!mounted) return null;
 
   const handleBindReferrer = async () => {
@@ -223,6 +270,10 @@ export default function DashboardPage() {
       }
 
       setReferrerBound(true);
+      setReferralPromptDismissed(false);
+      if (typeof window !== "undefined" && address) {
+        window.localStorage.removeItem(`referral-skip-${address.toLowerCase()}`);
+      }
       toast({
         title: t('referralSuccess'),
         description: t('referralSuccessDesc'),
@@ -230,6 +281,18 @@ export default function DashboardPage() {
     } finally {
       setIsBindingReferrer(false);
     }
+  };
+
+  const handleSkipReferralForNow = () => {
+    if (!address) return;
+    setReferralPromptDismissed(true);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(`referral-skip-${address.toLowerCase()}`, "1");
+    }
+    toast({
+      title: t("referralSkipForNow"),
+      description: t("referralSkipHint"),
+    });
   };
 
   const navItems: { key: PageTab; icon: typeof Home; label: string }[] = [
@@ -249,6 +312,33 @@ export default function DashboardPage() {
     team: <TeamPage />,
     admin: <AdminPage />,
   };
+
+  const onboardingSteps = [
+    {
+      key: "wallet",
+      label: t("stepConnectWallet"),
+      done: isConnected,
+      later: false,
+    },
+    {
+      key: "network",
+      label: t("stepSwitchNetwork"),
+      done: isConnected && chainId === 11155111,
+      later: false,
+    },
+    {
+      key: "referral",
+      label: t("stepBindReferrer"),
+      done: !isConnected || isOwner || referrerBound,
+      later: isConnected && !isOwner && !referrerBound && referralPromptDismissed,
+    },
+    {
+      key: "nodes",
+      label: t("stepBuyNftNode"),
+      done: hasPurchasedNode,
+      later: false,
+    },
+  ];
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
@@ -333,6 +423,23 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="mx-auto w-full max-w-7xl">
+          <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-3">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-medium">{t("onboardingTitle")}</p>
+              <span className="text-xs text-muted-foreground">{onboardingSteps.filter((step) => step.done).length}/{onboardingSteps.length}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              {onboardingSteps.map((step) => (
+                <div key={step.key} className="rounded-md border border-border/40 bg-background/60 px-2.5 py-2 text-xs flex items-center justify-between gap-2">
+                  <span className="truncate">{step.label}</span>
+                  <span className={step.done ? "text-primary font-medium" : step.later ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}>
+                    {step.done ? t("stepDone") : step.later ? t("stepLater") : t("stepPending")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <div className="flex items-center justify-between sm:justify-start gap-2">
@@ -362,7 +469,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {needsReferralBinding ? (
+        {needsReferralBinding && referralPromptDismissed ? (
+          <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <span className="text-amber-700 dark:text-amber-300">{t("referralPendingBanner")}</span>
+            <Button size="sm" variant="outline" className="h-7" onClick={() => setReferralPromptDismissed(false)}>
+              {t("referralBindNow")}
+            </Button>
+          </div>
+        ) : null}
+
+        {shouldBlockForReferral ? (
           /* ===== Referral Binding Overlay ===== */
           <div className="flex items-center justify-center min-h-[calc(100dvh-12rem)] md:min-h-[calc(100vh-10rem)]">
             <div className="w-full max-w-md mx-auto">
@@ -413,9 +529,17 @@ export default function DashboardPage() {
                 </Button>
 
                 {/* Skip link */}
-                <p className="text-center text-xs text-muted-foreground">
-                  {t('referralSkip')}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-center text-xs text-muted-foreground">{t('referralSkip')}</p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleSkipReferralForNow}
+                    className="w-full text-xs"
+                  >
+                    {t("referralSkipForNow")}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

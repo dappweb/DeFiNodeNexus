@@ -113,6 +113,7 @@
 ## 10. 相关文件
 
 - 执行清单：[docs/full-business-test-checklist.md](docs/full-business-test-checklist.md)
+- 上线验收 KPI：[docs/launch-acceptance-kpi.md](docs/launch-acceptance-kpi.md)
 - Sepolia 方案：[docs/sepolia-test-plan.md](docs/sepolia-test-plan.md)
 - Round3 脚本：[scripts/sepolia-round3-test.js](scripts/sepolia-round3-test.js)
 - E2E 用例目录：[tests/e2e](tests/e2e)

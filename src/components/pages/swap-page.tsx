@@ -27,6 +27,8 @@ export function SwapPage() {
   const [amountIn, setAmountIn] = useState("");
   const [amountOut, setAmountOut] = useState("0");
   const [loading, setLoading] = useState(false);
+  const [txStage, setTxStage] = useState<"idle" | "checking" | "approving" | "submitting" | "done">("idle");
+  const [approvalNeeded, setApprovalNeeded] = useState(false);
 
   const [totDecimals, setTotDecimals] = useState(18);
   const [usdtDecimals, setUsdtDecimals] = useState(18);
@@ -121,6 +123,40 @@ export function SwapPage() {
     refreshQuote();
   }, [refreshQuote]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkApproval = async () => {
+      if (!isConnected || !address || !swap || !tot || !usdt) {
+        if (!cancelled) setApprovalNeeded(false);
+        return;
+      }
+
+      const input = parseInput();
+      if (input <= BigInt(0)) {
+        if (!cancelled) setApprovalNeeded(false);
+        return;
+      }
+
+      try {
+        const allowance = side === "BUY"
+          ? await usdt.allowance(address, CONTRACTS.SWAP)
+          : await tot.allowance(address, CONTRACTS.SWAP);
+        if (!cancelled) {
+          setApprovalNeeded(allowance < input);
+        }
+      } catch {
+        if (!cancelled) setApprovalNeeded(false);
+      }
+    };
+
+    checkApproval();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, address, side, parseInput, swap, tot, usdt]);
+
   const handleSwapDirection = () => {
     setSide((prev) => (prev === "BUY" ? "SELL" : "BUY"));
     setAmountIn("");
@@ -141,24 +177,30 @@ export function SwapPage() {
     if (input <= BigInt(0)) return;
 
     setLoading(true);
+    setTxStage("checking");
+    let success = false;
     try {
       if (side === "BUY") {
         const allowance = await usdt.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
+          setTxStage("approving");
           const approveRes = await execTx(usdt.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
+            setTxStage("idle");
             return;
           }
         }
 
         const quote = await swap.quoteBuy(input);
         const minTotOut = (quote[0] * BigInt(9950)) / BigInt(10000);
+        setTxStage("submitting");
         const txRes = await execTx(swap.buyTot(input, minTotOut));
         if (!txRes.success) {
           toast({ title: t("toastBuyFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
+          setTxStage("idle");
           return;
         }
 
@@ -166,20 +208,24 @@ export function SwapPage() {
       } else {
         const allowance = await tot.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
+          setTxStage("approving");
           const approveRes = await execTx(tot.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
+            setTxStage("idle");
             return;
           }
         }
 
         const quote = await swap.quoteSell(input);
         const minUsdtOut = (quote[0] * BigInt(9950)) / BigInt(10000);
+        setTxStage("submitting");
         const txRes = await execTx(swap.sellTot(input, minUsdtOut));
         if (!txRes.success) {
           toast({ title: t("toastSellFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
+          setTxStage("idle");
           return;
         }
 
@@ -188,13 +234,49 @@ export function SwapPage() {
 
       setAmountIn("");
       setAmountOut("0");
+      setTxStage("done");
+      success = true;
       await refreshBalances();
     } finally {
       setLoading(false);
+      if (!success) {
+        setTxStage("idle");
+      }
     }
   };
 
   const fromBalance = useMemo(() => (side === "BUY" ? usdtBalance : totBalance), [side, usdtBalance, totBalance]);
+  const disableReason = useMemo(() => {
+    if (!isConnected) return t("connectWalletFirst");
+    if (!amountIn || Number(amountIn) <= 0) return t("enterAmount");
+
+    if (side === "BUY" && Number(amountIn) > Number(usdtBalance)) {
+      return t("insufficientUsdtBalance");
+    }
+    if (side === "SELL" && Number(amountIn) > Number(totBalance)) {
+      return t("insufficientTotBalance");
+    }
+    if (side === "SELL" && Number(maxSellAmount) > 0 && Number(amountIn) > Number(maxSellAmount)) {
+      return t("exceedsMaxSellAmount");
+    }
+
+    return "";
+  }, [isConnected, amountIn, side, usdtBalance, totBalance, maxSellAmount, t]);
+
+  const txStageLabel = useMemo(() => {
+    switch (txStage) {
+      case "checking":
+        return t("swapStageChecking");
+      case "approving":
+        return t("swapStageApproving");
+      case "submitting":
+        return t("swapStageSubmitting");
+      case "done":
+        return t("swapStageDone");
+      default:
+        return t("swapStageIdle");
+    }
+  }, [txStage, t]);
 
   const formatCountdown = (seconds: number) => {
     if (seconds <= 0) return t("canTrigger");
@@ -286,6 +368,10 @@ export function SwapPage() {
 
           <div className="space-y-2 p-3 rounded-lg bg-muted/20 border border-border/30">
             <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{t("swapReviewReceive")}</span>
+              <span className="font-medium">{Number(amountOut).toLocaleString()} {toToken}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground flex items-center gap-1"><Info size={12} />{t("onChainFee")}</span>
               <span className="font-medium">{side === "BUY" ? `${Number(buyFeeBps) / 100}%` : `${Number(sellFeeBps) / 100}%`}</span>
             </div>
@@ -293,9 +379,18 @@ export function SwapPage() {
               <span className="text-muted-foreground">{t("slippageProtection")}</span>
               <span className="font-medium">0.5%</span>
             </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{t("swapReviewApproval")}</span>
+              <span className="font-medium">{approvalNeeded ? t("swapReviewApprovalNeeded") : t("swapReviewApprovalReady")}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{t("swapReviewStatus")}</span>
+              <span className="font-medium">{txStageLabel}</span>
+            </div>
+            {disableReason ? <p className="text-[11px] text-amber-600 dark:text-amber-400">{disableReason}</p> : null}
           </div>
 
-          <Button className="w-full bg-primary hover:bg-primary/90 text-lg py-6" onClick={handleSwap} disabled={loading || !isConnected || !amountIn || Number(amountIn) <= 0}>
+          <Button className="w-full bg-primary hover:bg-primary/90 text-lg py-6" onClick={handleSwap} disabled={loading || Boolean(disableReason)}>
             {loading ? t("swapping") : side === "BUY" ? t("buyTot") : t("sellTot")}
           </Button>
         </CardContent>
