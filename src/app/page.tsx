@@ -158,15 +158,10 @@ export default function DashboardPage() {
   const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
 
   useEffect(() => {
-    if (isOwner && activeTab !== "admin") {
-      setActiveTab("admin");
-      return;
-    }
-
     if (!shouldShowAdmin && activeTab === "admin") {
       setActiveTab("home");
     }
-  }, [isOwner, shouldShowAdmin, activeTab]);
+  }, [shouldShowAdmin, activeTab]);
 
   useEffect(() => {
     if (!needsReferralBinding) return;
