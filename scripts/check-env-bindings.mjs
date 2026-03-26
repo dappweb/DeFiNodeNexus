@@ -5,6 +5,10 @@ import dotenv from "dotenv";
 const root = process.cwd();
 const envPath = path.join(root, ".env");
 const envLocalPath = path.join(root, ".env.local");
+const isCi =
+  process.env.CI === "true" ||
+  process.env.CF_PAGES === "1" ||
+  process.env.CLOUDFLARE_PAGES === "1";
 
 const requiredPairs = [
   ["NEXT_PUBLIC_NEXUS_ADDRESS", "NEXUS_ADDRESS"],
@@ -38,18 +42,31 @@ function maskAddress(value) {
 const env = loadEnvFile(envPath);
 const envLocal = loadEnvFile(envLocalPath);
 
+function getEnvValue(primaryMap, key, fallbackMap) {
+  return (primaryMap[key] || fallbackMap[key] || process.env[key] || "").trim();
+}
+
 const errors = [];
 const warnings = [];
 
 for (const [pubKey, privateKey] of requiredPairs) {
-  const pub = envLocal[pubKey] || "";
-  const pri = env[privateKey] || "";
+  const pub = getEnvValue(envLocal, pubKey, env);
+  const pri = getEnvValue(env, privateKey, envLocal);
 
-  if (!pub) {
-    errors.push(`${pubKey} is missing in .env.local`);
-  }
-  if (!pri) {
-    errors.push(`${privateKey} is missing in .env`);
+  if (!isCi) {
+    if (!pub) {
+      errors.push(`${pubKey} is missing in .env.local (or process env)`);
+    }
+    if (!pri) {
+      errors.push(`${privateKey} is missing in .env (or process env)`);
+    }
+  } else {
+    if (pub && !pri) {
+      warnings.push(`${privateKey} is missing while ${pubKey} is set (CI mode)`);
+    }
+    if (!pub && pri) {
+      warnings.push(`${pubKey} is missing while ${privateKey} is set (CI mode)`);
+    }
   }
 
   if (pub && !isAddress(pub)) {
@@ -66,7 +83,7 @@ for (const [pubKey, privateKey] of requiredPairs) {
   }
 }
 
-const deployerKey = (env.DEPLOYER_PRIVATE_KEY || "").trim();
+const deployerKey = (env.DEPLOYER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY || "").trim();
 if (deployerKey && !/^0x[a-fA-F0-9]{64}$/.test(deployerKey)) {
   warnings.push("DEPLOYER_PRIVATE_KEY in .env is not 0x-prefixed 64-hex format");
 }
@@ -84,7 +101,7 @@ if (errors.length > 0) {
     }
   }
 
-  console.error("\nFix: keep .env.local NEXT_PUBLIC_* exactly equal to .env deployed addresses.\n");
+  console.error("\nFix: keep NEXT_PUBLIC_* equal to deployed addresses (from .env/.env.local/process env).\n");
   process.exit(1);
 }
 
