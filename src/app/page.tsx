@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [referrerError, setReferrerError] = useState("");
   const [referralPromptDismissed, setReferralPromptDismissed] = useState(false);
   const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
+  const [isOperatorManager, setIsOperatorManager] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -144,6 +145,24 @@ export default function DashboardPage() {
     };
   }, [nexus]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const checkOperator = async () => {
+      if (!nexus || !address) {
+        if (!cancelled) setIsOperatorManager(false);
+        return;
+      }
+      try {
+        const result = await nexus.isDistributor(address);
+        if (!cancelled) setIsOperatorManager(Boolean(result));
+      } catch {
+        if (!cancelled) setIsOperatorManager(false);
+      }
+    };
+    checkOperator();
+    return () => { cancelled = true; };
+  }, [nexus, address]);
+
   const displayAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : MOCK_USER_DATA.walletAddress;
@@ -153,7 +172,7 @@ export default function DashboardPage() {
     ? ownerAddress !== null && address.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
-  const shouldShowAdmin = isOwner;
+  const shouldShowAdmin = isOwner || isOperatorManager;
 
   // Referral binding required: connected + not owner + not yet bound
   const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;

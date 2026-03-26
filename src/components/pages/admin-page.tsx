@@ -8,7 +8,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Settings, ShieldCheck, Activity, Wallet } from "lucide-react";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract";
@@ -72,10 +71,9 @@ export function AdminPage() {
   const [tierConfigStatus, setTierConfigStatus] = useState("检查中");
 
   const [rewardFundAmount, setRewardFundAmount] = useState("");
-  const [dividendAmount, setDividendAmount] = useState("");
 
   const [distributorAddr, setDistributorAddr] = useState("");
-  const [distributorStatus, setDistributorStatus] = useState(true);
+  const [operatorManagers, setOperatorManagers] = useState<string[]>([]);
 
   const [swapTotReserve, setSwapTotReserve] = useState("-");
   const [swapUsdtReserve, setSwapUsdtReserve] = useState("-");
@@ -272,6 +270,30 @@ export function AdminPage() {
       setTofBurnBps(burn.toString());
       setTofClaimFeeBps(claim.toString());
 
+      try {
+        const eventFilter = nexus.filters.DistributorUpdated?.();
+        if (!eventFilter) {
+          setOperatorManagers([]);
+        } else {
+          const logs = await nexus.queryFilter(eventFilter, 0, "latest");
+          const latestStatus = new Map<string, boolean>();
+          logs.forEach((log: ethers.EventLog | ethers.Log) => {
+            const args = (log as ethers.EventLog).args;
+            const operator = args?.distributor?.toString() ?? args?.[0]?.toString() ?? "";
+            const allowed = Boolean(args?.allowed ?? args?.[1]);
+            if (operator && ethers.isAddress(operator)) {
+              latestStatus.set(operator.toLowerCase(), allowed);
+            }
+          });
+          const active = Array.from(latestStatus.entries())
+            .filter(([, allowed]) => allowed)
+            .map(([operator]) => ethers.getAddress(operator));
+          setOperatorManagers(active);
+        }
+      } catch {
+        setOperatorManagers([]);
+      }
+
       const [nftaRows, nftbRows] = await Promise.all([
         Promise.all(
           EXPECTED_NFTA_TIER_IDS.map(async (id) => {
@@ -380,10 +402,10 @@ export function AdminPage() {
           <ShieldCheck size={24} />
         </div>
         <div>
-          <h2 className="text-xl font-headline font-bold">Owner 管理员面板</h2>
-          <p className="text-xs text-muted-foreground">Owner: {ownerAddress ? `${ownerAddress.slice(0, 10)}...${ownerAddress.slice(-6)}` : "-"}</p>
+          <h2 className="text-xl font-headline font-bold">Truth Oracle 管理员面板</h2>
+          <p className="text-xs text-muted-foreground">超级管理员: {ownerAddress ? `${ownerAddress.slice(0, 10)}...${ownerAddress.slice(-6)}` : "-"}</p>
           <p className={`text-xs ${isOwner ? "text-green-500" : "text-yellow-500"}`}>
-            {isOwner ? "当前钱包是 Owner，可执行管理操作" : "当前钱包不是 Owner，仅可查看"}
+            {isOwner ? "当前钱包是超级管理员，可执行管理操作" : "当前钱包不是超级管理员，仅可查看"}
           </p>
         </div>
       </div>
@@ -438,7 +460,7 @@ export function AdminPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">关联 Nexus</div><div className="text-xs font-mono break-all">{swapNexusDisplay}</div></CardContent></Card>
+        <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">关联 Truth Oracle</div><div className="text-xs font-mono break-all">{swapNexusDisplay}</div></CardContent></Card>
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">TOT Token</div><div className="text-xs font-mono break-all">{swapTotToken}</div></CardContent></Card>
         <Card className="glass-panel"><CardContent className="pt-6"><div className="text-xs text-muted-foreground">USDT Token</div><div className="text-xs font-mono break-all">{swapUsdtToken}</div></CardContent></Card>
       </div>
@@ -455,10 +477,17 @@ export function AdminPage() {
         <TabsContent value="nexus">
           <Card className="glass-panel">
             <CardHeader>
-              <CardTitle>Nexus 基础设置</CardTitle>
-              <CardDescription>项目钱包、手续费和授权分发者</CardDescription>
+              <CardTitle>Truth Oracle 基础设置</CardTitle>
+              <CardDescription>项目钱包、手续费和管理员权限配置</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-xs space-y-1">
+                <p className="font-medium text-amber-700 dark:text-amber-300">参数说明与风险警示</p>
+                <p className="text-muted-foreground">1) 地址类参数（Treasury / 4 钱包 / 运营管理员）修改后立即生效，资金流向会直接变化。</p>
+                <p className="text-muted-foreground">2) 费率参数单位为 bps，100 = 1%，请输入整数。配置错误可能导致提现或领取成本异常。</p>
+                <p className="text-muted-foreground">3) 建议每次只改一组参数，记录 tx hash，并在前台完成一轮小额验证后再继续。</p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Input value={treasury} onChange={(e) => setTreasury(e.target.value)} placeholder="财库地址" aria-label="财库地址" />
                 <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Treasury", async () => {
@@ -534,17 +563,44 @@ export function AdminPage() {
                 }, "确认更新对应等级的提现费率？")}>设置提现费率</Button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="分发器地址" aria-label="分发器地址" />
-                <div className="flex items-center gap-2 px-2"><Switch checked={distributorStatus} onCheckedChange={setDistributorStatus} /><span className="text-sm">{distributorStatus ? "授权" : "取消授权"}</span></div>
-                <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("设置 Distributor", async () => {
-                  if (!nexus) return;
-                  if (!validateAddressField("分发器地址", distributorAddr)) return;
-                  setLoading(true);
-                  const r = await execTx(nexus.setDistributor(distributorAddr, distributorStatus));
-                  setLoading(false);
-                  notifyTx(r.success, r.hash, r.error, "设置 Distributor");
-                }, `确认${distributorStatus ? "授权" : "取消授权"} Distributor?`)}>设置 Distributor</Button>
+              <div className="space-y-3 rounded-md border border-border/60 px-3 py-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium">超级管理员（Owner）</p>
+                  <p className="text-xs font-mono break-all text-muted-foreground">{ownerAddress || "-"}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="运营管理员地址" aria-label="运营管理员地址" />
+                  <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("添加运营管理员", async () => {
+                    if (!nexus) return;
+                    if (!validateAddressField("运营管理员地址", distributorAddr)) return;
+                    setLoading(true);
+                    const r = await execTx(nexus.setDistributor(distributorAddr, true));
+                    setLoading(false);
+                    notifyTx(r.success, r.hash, r.error, "添加运营管理员");
+                    if (r.success) refreshData();
+                  }, `确认添加运营管理员\n${distributorAddr} ?`)}>添加运营管理员</Button>
+                  <Button variant="outline" disabled={!isOwner || !nexus || loading} onClick={() => runAction("移除运营管理员", async () => {
+                    if (!nexus) return;
+                    if (!validateAddressField("运营管理员地址", distributorAddr)) return;
+                    setLoading(true);
+                    const r = await execTx(nexus.setDistributor(distributorAddr, false));
+                    setLoading(false);
+                    notifyTx(r.success, r.hash, r.error, "移除运营管理员");
+                    if (r.success) refreshData();
+                  }, `确认移除运营管理员\n${distributorAddr} ?`)}>移除运营管理员</Button>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium">当前运营管理员</p>
+                  {operatorManagers.length > 0 ? (
+                    <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 space-y-1">
+                      {operatorManagers.map((item) => (
+                        <p key={item} className="text-xs font-mono break-all">{item}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">暂无已授权的运营管理员</p>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -606,6 +662,13 @@ export function AdminPage() {
               <CardDescription>手续费、限额、通缩与底池注入</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-xs space-y-1">
+                <p className="font-medium text-amber-700 dark:text-amber-300">参数说明与风险警示</p>
+                <p className="text-muted-foreground">1) 费率类参数（buy/sell/profitTax/deflation）会直接影响交易成本与用户收益，调整前请先公告。</p>
+                <p className="text-muted-foreground">2) 阈值类参数（distributionThreshold / maxDailyBuy / maxSellBps）会影响成交体验与分红节奏。</p>
+                <p className="text-muted-foreground">3) 流动性与紧急提取属于高风险操作，错误配置可能导致池子价格波动和资金风险。</p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <p className="text-xs font-medium">买入手续费 (buyFeeBps)</p>
@@ -750,19 +813,19 @@ export function AdminPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <p className="text-xs font-medium">更新 Nexus 地址</p>
-                  <p className="text-[11px] text-muted-foreground">修改 Swap 关联的 DeFiNodeNexus 合约</p>
-                  <Input value={swapNexusAddr} onChange={(e) => setSwapNexusAddr(e.target.value)} placeholder="Nexus 合约地址" aria-label="Nexus 合约地址" />
+                  <p className="text-xs font-medium">更新 Truth Oracle 地址</p>
+                  <p className="text-[11px] text-muted-foreground">修改 Swap 关联的 Truth Oracle（Nexus）合约</p>
+                  <Input value={swapNexusAddr} onChange={(e) => setSwapNexusAddr(e.target.value)} placeholder="Truth Oracle 合约地址" aria-label="Truth Oracle 合约地址" />
                 </div>
-                <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("设置 Nexus 地址", async () => {
+                <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("设置 Truth Oracle 地址", async () => {
                   if (!swap) return;
-                  if (!validateAddressField("Nexus 地址", swapNexusAddr)) return;
+                  if (!validateAddressField("Truth Oracle 地址", swapNexusAddr)) return;
                   setLoading(true);
                   const r = await execTx(swap.setNexus(swapNexusAddr));
                   setLoading(false);
-                  notifyTx(r.success, r.hash, r.error, "设置 Nexus 地址");
+                  notifyTx(r.success, r.hash, r.error, "设置 Truth Oracle 地址");
                   if (r.success) refreshData();
-                }, `确认更新 Nexus 地址为\n${swapNexusAddr} ?`)}>设置 Nexus 地址</Button>
+                }, `确认更新 Truth Oracle 地址为\n${swapNexusAddr} ?`)}>设置 Truth Oracle 地址</Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -787,6 +850,10 @@ export function AdminPage() {
                   if (r.success) refreshData();
                 }, "⚠️ 紧急提取操作！确认执行？")}>紧急提取</Button>
               </div>
+
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-3 text-xs text-destructive">
+                高风险提醒：移除流动性、更新 Truth Oracle 地址、紧急提取都会直接影响线上资金与交易路径，请先在测试环境与小额资金验证。
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -798,6 +865,9 @@ export function AdminPage() {
                 <Settings className="h-5 w-5 text-primary" />
                 运营操作
               </CardTitle>
+              <CardDescription>
+                分红相关操作由 Keeper 自动执行（达到阈值自动分红），后台仅保留非自动化运营动作。
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -813,18 +883,6 @@ export function AdminPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input value={dividendAmount} onChange={(e) => setDividendAmount(e.target.value)} placeholder="NFTB 分红 TOT 数量" aria-label="NFTB 分红 TOT 数量" />
-                <Button disabled={!isOwner || !nexus || loading} onClick={() => runAction("手动分红 NFTB", async () => {
-                  if (!nexus) return;
-                  if (!validatePositiveAmount("分红金额", dividendAmount)) return;
-                  setLoading(true);
-                  const r = await execTx(nexus.distributeNftbDividends(toUnits(dividendAmount)));
-                  setLoading(false);
-                  notifyTx(r.success, r.hash, r.error, "手动分红 NFTB");
-                }, "确认执行一次 NFTB 分红？")}>手动分红 NFTB</Button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("执行一次通缩", async () => {
                   if (!swap) return;
                   setLoading(true);
@@ -833,14 +891,9 @@ export function AdminPage() {
                   notifyTx(r.success, r.hash, r.error, "执行一次通缩");
                   if (r.success) refreshData();
                 }, "确认执行一次通缩？")}>执行一次通缩</Button>
-                <Button disabled={!isOwner || !swap || loading} onClick={() => runAction("强制分红（Swap池）", async () => {
-                  if (!swap) return;
-                  setLoading(true);
-                  const r = await execTx(swap.forceDistribute());
-                  setLoading(false);
-                  notifyTx(r.success, r.hash, r.error, "强制分红（Swap池）");
-                  if (r.success) refreshData();
-                }, "确认强制触发 Swap 池分红？")}>强制分红（Swap池）</Button>
+                <div className="rounded-md border border-border/60 px-3 py-2 text-xs text-muted-foreground flex items-center">
+                  分红由 Keeper 自动触发，无需手动执行。
+                </div>
               </div>
 
               <div className="flex justify-end">
