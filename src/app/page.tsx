@@ -254,7 +254,7 @@ export default function DashboardPage() {
     <div className="flex min-h-dvh flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-border/50 bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 md:h-20 w-full max-w-7xl items-center gap-3 md:gap-4 px-3 sm:px-4 md:px-6">
+        <div className="mx-auto flex h-16 md:h-20 w-full max-w-7xl items-center gap-2 sm:gap-3 md:gap-4 px-3 sm:px-4 md:px-6">
           <div className="flex shrink-0 items-center gap-2">
           <img
             src="/truth-oracle-logo-light.svg"
@@ -269,12 +269,12 @@ export default function DashboardPage() {
           </div>
 
         {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-1 ml-6">
+          <nav className="hidden md:flex items-center gap-1 ml-3 lg:ml-6 min-w-0">
           {navItems.map((item) => (
             <button
               key={item.key}
               onClick={() => setActiveTab(item.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === item.key
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -288,7 +288,7 @@ export default function DashboardPage() {
 
           <div className="flex-1" />
 
-          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
             <LanguageSwitcher />
             <ThemeToggle />
 
@@ -297,11 +297,11 @@ export default function DashboardPage() {
                 onClick={connect}
                 disabled={isConnecting}
                 size="sm"
-                className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-3 sm:px-4 font-semibold cyan-glow text-xs"
+                className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-2.5 sm:px-4 font-semibold cyan-glow text-xs"
               >
-                <LinkIcon size={14} className="mr-1.5" />
+                <LinkIcon size={14} className="mr-1 sm:mr-1.5" />
                 <span className="hidden sm:inline">{isConnecting ? t("connecting") : t("connectWallet")}</span>
-                <span className="sm:hidden">{isConnecting ? "..." : t("connectWallet")}</span>
+                <span className="sm:hidden">{isConnecting ? "..." : t("connect")}</span>
               </Button>
             ) : (
               <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20 max-w-[10.5rem] sm:max-w-none">
@@ -331,10 +331,10 @@ export default function DashboardPage() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-6">
+      <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="mx-auto w-full max-w-7xl">
           <div className="mb-4 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <div className="flex items-center justify-between sm:justify-start gap-2">
               <span className="text-muted-foreground">{t("networkLabel")}</span>
               <span className={chainId === 11155111 ? "text-primary font-medium" : "text-destructive font-medium"}>
@@ -432,12 +432,13 @@ export default function DashboardPage() {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto flex w-full max-w-md items-center justify-around h-16 px-2 rounded-2xl border border-border/50 bg-background/95 backdrop-blur-md shadow-lg">
+        <div className="pointer-events-auto mx-auto w-full max-w-md h-16 px-2 rounded-2xl border border-border/50 bg-background/95 backdrop-blur-md shadow-lg overflow-x-auto no-scrollbar">
+          <div className="flex h-full items-center justify-start gap-1 min-w-max">
           {navItems.map((item) => (
             <button
               key={item.key}
               onClick={() => setActiveTab(item.key)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors min-w-0 ${
+              className={`flex h-12 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
                 activeTab === item.key
                   ? "text-primary"
                   : "text-muted-foreground"
@@ -447,6 +448,7 @@ export default function DashboardPage() {
               <span className="text-[10px] font-medium truncate">{item.label}</span>
             </button>
           ))}
+          </div>
         </div>
       </nav>
     </div>
