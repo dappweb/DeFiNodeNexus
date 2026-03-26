@@ -87,7 +87,7 @@ export function HomePage() {
     let cancelled = false;
 
     const loadOnChainOverview = async () => {
-      if (!isConnected || !address || !tot || !tof || !nexus || !swap) {
+      if (!tot || !tof || !nexus || !swap) {
         if (!cancelled) {
           setTotBalance("0");
           setTofBalance("0");
@@ -100,16 +100,22 @@ export function HomePage() {
       }
 
       try {
-        const [totDec, tofDec, totBal, tofBal, nftaNodes, nftbNodes, currentPrice, tofPerUsdt] = await Promise.all([
+        const [totDec, tofDec, currentPrice, tofPerUsdt] = await Promise.all([
           tot.decimals(),
           tof.decimals(),
-          tot.balanceOf(address),
-          tof.balanceOf(address),
-          nexus.getUserNftaNodes(address),
-          nexus.getUserNftbNodes(address),
           swap.getCurrentPrice(),
           nexus.tofPerUsdt(),
         ]);
+
+        const hasWallet = isConnected && Boolean(address);
+        const [totBal, tofBal, nftaNodes, nftbNodes] = hasWallet
+          ? await Promise.all([
+              tot.balanceOf(address as string),
+              tof.balanceOf(address as string),
+              nexus.getUserNftaNodes(address as string),
+              nexus.getUserNftbNodes(address as string),
+            ])
+          : [0n, 0n, [], []];
 
         if (cancelled) return;
 
