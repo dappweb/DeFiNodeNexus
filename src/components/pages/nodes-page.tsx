@@ -113,7 +113,10 @@ export function NodesPage() {
       setNftbTiers([]);
       setNftaNodes([]);
       setNftbNodes([]);
-      setLoadError(isConnected ? t("toastContractMissingDesc") : "");
+      // Only show the "check NEXT_PUBLIC" error when the address is genuinely not configured.
+      // When it IS configured but the provider is still initialising, nexus is transiently
+      // null – showing the error in that case is misleading.
+      setLoadError(isConnected && !CONTRACTS.NEXUS ? t("toastContractMissingDesc") : "");
       if (showLoading) {
         setIsRefreshing(false);
       }
