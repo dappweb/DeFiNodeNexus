@@ -52,7 +52,6 @@ export default function DashboardPage() {
   const [referrerError, setReferrerError] = useState("");
   const [referralPromptDismissed, setReferralPromptDismissed] = useState(false);
   const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
-  const [hasPurchasedNode, setHasPurchasedNode] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -204,38 +203,7 @@ export default function DashboardPage() {
     setReferralPromptDismissed(window.localStorage.getItem(key) === "1");
   }, [address]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadNodeOwnership = async () => {
-      if (!isConnected || !address || !nexus) {
-        if (!cancelled) {
-          setHasPurchasedNode(false);
-        }
-        return;
-      }
-
-      try {
-        const [nftaNodes, nftbNodes] = await Promise.all([
-          nexus.getUserNftaNodes(address),
-          nexus.getUserNftbNodes(address),
-        ]);
-        if (!cancelled) {
-          setHasPurchasedNode(nftaNodes.length + nftbNodes.length > 0);
-        }
-      } catch {
-        if (!cancelled) {
-          setHasPurchasedNode(false);
-        }
-      }
-    };
-
-    loadNodeOwnership();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isConnected, address, nexus]);
+  const hasPurchasedNode = MOCK_USER_DATA.nftaNodes.length + MOCK_USER_DATA.nftbNodes.length > 0;
 
   if (!mounted) return null;
 
