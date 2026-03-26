@@ -113,10 +113,8 @@ export function NodesPage() {
       setNftbTiers([]);
       setNftaNodes([]);
       setNftbNodes([]);
-      // Only show the "check NEXT_PUBLIC" error when the address is genuinely not configured.
-      // When it IS configured but the provider is still initialising, nexus is transiently
-      // null – showing the error in that case is misleading.
-      setLoadError(isConnected && !CONTRACTS.NEXUS ? t("toastContractMissingDesc") : "");
+      // nexus is only null when CONTRACTS.NEXUS address is not configured
+      setLoadError(t("toastContractMissingDesc"));
       if (showLoading) {
         setIsRefreshing(false);
       }
@@ -239,7 +237,7 @@ export function NodesPage() {
       }
       setInitialLoaded(true);
     }
-  }, [nexus, address, isConnected, t]);
+  }, [nexus, address, t]);
 
   useEffect(() => {
     refreshData();

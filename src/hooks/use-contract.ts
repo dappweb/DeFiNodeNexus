@@ -18,14 +18,29 @@ function getE2EContractMock(address: string) {
   return window.__E2E_CONTRACT_MOCK__?.getContract(address) ?? null;
 }
 
+/**
+ * A read-only fallback provider for Sepolia so that public contract data
+ * (e.g. tier info) can be fetched even before the user connects a wallet.
+ * Lazily initialised to avoid SSR issues.
+ */
+let _fallbackProvider: ethers.JsonRpcProvider | null = null;
+function getFallbackProvider(): ethers.JsonRpcProvider {
+  if (!_fallbackProvider) {
+    const rpcUrl =
+      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ||
+      "https://rpc.sepolia.org";
+    _fallbackProvider = new ethers.JsonRpcProvider(rpcUrl);
+  }
+  return _fallbackProvider;
+}
+
 export function useNexusContract() {
   const { signer, provider } = useWeb3();
   return useMemo(() => {
     if (!CONTRACTS.NEXUS) return null;
     const mock = getE2EContractMock(CONTRACTS.NEXUS);
     if (mock) return mock as ethers.Contract;
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider) return null;
+    const signerOrProvider = signer || provider || getFallbackProvider();
     return new ethers.Contract(CONTRACTS.NEXUS, NEXUS_ABI, signerOrProvider);
   }, [signer, provider]);
 }
@@ -36,8 +51,7 @@ export function useSwapContract() {
     if (!CONTRACTS.SWAP) return null;
     const mock = getE2EContractMock(CONTRACTS.SWAP);
     if (mock) return mock as ethers.Contract;
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider) return null;
+    const signerOrProvider = signer || provider || getFallbackProvider();
     return new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, signerOrProvider);
   }, [signer, provider]);
 }
@@ -48,8 +62,7 @@ export function useERC20Contract(address: string | undefined) {
     if (!address) return null;
     const mock = getE2EContractMock(address);
     if (mock) return mock as ethers.Contract;
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider) return null;
+    const signerOrProvider = signer || provider || getFallbackProvider();
     return new ethers.Contract(address, ERC20_ABI, signerOrProvider);
   }, [address, signer, provider]);
 }

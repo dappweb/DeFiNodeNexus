@@ -3,6 +3,8 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   env: {
+    NEXT_PUBLIC_SEPOLIA_RPC_URL:
+      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL || "",
     NEXT_PUBLIC_NEXUS_ADDRESS:
       process.env.NEXT_PUBLIC_NEXUS_ADDRESS || process.env.NEXUS_ADDRESS || "",
     NEXT_PUBLIC_SWAP_ADDRESS:
