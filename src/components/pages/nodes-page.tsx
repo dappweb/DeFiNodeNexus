@@ -94,120 +94,149 @@ export function NodesPage() {
   const [selectedNftbTier, setSelectedNftbTier] = useState<number | null>(null);
   const [nftbPayToken, setNftbPayToken] = useState<"USDT" | "TOF">("USDT");
   const [referrer, setReferrer] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [nftaStage, setNftaStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const zeroValue = ethers.parseUnits("0", 0);
   const MAX_TIER_SCAN = 20;
 
-  const refreshData = useCallback(async () => {
-    if (!nexus) return;
+  const refreshData = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setIsRefreshing(true);
+    }
+    setLoadError("");
 
-    const nextNftaTierId = Number(await nexus.nextNftaTierId());
-    const nextNftbTierId = Number(await nexus.nextNftbTierId());
-
-    const nftaCandidateIds = Array.from(
-      new Set([
-        ...Array.from({ length: Math.max(0, nextNftaTierId - 1) }, (_, i) => i + 1),
-        ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
-      ])
-    );
-
-    const nftbCandidateIds = Array.from(
-      new Set([
-        ...Array.from({ length: Math.max(0, nextNftbTierId - 1) }, (_, i) => i + 1),
-        ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
-      ])
-    );
-
-    const nftaTierCalls = nftaCandidateIds.map(async (id) => {
-      const tier = await nexus.nftaTiers(id);
-      const remaining = await nexus.getNftaTierRemaining(id);
-      if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.currentSupply === 0n) {
-        return null;
-      }
-      return {
-        id,
-        price: tier.price,
-        dailyYield: tier.dailyYield,
-        maxSupply: tier.maxSupply,
-        currentSupply: tier.currentSupply,
-        isActive: tier.isActive,
-        remaining,
-      } as NftaTier;
-    });
-
-    const nftbTierCalls = nftbCandidateIds.map(async (id) => {
-      const tier = await nexus.nftbTiers(id);
-      const remaining = await nexus.getNftbTierRemaining(id);
-      if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.usdtMinted === 0n && tier.tofMinted === 0n) {
-        return null;
-      }
-      return {
-        id,
-        price: tier.price,
-        weight: tier.weight,
-        maxSupply: tier.maxSupply,
-        usdtMinted: tier.usdtMinted,
-        tofMinted: tier.tofMinted,
-        dividendBps: tier.dividendBps,
-        isActive: tier.isActive,
-        usdtRemaining: remaining[0],
-        tofRemaining: remaining[1],
-      } as NftbTier;
-    });
-
-    const [nftaTierList, nftbTierList] = await Promise.all([
-      Promise.all(nftaTierCalls),
-      Promise.all(nftbTierCalls),
-    ]);
-
-    setNftaTiers(nftaTierList.filter((tier): tier is NftaTier => tier !== null));
-    setNftbTiers(nftbTierList.filter((tier): tier is NftbTier => tier !== null));
-
-    if (!address) {
+    if (!nexus) {
+      setNftaTiers([]);
+      setNftbTiers([]);
       setNftaNodes([]);
       setNftbNodes([]);
+      setLoadError(isConnected ? t("toastContractMissingDesc") : "");
+      if (showLoading) {
+        setIsRefreshing(false);
+      }
+      setInitialLoaded(true);
       return;
     }
 
-    const [nftaIds, nftbIds] = await Promise.all([
-      nexus.getUserNftaNodes(address),
-      nexus.getUserNftbNodes(address),
-    ]);
+    try {
 
-    const nftaNodeCalls = nftaIds.map(async (id: bigint) => {
-      const node = await nexus.nftaNodes(id);
-      const pending = await nexus.pendingNftaYield(id);
-      return {
-        nodeId: id,
-        tierId: node.tierId,
-        dailyYield: node.dailyYield,
-        lastClaimDay: node.lastClaimDay,
-        isActive: node.isActive,
-        pending,
-      } as NodeAItem;
-    });
+      const nextNftaTierId = Number(await nexus.nextNftaTierId());
+      const nextNftbTierId = Number(await nexus.nextNftbTierId());
 
-    const nftbNodeCalls = nftbIds.map(async (id: bigint) => {
-      const node = await nexus.nftbNodes(id);
-      const pending = await nexus.pendingNftbDividend(id);
-      return {
-        nodeId: id,
-        tierId: node.tierId,
-        weight: node.weight,
-        isActive: node.isActive,
-        pending,
-      } as NodeBItem;
-    });
+      const nftaCandidateIds = Array.from(
+        new Set([
+          ...Array.from({ length: Math.max(0, nextNftaTierId - 1) }, (_, i) => i + 1),
+          ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
+        ])
+      );
 
-    const [nftaNodeList, nftbNodeList] = await Promise.all([
-      Promise.all(nftaNodeCalls),
-      Promise.all(nftbNodeCalls),
-    ]);
+      const nftbCandidateIds = Array.from(
+        new Set([
+          ...Array.from({ length: Math.max(0, nextNftbTierId - 1) }, (_, i) => i + 1),
+          ...Array.from({ length: MAX_TIER_SCAN }, (_, i) => i + 1),
+        ])
+      );
 
-    setNftaNodes(nftaNodeList);
-    setNftbNodes(nftbNodeList);
-  }, [nexus, address]);
+      const nftaTierCalls = nftaCandidateIds.map(async (id) => {
+        const tier = await nexus.nftaTiers(id);
+        const remaining = await nexus.getNftaTierRemaining(id);
+        if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.currentSupply === 0n) {
+          return null;
+        }
+        return {
+          id,
+          price: tier.price,
+          dailyYield: tier.dailyYield,
+          maxSupply: tier.maxSupply,
+          currentSupply: tier.currentSupply,
+          isActive: tier.isActive,
+          remaining,
+        } as NftaTier;
+      });
+
+      const nftbTierCalls = nftbCandidateIds.map(async (id) => {
+        const tier = await nexus.nftbTiers(id);
+        const remaining = await nexus.getNftbTierRemaining(id);
+        if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.usdtMinted === 0n && tier.tofMinted === 0n) {
+          return null;
+        }
+        return {
+          id,
+          price: tier.price,
+          weight: tier.weight,
+          maxSupply: tier.maxSupply,
+          usdtMinted: tier.usdtMinted,
+          tofMinted: tier.tofMinted,
+          dividendBps: tier.dividendBps,
+          isActive: tier.isActive,
+          usdtRemaining: remaining[0],
+          tofRemaining: remaining[1],
+        } as NftbTier;
+      });
+
+      const [nftaTierList, nftbTierList] = await Promise.all([
+        Promise.all(nftaTierCalls),
+        Promise.all(nftbTierCalls),
+      ]);
+
+      setNftaTiers(nftaTierList.filter((tier): tier is NftaTier => tier !== null));
+      setNftbTiers(nftbTierList.filter((tier): tier is NftbTier => tier !== null));
+
+      if (!address) {
+        setNftaNodes([]);
+        setNftbNodes([]);
+        return;
+      }
+
+      const [nftaIds, nftbIds] = await Promise.all([
+        nexus.getUserNftaNodes(address),
+        nexus.getUserNftbNodes(address),
+      ]);
+
+      const nftaNodeCalls = nftaIds.map(async (id: bigint) => {
+        const node = await nexus.nftaNodes(id);
+        const pending = await nexus.pendingNftaYield(id);
+        return {
+          nodeId: id,
+          tierId: node.tierId,
+          dailyYield: node.dailyYield,
+          lastClaimDay: node.lastClaimDay,
+          isActive: node.isActive,
+          pending,
+        } as NodeAItem;
+      });
+
+      const nftbNodeCalls = nftbIds.map(async (id: bigint) => {
+        const node = await nexus.nftbNodes(id);
+        const pending = await nexus.pendingNftbDividend(id);
+        return {
+          nodeId: id,
+          tierId: node.tierId,
+          weight: node.weight,
+          isActive: node.isActive,
+          pending,
+        } as NodeBItem;
+      });
+
+      const [nftaNodeList, nftbNodeList] = await Promise.all([
+        Promise.all(nftaNodeCalls),
+        Promise.all(nftbNodeCalls),
+      ]);
+
+      setNftaNodes(nftaNodeList);
+      setNftbNodes(nftbNodeList);
+    } catch {
+      setLoadError(t("nodesLoadFailed"));
+    } finally {
+      if (showLoading) {
+        setIsRefreshing(false);
+      }
+      setInitialLoaded(true);
+    }
+  }, [nexus, address, isConnected, t]);
 
   useEffect(() => {
     refreshData();
@@ -248,7 +277,7 @@ export function NodesPage() {
       setNftaStage("confirming");
 
       toast({ title: t("toastBuyNftaSuccess"), description: res.hash?.slice(0, 10) + "..." });
-      await refreshData();
+      await refreshData(false);
     } finally {
       setNftaStage("idle");
       setLoading(false);
@@ -318,7 +347,7 @@ export function NodesPage() {
         toast({ title: t("toastBuyNftbSuccess"), description: res.hash?.slice(0, 10) + "..." });
       }
 
-      await refreshData();
+      await refreshData(false);
     } finally {
       setNftbStage("idle");
       setLoading(false);
@@ -351,7 +380,7 @@ export function NodesPage() {
         return;
       }
       toast({ title: t("toastNftaClaimed"), description: res.hash?.slice(0, 10) + "..." });
-      await refreshData();
+      await refreshData(false);
     } finally {
       setLoading(false);
     }
@@ -367,7 +396,7 @@ export function NodesPage() {
         return;
       }
       toast({ title: t("toastNftbClaimed"), description: res.hash?.slice(0, 10) + "..." });
-      await refreshData();
+      await refreshData(false);
     } finally {
       setLoading(false);
     }
@@ -460,6 +489,32 @@ export function NodesPage() {
 
       {/* ── 主 Tab 区 ── */}
       <Tabs defaultValue="nfta" className="space-y-5">
+        {!initialLoaded && isRefreshing && (
+          <Card className="glass-panel">
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              {t("nodesLoading")}
+            </CardContent>
+          </Card>
+        )}
+
+        {loadError && (
+          <Card className="glass-panel border-destructive/40">
+            <CardContent className="py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-sm text-destructive">{loadError}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => refreshData()}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? t("processing") : t("retry")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="nfta">NFT-A</TabsTrigger>
           <TabsTrigger value="nftb">NFT-B</TabsTrigger>
