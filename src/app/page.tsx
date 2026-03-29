@@ -1,36 +1,35 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ethers } from "ethers";
-import {
-  User,
-  Link as LinkIcon,
-  Home,
-  Cpu,
-  ArrowDownUp,
-  TrendingUp,
-  Users,
-  ShieldCheck,
-  UserPlus,
-  CheckCircle2,
-  LogOut,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useWeb3 } from "@/lib/web3-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { execTx, useNexusContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { useWeb3 } from "@/lib/web3-provider";
+import { ethers } from "ethers";
+import {
+    ArrowDownUp,
+    CheckCircle2,
+    Cpu,
+    Home,
+    Link as LinkIcon,
+    LogOut,
+    ShieldCheck,
+    TrendingUp,
+    UserPlus,
+    Users
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
+import { AdminPage } from "@/components/pages/admin-page";
+import { EarningsPage } from "@/components/pages/earnings-page";
 import { HomePage } from "@/components/pages/home-page";
 import { NodesPage } from "@/components/pages/nodes-page";
 import { SwapPage } from "@/components/pages/swap-page";
-import { EarningsPage } from "@/components/pages/earnings-page";
 import { TeamPage } from "@/components/pages/team-page";
-import { AdminPage } from "@/components/pages/admin-page";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
@@ -187,13 +186,15 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!needsReferralBinding) return;
 
+    const addressLower = address?.toLowerCase();
+
     setReferrerAddress((prev) => {
       const trimmed = prev.trim();
-      const isSelf = Boolean(address) && trimmed.toLowerCase() === address.toLowerCase();
+      const isSelf = Boolean(addressLower) && trimmed.toLowerCase() === addressLower;
       const isValid = ethers.isAddress(trimmed);
 
       if (!trimmed && referrerFromUrl) {
-        const isUrlSelf = Boolean(address) && referrerFromUrl.toLowerCase() === address.toLowerCase();
+        const isUrlSelf = Boolean(addressLower) && referrerFromUrl.toLowerCase() === addressLower;
         if (!isUrlSelf) {
           return referrerFromUrl;
         }

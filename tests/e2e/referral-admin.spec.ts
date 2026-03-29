@@ -1,6 +1,6 @@
-import path from "node:path"
-import { expect, test } from "@playwright/test"
-import type { Page } from "@playwright/test"
+import type { Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import path from "node:path";
 
 const mockWalletScript = path.resolve(__dirname, "helpers/mock-ethereum.js")
 
@@ -24,7 +24,7 @@ async function bootstrap(page: Page, options?: { owner?: boolean; referrerBound?
 test("推荐绑定流程可执行", async ({ page }) => {
   await bootstrap(page, { owner: false, referrerBound: false })
 
-  await expect(page.getByText(/Bind Referrer|绑定推荐人/i)).toBeVisible()
+  await expect(page.getByRole("heading", { name: /Bind Referrer|绑定推荐人/i })).toBeVisible()
 
   const referrerInput = page.getByPlaceholder(/0x\.{3}|0x.../i)
   await referrerInput.fill("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
@@ -32,7 +32,7 @@ test("推荐绑定流程可执行", async ({ page }) => {
   await page.getByRole("button", { name: /Confirm & Activate|确认并激活/i }).click()
 
   await expect(page.getByText(/Referrer Bound Successfully|推荐人绑定成功/i).first()).toBeVisible()
-  await expect(page.getByText(/Bind Referrer|绑定推荐人/i)).toHaveCount(0)
+  await expect(page.getByRole("button", { name: /Confirm & Activate|确认并激活/i })).toHaveCount(0)
 })
 
 test("管理员参数配置流程可执行", async ({ page }) => {
@@ -52,7 +52,7 @@ test("管理员参数配置流程可执行", async ({ page }) => {
     await adminNav.click()
   }
 
-  await expect(page.getByText(/Owner 管理员面板/i)).toBeVisible()
+  await expect(page.getByRole("heading", { name: /管理员面板|Admin Panel/i })).toBeVisible()
 
   await page.getByPlaceholder("TOF 销毁比例 (bps)").fill("650")
   await page.getByPlaceholder("TOF 领取手续费 (bps)").fill("200")

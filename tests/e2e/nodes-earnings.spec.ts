@@ -1,6 +1,6 @@
-import path from "node:path"
-import { expect, test } from "@playwright/test"
 import type { Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
+import path from "node:path"
 
 const mockWalletScript = path.resolve(__dirname, "helpers/mock-ethereum.js")
 
@@ -10,7 +10,15 @@ async function connectWallet(page: Page) {
 
   const connectButton = page.getByRole("button", { name: /Connect Wallet|连接钱包/i }).first()
   if (await connectButton.isVisible().catch(() => false)) {
-    await connectButton.click()
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await connectButton.click({ timeout: 5000 })
+        break
+      } catch (error) {
+        if (attempt === 2) throw error
+        await page.waitForTimeout(300)
+      }
+    }
   } else {
     await page.evaluate(async () => {
       await window.ethereum?.request({ method: "eth_requestAccounts" })

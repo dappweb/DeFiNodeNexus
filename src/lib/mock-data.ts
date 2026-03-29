@@ -98,6 +98,11 @@ export const MOCK_USER_DATA = {
     weekTot: 1450.0,
     weekUsdt: 355.25,
   },
+  predictionHistory: [
+    { predictionId: "P-1001", platform: "BTC 1H", date: "2026-03-28", stake: 120, winnings: 210, outcome: "WIN" },
+    { predictionId: "P-1002", platform: "ETH 4H", date: "2026-03-27", stake: 90, winnings: 0, outcome: "LOSS" },
+    { predictionId: "P-1003", platform: "SOL Daily", date: "2026-03-26", stake: 75, winnings: 132, outcome: "WIN" },
+  ],
   // --- Team Nodes ---
   teamInfo: {
     totalMembers: 24,
