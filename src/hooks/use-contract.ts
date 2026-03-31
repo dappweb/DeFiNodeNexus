@@ -28,7 +28,7 @@ function getFallbackProvider(): ethers.JsonRpcProvider {
   if (!_fallbackProvider) {
     const rpcUrl =
       process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL ||
-      "https://rpc.sepolia.org";
+      "https://ethereum-sepolia-rpc.publicnode.com";
     _fallbackProvider = new ethers.JsonRpcProvider(rpcUrl);
   }
   return _fallbackProvider;

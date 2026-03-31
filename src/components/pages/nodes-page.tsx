@@ -229,7 +229,8 @@ export function NodesPage() {
 
       setNftaNodes(nftaNodeList);
       setNftbNodes(nftbNodeList);
-    } catch {
+    } catch (error) {
+      console.error("Failed to load node data", error);
       setLoadError(t("nodesLoadFailed"));
     } finally {
       if (showLoading) {
