@@ -10,6 +10,66 @@
 				"dev"
 			],
 			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Run Next Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"dev"
+			],
+			"isBackground": true
 		}
 	]
 }

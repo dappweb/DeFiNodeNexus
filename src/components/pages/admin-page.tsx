@@ -1,3 +1,4 @@
+  // ...existing code...
 "use client";
 
 import { useEffect, useState } from "react";
@@ -41,51 +42,39 @@ type AdminNftbTierSnapshot = {
   dividendBps: bigint;
   isActive: boolean;
 };
-
-const EXPECTED_NFTA_TIER_IDS = [1, 2];
-const EXPECTED_NFTB_TIER_IDS = [1, 2, 3];
-
-export function AdminPage() {
-  const { address } = useWeb3();
-  const nexus = useNexusContract();
-  const swap = useSwapContract();
-  const { toast } = useToast();
-
-  const [loading, setLoading] = useState(false);
-  const [ownerAddress, setOwnerAddress] = useState("");
-  const [isOwner, setIsOwner] = useState(false);
-
-  const [treasury, setTreasury] = useState("");
-  const [zeroLine, setZeroLine] = useState("");
-  const [community, setCommunity] = useState("");
-  const [foundation, setFoundation] = useState("");
-  const [institution, setInstitution] = useState("");
-
-  const [tofBurnBps, setTofBurnBps] = useState("");
-  const [tofClaimFeeBps, setTofClaimFeeBps] = useState("");
-  const [withdrawLevel, setWithdrawLevel] = useState("0");
-  const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
-
-  const [nftaTierSnapshot, setNftaTierSnapshot] = useState<AdminNftaTierSnapshot[]>([]);
-  const [nftbTierSnapshot, setNftbTierSnapshot] = useState<AdminNftbTierSnapshot[]>([]);
-  const [tierConfigStatus, setTierConfigStatus] = useState("检查中");
-
-  const [rewardFundAmount, setRewardFundAmount] = useState("");
-
-  const [distributorAddr, setDistributorAddr] = useState("");
-  const [operatorManagers, setOperatorManagers] = useState<string[]>([]);
-
-  const [swapTotReserve, setSwapTotReserve] = useState("-");
-  const [swapUsdtReserve, setSwapUsdtReserve] = useState("-");
-  const [swapDividendPool, setSwapDividendPool] = useState("-");
-  const [swapBuyFeeBps, setSwapBuyFeeBps] = useState("");
-  const [swapSellFeeBps, setSwapSellFeeBps] = useState("");
-  const [swapProfitTaxBps, setSwapProfitTaxBps] = useState("");
-  const [swapDistributionThreshold, setSwapDistributionThreshold] = useState("");
-  const [swapMaxDailyBuy, setSwapMaxDailyBuy] = useState("");
-  const [swapMaxSellBps, setSwapMaxSellBps] = useState("");
-  const [swapDeflationBps, setSwapDeflationBps] = useState("");
-  const [addLpTot, setAddLpTot] = useState("");
+  async function handleBulkCardAction(action: 'mint' | 'transfer' | 'claim', type: 'nfta' | 'nftb') {
+    setLoading(true);
+    if (type === 'nfta') setBulkCardResultNfta("");
+    if (type === 'nftb') setBulkCardResultNftb("");
+    try {
+      const input = type === 'nfta' ? bulkCardInputNfta : bulkCardInputNftb;
+      const lines = input.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (lines.length === 0) {
+        if (type === 'nfta') setBulkCardResultNfta("未检测到有效输入");
+        if (type === 'nftb') setBulkCardResultNftb("未检测到有效输入");
+        setLoading(false);
+        return;
+      }
+      let results: string[] = [];
+      for (const line of lines) {
+        const [addr, cardId] = line.split(/,|，/).map(s => s.trim());
+        if (!ethers.isAddress(addr) || !cardId || isNaN(Number(cardId))) {
+          results.push(`${line} => 格式错误`);
+          continue;
+        }
+        try {
+          let tx;
+          if (type === 'nfta') {
+            if (action === 'mint') tx = await execTx(nexus.mintNftaCard(addr, BigInt(cardId)));
+            if (action === 'transfer') tx = await execTx(nexus.transferNftaCard(addr, BigInt(cardId)));
+            if (action === 'claim') tx = await execTx(nexus.claimNftaYield(addr, BigInt(cardId)));
+          } else if (type === 'nftb') {
+            if (action === 'mint') tx = await execTx(nexus.mintNftbCard(addr, BigInt(cardId)));
+            if (action === 'transfer') tx = await execTx(nexus.transferNftbCard(addr, BigInt(cardId)));
+            if (action === 'claim') tx = await execTx(nexus.claimNftbDividend(addr, BigInt(cardId)));
+          }
+          if (tx?.success) {
+            results.push(`${line} => 成功 ${tx.hash ? tx.hash.slice(0, 12) : ''}`);
   const [addLpUsdt, setAddLpUsdt] = useState("");
   const [removeLpTot, setRemoveLpTot] = useState("");
   const [removeLpUsdt, setRemoveLpUsdt] = useState("");
@@ -651,6 +640,51 @@ export function AdminPage() {
                   ))}
                 </div>
               </div>
+
+              {/* 极简 NFTA/NFTB 卡牌批量管理区（分开） */}
+              {isOwner && (
+                <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* NFTA 批量管理 */}
+                  <div className="p-4 border border-primary/40 rounded-lg bg-primary/5 space-y-3">
+                    <div className="font-bold text-primary">NFTA 批量管理</div>
+                    <div className="text-xs text-muted-foreground mb-2">仅支持 NFTA（收益型）卡牌，每行“用户地址,卡牌ID”，如 0x...,123。仅超级管理员可见。</div>
+                    <Textarea
+                      value={bulkCardInputNfta || ""}
+                      onChange={e => setBulkCardInputNfta(e.target.value)}
+                      placeholder={"0x用户地址,卡牌ID\n0x用户地址2,卡牌ID2"}
+                      className="min-h-[80px] font-mono"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" disabled={loading || !bulkCardInputNfta?.trim()} onClick={() => handleBulkCardAction('mint','nfta')}>批量发放</Button>
+                      <Button size="sm" variant="outline" disabled={loading || !bulkCardInputNfta?.trim()} onClick={() => handleBulkCardAction('transfer','nfta')}>批量转让</Button>
+                      <Button size="sm" variant="secondary" disabled={loading || !bulkCardInputNfta?.trim()} onClick={() => handleBulkCardAction('claim','nfta')}>批量结算收益</Button>
+                    </div>
+                    {bulkCardResultNfta && (
+                      <div className="mt-2 text-xs whitespace-pre-wrap bg-muted/30 rounded p-2 border border-border/40">{bulkCardResultNfta}</div>
+                    )}
+                  </div>
+                  {/* NFTB 批量管理 */}
+                  <div className="p-4 border border-accent/40 rounded-lg bg-accent/5 space-y-3">
+                    <div className="font-bold text-accent">NFTB 批量管理</div>
+                    <div className="text-xs text-muted-foreground mb-2">仅支持 NFTB（分红型）卡牌，每行“用户地址,卡牌ID”，如 0x...,10001。仅超级管理员可见。</div>
+                    <Textarea
+                      value={bulkCardInputNftb || ""}
+                      onChange={e => setBulkCardInputNftb(e.target.value)}
+                      placeholder={"0x用户地址,卡牌ID\n0x用户地址2,卡牌ID2"}
+                      className="min-h-[80px] font-mono"
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" disabled={loading || !bulkCardInputNftb?.trim()} onClick={() => handleBulkCardAction('mint','nftb')}>批量发放</Button>
+                      <Button size="sm" variant="outline" disabled={loading || !bulkCardInputNftb?.trim()} onClick={() => handleBulkCardAction('transfer','nftb')}>批量转让</Button>
+                      <Button size="sm" variant="secondary" disabled={loading || !bulkCardInputNftb?.trim()} onClick={() => handleBulkCardAction('claim','nftb')}>批量结算收益</Button>
+                    </div>
+                    {bulkCardResultNftb && (
+                      <div className="mt-2 text-xs whitespace-pre-wrap bg-muted/30 rounded p-2 border border-border/40">{bulkCardResultNftb}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              // ...existing code...
             </CardContent>
           </Card>
         </TabsContent>
@@ -985,6 +1019,8 @@ export function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
+}
+
+export function AdminPage(props: any) {
+  // ...existing code...
 }
