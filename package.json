@@ -28,6 +28,9 @@
     "health:daily": "node scripts/daily-health-check.js",
     "tiers:check": "node scripts/check-fixed-tiers.js",
     "tiers:fix:nftb": "node scripts/fix-nftb-fixed-tiers-sepolia.js",
+    "tokenomics:chapter1:local": "npx hardhat run scripts/chapter1-tokenomics-alignment-local.js",
+    "nfta:chapter3:local": "npx hardhat run scripts/chapter3-nfta-alignment-local.js",
+    "nftb:chapter5:local": "npx hardhat run scripts/chapter5-nftb-alignment-local.js",
     "mint:usdt:sepolia": "npx hardhat run scripts/mint-usdt-sepolia.js --network sepolia",
     "regression:full:local": "npx hardhat run scripts/full-business-regression-local.js"
   },

@@ -99,6 +99,7 @@ export function NodesPage() {
   const [loadError, setLoadError] = useState("");
   const [nftaStage, setNftaStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
+  const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
   const zeroValue = ethers.parseUnits("0", 0);
   const MAX_TIER_SCAN = 20;
 
@@ -222,10 +223,25 @@ export function NodesPage() {
         } as NodeBItem;
       });
 
-      const [nftaNodeList, nftbNodeList] = await Promise.all([
+      const [rawNftaNodeList, nftbNodeList] = await Promise.all([
         Promise.all(nftaNodeCalls),
         Promise.all(nftbNodeCalls),
       ]);
+
+      let highestPendingNodeId: bigint | null = null;
+      let highestDailyYield = 0n;
+      for (const node of rawNftaNodeList) {
+        if (!node.isActive) continue;
+        if (node.dailyYield > highestDailyYield) {
+          highestDailyYield = node.dailyYield;
+          highestPendingNodeId = node.nodeId;
+        }
+      }
+
+      const nftaNodeList = rawNftaNodeList.map((node) => ({
+        ...node,
+        pending: highestPendingNodeId !== null && node.nodeId === highestPendingNodeId ? node.pending : 0n,
+      }));
 
       setNftaNodes(nftaNodeList);
       setNftbNodes(nftbNodeList);
@@ -398,6 +414,29 @@ export function NodesPage() {
         return;
       }
       toast({ title: t("toastNftbClaimed"), description: res.hash?.slice(0, 10) + "..." });
+      await refreshData(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const transferNfta = async (nodeId: bigint) => {
+    if (!nexus) return;
+    const target = (nftaTransferToByNode[nodeId.toString()] || "").trim();
+    if (!ethers.isAddress(target)) {
+      toast({ title: "转让失败", description: "请输入有效钱包地址", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await execTx(nexus.transferNftaCard(target, nodeId));
+      if (!res.success) {
+        toast({ title: "转让失败", description: res.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: "转让成功", description: res.hash?.slice(0, 10) + "..." });
+      setNftaTransferToByNode((prev) => ({ ...prev, [nodeId.toString()]: "" }));
       await refreshData(false);
     } finally {
       setLoading(false);
@@ -727,6 +766,27 @@ export function NodesPage() {
                         <span className="text-muted-foreground">{t("labelPendingShort")} </span>
                         <span className="font-medium text-primary">{formatTot(node.pending)} TOT</span>
                       </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                      <Input
+                        value={nftaTransferToByNode[node.nodeId.toString()] || ""}
+                        onChange={(e) =>
+                          setNftaTransferToByNode((prev) => ({
+                            ...prev,
+                            [node.nodeId.toString()]: e.target.value,
+                          }))
+                        }
+                        placeholder="输入接收地址进行转让"
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => transferNfta(node.nodeId)}
+                        disabled={!isConnected || loading}
+                      >
+                        转让
+                      </Button>
                     </div>
                   </div>
                 ))

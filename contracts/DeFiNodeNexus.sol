@@ -121,6 +121,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
     mapping(uint256 => uint256) public accUsdtDividendPerWeightByTier;
     mapping(uint256 => uint256) public usdtRewardDebtByNode;
+    mapping(uint256 => uint256) public predictionFlowBpsByTier;
+    mapping(address => uint256) public nftaLastClaimDayByUser;
     uint256 public tofPerUsdt;          // TOF amount per 1 USDT (scaled by 1e18)
 
     // ======================== Events ========================
@@ -130,6 +132,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event NftbTierConfigured(uint256 indexed tierId, uint256 price, uint256 weight, uint256 maxSupply, uint256 dividendBps, bool isActive);
     event ProjectWalletUpdated(address indexed newWallet);
     event NftaPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
+    event NftaCardTransferred(address indexed from, address indexed to, uint256 indexed nodeId);
     event NftbPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
     event NftaYieldClaimed(address indexed user, uint256 indexed nodeId, uint256 totAmount, uint256 tofConsumed);
     event NftbDividendClaimed(address indexed user, uint256 indexed nodeId, uint256 amount);
@@ -138,6 +141,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event TotWithdrawn(address indexed user, uint256 totAmount, uint256 tofFee, uint256 burnedTof);
     event DividendRoundFunded(uint256 amount, uint256 newAccDividendPerWeight);
     event UsdtDividendRoundFunded(uint256 amount, uint256 newAccDividendPerWeight);
+    event PredictionFlowRateUpdated(uint256 indexed tierId, uint256 bps);
+    event PredictionFlowDistributed(uint256 flowAmount, uint256 distributedAmount, uint256 treasuryAmount);
     event RewardPoolFunded(address indexed from, uint256 amount);
     event TreasuryUpdated(address indexed newTreasury);
     event WalletsUpdated(address zeroLine, address community, address foundation, address institution);
@@ -177,6 +182,9 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         tofBurnBps = 500;
         tofClaimFeeBps = 7000;
         tofPerUsdt = 200e18;
+        predictionFlowBpsByTier[1] = 40; // 0.4%
+        predictionFlowBpsByTier[2] = 50; // 0.5%
+        predictionFlowBpsByTier[3] = 60; // 0.6%
 
         // Withdraw fee by user level (TOF cost per TOT withdrawn)
         withdrawFeeBpsByLevel[0] = 1000;  // Lv0  10%
@@ -212,7 +220,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         NftaTier storage tier = nftaTiers[tierId];
         require(tier.isActive, "Tier inactive");
         require(tier.price > 0, "Price is zero");
-        require(userNftaNodes[msg.sender].length == 0, "Only one NFTA allowed");
         require(tier.currentSupply < tier.maxSupply, "Tier sold out");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
@@ -247,6 +254,35 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         nodeId = _createNftaNode(msg.sender, tierId, tier.dailyYield);
 
         emit NftaPurchased(msg.sender, nodeId, tierId, price);
+    }
+
+    /// @notice Transfer an owned NFTA node to another address.
+    function transferNftaCard(address to, uint256 nodeId) external {
+        require(to != address(0), "To is zero");
+
+        NodeA storage node = nftaNodes[nodeId];
+        address from = node.owner;
+        require(node.isActive, "Inactive");
+        require(from != address(0), "Node not found");
+        require(to != from, "Same owner");
+        require(msg.sender == from || msg.sender == owner(), "Not authorized");
+
+        uint256 today = block.timestamp / 1 days;
+        bool recipientHadNoNfta = userNftaNodes[to].length == 0;
+
+        _removeNftaNodeFromUser(from, nodeId);
+        userNftaNodes[to].push(nodeId);
+
+        node.owner = to;
+
+        accounts[from].totalNodes -= 1;
+        accounts[to].totalNodes += 1;
+
+        if (recipientHadNoNfta && nftaLastClaimDayByUser[to] < today) {
+            nftaLastClaimDayByUser[to] = today;
+        }
+
+        emit NftaCardTransferred(from, to, nodeId);
     }
 
     /**
@@ -305,15 +341,20 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         require(node.owner == msg.sender, "Not owner");
         require(node.isActive, "Inactive");
 
-        uint256 today = block.timestamp / 1 days;
-        require(today > node.lastClaimDay, "Already claimed today");
+        _claimNftaYieldForUser(msg.sender);
+    }
 
-        uint256 reward = node.dailyYield;
+    function _claimNftaYieldForUser(address user) internal {
+        (uint256 reward, uint256 rewardNodeId) = _getHighestActiveNftaYield(user);
+        require(reward > 0, "No NFTA nodes");
+
+        uint256 today = block.timestamp / 1 days;
+        require(today > nftaLastClaimDayByUser[user], "Already claimed today");
 
         // TOF fee to claim
         uint256 tofFee = (reward * tofClaimFeeBps) / BASIS_POINTS;
         if (tofFee > 0) {
-            tofToken.safeTransferFrom(msg.sender, address(this), tofFee);
+            tofToken.safeTransferFrom(user, address(this), tofFee);
 
             uint256 burnAmount = (tofFee * tofBurnBps) / BASIS_POINTS;
             if (burnAmount > 0) {
@@ -325,26 +366,21 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             }
         }
 
-        node.lastClaimDay = today;
-        accounts[msg.sender].pendingTot += reward;
-        accounts[msg.sender].claimedTot += reward;
+        nftaLastClaimDayByUser[user] = today;
+        accounts[user].pendingTot += reward;
+        accounts[user].claimedTot += reward;
 
-        emit NftaYieldClaimed(msg.sender, nodeId, reward, tofFee);
+        nftaNodes[rewardNodeId].lastClaimDay = today;
+
+        emit NftaYieldClaimed(user, rewardNodeId, reward, tofFee);
     }
 
-    /// @notice Claim all NFTA yields for the caller. Must have enough TOF for all nodes.
+    /// @notice Claim NFTA yield for caller once per day, using highest active NFTA node only.
     function claimAllNftaYield() external {
         uint256[] storage nodes = userNftaNodes[msg.sender];
-        uint256 length = nodes.length;
-        require(length > 0, "No NFTA nodes");
+        require(nodes.length > 0, "No NFTA nodes");
 
-        uint256 today = block.timestamp / 1 days;
-        for (uint256 i = 0; i < length; i++) {
-            NodeA storage node = nftaNodes[nodes[i]];
-            if (node.isActive && node.lastClaimDay < today) {
-                claimNftaYield(nodes[i]);
-            }
-        }
+        _claimNftaYieldForUser(msg.sender);
     }
 
     function claimNftbDividend(uint256 nodeId) public {
@@ -451,9 +487,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         if (!node.isActive || node.owner == address(0)) return 0;
 
         uint256 today = block.timestamp / 1 days;
-        if (today <= node.lastClaimDay) return 0;
+        if (today <= nftaLastClaimDayByUser[node.owner]) return 0;
 
-        return node.dailyYield;
+        (uint256 reward,) = _getHighestActiveNftaYield(node.owner);
+        return reward;
     }
 
     function pendingNftbDividend(uint256 nodeId) public view returns (uint256) {
@@ -665,6 +702,47 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit UsdtDividendRoundFunded(amount, 0);
     }
 
+    /**
+     * @notice Distribute prediction-platform flow (USDT) to NFTB tiers.
+     * Rates are configured per tier in bps, default:
+     *   - Tier1: 0.4% (40 bps)
+     *   - Tier2: 0.5% (50 bps)
+     *   - Tier3: 0.6% (60 bps)
+     * The undistributed remainder goes to treasury.
+     */
+    function distributePredictionFlowUsdt(uint256 flowAmount) external {
+        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
+        require(flowAmount > 0, "Zero");
+
+        usdtToken.safeTransferFrom(msg.sender, address(this), flowAmount);
+
+        uint256 distributed;
+
+        for (uint256 tid = 1; tid < nextNftbTierId; tid++) {
+            NftbTier memory tier = nftbTiers[tid];
+            if (!tier.isActive) continue;
+
+            uint256 flowRateBps = predictionFlowBpsByTier[tid];
+            if (flowRateBps == 0) continue;
+
+            uint256 tierAmount = (flowAmount * flowRateBps) / BASIS_POINTS;
+            if (tierAmount == 0) continue;
+
+            uint256 tierWeight = totalWeightByTier[tid];
+            if (tierWeight == 0) continue;
+
+            accUsdtDividendPerWeightByTier[tid] += (tierAmount * ACC_PRECISION) / tierWeight;
+            distributed += tierAmount;
+        }
+
+        uint256 treasuryAmount = flowAmount - distributed;
+        if (treasuryAmount > 0) {
+            usdtToken.safeTransfer(treasury, treasuryAmount);
+        }
+
+        emit PredictionFlowDistributed(flowAmount, distributed, treasuryAmount);
+    }
+
     function setDistributor(address addr, bool status) external onlyOwner {
         require(addr != address(0), "Zero");
         isDistributor[addr] = status;
@@ -719,6 +797,13 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit TofPerUsdtUpdated(rate);
     }
 
+    function setPredictionFlowRateBps(uint256 tierId, uint256 bps) external onlyOwner {
+        require(tierId > 0 && tierId < nextNftbTierId, "Invalid tier");
+        require(bps <= BASIS_POINTS, "Too high");
+        predictionFlowBpsByTier[tierId] = bps;
+        emit PredictionFlowRateUpdated(tierId, bps);
+    }
+
     function setWithdrawFeeBps(uint8 level, uint256 feeBps) external onlyOwner {
         require(level <= 5, "Invalid level");
         require(feeBps <= BASIS_POINTS, "Too high");
@@ -730,12 +815,17 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // ================================================================
 
     function _createNftaNode(address user, uint256 tierId, uint256 dailyYield) internal returns (uint256 nodeId) {
+        uint256 today = block.timestamp / 1 days;
+        if (userNftaNodes[user].length == 0 && nftaLastClaimDayByUser[user] < today) {
+            nftaLastClaimDayByUser[user] = today;
+        }
+
         nodeId = nextNodeId++;
         nftaNodes[nodeId] = NodeA({
             owner: user,
             tierId: tierId,
             dailyYield: dailyYield,
-            lastClaimDay: block.timestamp / 1 days,
+            lastClaimDay: today,
             isActive: true
         });
 
@@ -760,6 +850,37 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         userNftbNodes[user].push(nodeId);
         accounts[user].totalNodes += 1;
         _increaseUplineTeamNodes(user, 1);
+    }
+
+    function _removeNftaNodeFromUser(address user, uint256 nodeId) internal {
+        uint256[] storage nodes = userNftaNodes[user];
+        uint256 length = nodes.length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (nodes[i] == nodeId) {
+                nodes[i] = nodes[length - 1];
+                nodes.pop();
+                return;
+            }
+        }
+
+        revert("Node not in owner list");
+    }
+
+    function _getHighestActiveNftaYield(address user) internal view returns (uint256 reward, uint256 rewardNodeId) {
+        uint256[] storage nodes = userNftaNodes[user];
+        uint256 length = nodes.length;
+
+        for (uint256 i = 0; i < length; i++) {
+            uint256 nodeId = nodes[i];
+            NodeA memory node = nftaNodes[nodeId];
+            if (!node.isActive || node.owner != user) continue;
+
+            if (node.dailyYield > reward) {
+                reward = node.dailyYield;
+                rewardNodeId = nodeId;
+            }
+        }
     }
 
     /**

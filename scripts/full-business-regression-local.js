@@ -64,7 +64,7 @@ async function main() {
 
   console.log("Running FULL local business regression with owner:", owner.address);
 
-  const tot = await deployTokenProxy("TOTToken", "Truth Oracle Token", "TOT", owner);
+  const tot = await deployTokenProxy("TOTToken", "Truth Oracle Token", "TOT", owner, "1000000000", "1000000000");
   const tof = await deployTokenProxy("TOFToken", "Truth Oracle Fuel", "TOF", owner, "10000000000", "0");
   const usdt = await deployTokenProxy("TOTToken", "Mock USDT", "USDT", owner);
 
@@ -121,7 +121,7 @@ async function main() {
 
   await expectRevert(() => tot.connect(userA).mint(userA.address, 1n), "TOT mint onlyOwner");
   await expectRevert(() => tot.airdrop([userA.address], [1n, 2n]), "TOT airdrop mismatch");
-  await (await tot.mint(userA.address, ethers.parseUnits("100", 18))).wait();
+  await (await tot.transfer(userA.address, ethers.parseUnits("100", 18))).wait();
 
   await expectRevert(() => nexus.connect(userA).fundRewardPool(ethers.parseUnits("1", 18)), "fundRewardPool onlyOwner");
   await (await tot.approve(await nexus.getAddress(), ethers.parseUnits("200000", 18))).wait();

@@ -120,7 +120,7 @@ export function EarningsPage() {
       mapped.push({
         key: `${ev.transactionHash}-team`,
         type: "Team Bonus",
-        unit: "TOT",
+        unit: "USDT",
         amount: args.amount,
         block: ev.blockNumber,
         txHash: ev.transactionHash,
