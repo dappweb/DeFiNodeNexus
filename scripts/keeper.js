@@ -6,7 +6,8 @@ const path = require("path");
 /**
  * Keeper Bot — periodically triggers:
  *   1. TOTSwap.deflate()        — every 4 hours
- *   2. TOTSwap.forceDistribute() — when nftbDividendPool >= distributionThreshold
+ *   2. TOTSwap.forceDistribute() — when nftbDividendPool >= distributionThreshold (TOT)
+ *   3. TOTSwap.forceDistribute() — when nftbUsdtDividendPool >= usdtDistributionThreshold (USDT)
  *
  * Trigger methods:
  *   A) Standalone daemon:    node scripts/keeper.js
@@ -30,6 +31,8 @@ const SWAP_ABI = [
   "function timeUntilNextDeflation() view returns (uint256)",
   "function nftbDividendPool() view returns (uint256)",
   "function distributionThreshold() view returns (uint256)",
+  "function nftbUsdtDividendPool() view returns (uint256)",
+  "function usdtDistributionThreshold() view returns (uint256)",
   "function totReserve() view returns (uint256)",
   "function usdtReserve() view returns (uint256)",
   "function lastDeflationTime() view returns (uint256)",
@@ -129,7 +132,7 @@ async function runKeeper() {
   const releaseLock = acquireLock(cfg.lockFile);
   const { swap, wallet } = createSwapContract();
   const startedAt = new Date().toISOString();
-  const results = { deflation: null, distribution: null };
+  const results = { deflation: null, distribution: null, usdtDistribution: null };
   let statusCode = "success";
 
   console.log(`[keeper] ${startedAt} | wallet: ${wallet.address}`);
@@ -159,7 +162,7 @@ async function runKeeper() {
       statusCode = "error";
     }
 
-    // ── 2. Check & trigger distribution ──
+    // ── 2. Check & trigger TOT distribution ──
     try {
       const pool = await swap.nftbDividendPool();
       const threshold = await swap.distributionThreshold();
@@ -168,19 +171,44 @@ async function runKeeper() {
       const threshFmt = ethers.formatUnits(threshold, 18);
 
       if (pool >= threshold && pool > 0n) {
-        console.log(`[keeper] Dividend pool ${poolFmt} TOT ≥ threshold ${threshFmt} — distributing...`);
+        console.log(`[keeper] TOT dividend pool ${poolFmt} TOT ≥ threshold ${threshFmt} — distributing...`);
         const tx = await swap.forceDistribute();
         const receipt = await tx.wait();
-        console.log(`[keeper] ✓ forceDistribute() mined: ${receipt.hash}`);
+        console.log(`[keeper] ✓ forceDistribute() (TOT) mined: ${receipt.hash}`);
         results.distribution = { success: true, hash: receipt.hash, amount: poolFmt };
       } else {
-        console.log(`[keeper] Dividend pool ${poolFmt} / ${threshFmt} TOT — below threshold`);
+        console.log(`[keeper] TOT dividend pool ${poolFmt} / ${threshFmt} — below threshold`);
         results.distribution = { success: true, skipped: true, pool: poolFmt, threshold: threshFmt };
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[keeper] ✗ forceDistribute() failed: ${msg}`);
+      console.error(`[keeper] ✗ forceDistribute() (TOT) failed: ${msg}`);
       results.distribution = { success: false, error: msg.slice(0, 200) };
+      statusCode = "error";
+    }
+
+    // ── 3. Check & trigger USDT distribution ──
+    try {
+      const usdtPool = await swap.nftbUsdtDividendPool();
+      const usdtThreshold = await swap.usdtDistributionThreshold();
+
+      const usdtPoolFmt = ethers.formatUnits(usdtPool, 18);
+      const usdtThreshFmt = ethers.formatUnits(usdtThreshold, 18);
+
+      if (usdtPool >= usdtThreshold && usdtPool > 0n) {
+        console.log(`[keeper] USDT dividend pool ${usdtPoolFmt} USDT ≥ threshold ${usdtThreshFmt} — distributing...`);
+        const tx = await swap.forceDistribute();
+        const receipt = await tx.wait();
+        console.log(`[keeper] ✓ forceDistribute() (USDT) mined: ${receipt.hash}`);
+        results.usdtDistribution = { success: true, hash: receipt.hash, amount: usdtPoolFmt };
+      } else {
+        console.log(`[keeper] USDT dividend pool ${usdtPoolFmt} / ${usdtThreshFmt} USDT — below threshold`);
+        results.usdtDistribution = { success: true, skipped: true, pool: usdtPoolFmt, threshold: usdtThreshFmt };
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[keeper] ✗ forceDistribute() (USDT) failed: ${msg}`);
+      results.usdtDistribution = { success: false, error: msg.slice(0, 200) };
       statusCode = "error";
     }
 

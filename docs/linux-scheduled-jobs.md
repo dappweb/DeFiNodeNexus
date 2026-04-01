@@ -111,28 +111,42 @@ journalctl -u definode-keeper.service -n 100 --no-pager
 journalctl -u definode-health.service -n 100 --no-pager
 ```
 
-## 6. 当前脚本能力
+## 6. 定时分配任务总览
 
-### 6.1 keeper
+| # | 任务 | 触发条件 | 调用方法 | 自动化方式 |
+|---|---|---|---|---|
+| 1 | **TOT 通缩** | 每 4 小时 | `TOTSwap.deflate()` | keeper 自动 |
+| 2 | **TOT NFTB 分红发放** | TOT 池 ≥ threshold（默认值可配）| `TOTSwap.forceDistribute()` | keeper 自动 |
+| 3 | **USDT NFTB 分红发放** | USDT 池 ≥ usdtDistributionThreshold（默认 10,000 USDT）| `TOTSwap.forceDistribute()` | keeper 自动 |
+| 4 | **预测流水 USDT 分红** | 手动触发（Admin 页面） | `DeFiNodeNexus.distributePredictionFlowUsdt()` | Admin 手动 |
 
-- 检查并执行 `deflate()`
-- 检查并执行 `forceDistribute()`
-- 文件锁防重入
-- 输出状态文件
+> 任务 2 和 3 共用同一个 `forceDistribute()` 函数，合约内部按池状态分别处理 TOT 和 USDT。  
+> 任务 4 的资金来源为链外预测平台收入，需要由管理员手动录入并发放。
+
+## 7. 当前脚本能力
+
+### 7.1 keeper
+
+- 检查并执行 `deflate()`（任务 1）
+- 检查 TOT 分红池并在达阈值时执行 `forceDistribute()`（任务 2）
+- 检查 USDT 分红池并在达阈值时执行 `forceDistribute()`（任务 3）
+- 文件锁防重入（多实例保护）
+- 输出状态文件（`runtime/keeper/latest-run.json`）
 - 失败时可发送 Discord / Telegram 告警
 
-### 6.2 daily-health-check
+### 7.2 daily-health-check
 
 - 检查通缩延迟
-- 检查分红池是否积压
+- 检查 TOT 分红池是否积压待发
+- 检查 USDT 分红池是否积压待发
 - 检查 TOT/USDT 储备是否低于阈值
-- 检查 keeper 上次状态
-- 输出健康报告
+- 检查 keeper 上次运行状态
+- 输出健康报告（`runtime/health/latest-health-check.json`）
 - 有告警时发送 Discord / Telegram
 
-## 7. 建议
+## 8. 建议
 
 - 生产环境优先使用 `systemd timer`，不要只依赖 Web API。
-- `KEEPER_LOCK_FILE` 建议使用 Linux 绝对路径。
-- `keeper.env` 必须限制为 `600` 权限。
-- 后续可继续补：USDT 分红自动化、管理员页展示最近一次 keeper 结果。
+- `KEEPER_LOCK_FILE` 建议使用 Linux 绝对路径（`/var/lock/definode-keeper.lock`）。
+- `keeper.env` 必须限制为 `600` 权限，私钥不能明文提交。
+- 预测流水分红（任务 4）建议在 Admin 页面操作后在日志中记录金额和 tx hash，用于审计。

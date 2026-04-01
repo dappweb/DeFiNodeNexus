@@ -8,6 +8,8 @@ const SWAP_ABI = [
   "function lastDeflationTime() view returns (uint256)",
   "function nftbDividendPool() view returns (uint256)",
   "function distributionThreshold() view returns (uint256)",
+  "function nftbUsdtDividendPool() view returns (uint256)",
+  "function usdtDistributionThreshold() view returns (uint256)",
   "function totReserve() view returns (uint256)",
   "function usdtReserve() view returns (uint256)",
   "function owner() view returns (address)",
@@ -81,6 +83,8 @@ async function main() {
     lastDeflationTime,
     dividendPool,
     distributionThreshold,
+    usdtDividendPool,
+    usdtDistributionThreshold,
     totReserve,
     usdtReserve,
     swapOwner,
@@ -95,6 +99,8 @@ async function main() {
     swap.lastDeflationTime(),
     swap.nftbDividendPool(),
     swap.distributionThreshold(),
+    swap.nftbUsdtDividendPool(),
+    swap.usdtDistributionThreshold(),
     swap.totReserve(),
     swap.usdtReserve(),
     swap.owner(),
@@ -123,6 +129,8 @@ async function main() {
   const usdtReserveNum = Number(ethers.formatUnits(usdtReserve, 18));
   const dividendPoolNum = Number(ethers.formatUnits(dividendPool, 18));
   const distributionThresholdNum = Number(ethers.formatUnits(distributionThreshold, 18));
+  const usdtDividendPoolNum = Number(ethers.formatUnits(usdtDividendPool, 18));
+  const usdtDistributionThresholdNum = Number(ethers.formatUnits(usdtDistributionThreshold, 18));
 
   const warnings = [];
   if (totReserveNum < minTotReserve) warnings.push(`TOT reserve low: ${totReserveNum} < ${minTotReserve}`);
@@ -131,7 +139,10 @@ async function main() {
     warnings.push(`Deflation delayed: ${deflationDelayHours.toFixed(2)}h > ${maxDeflationDelayHours}h`);
   }
   if (dividendPoolNum >= distributionThresholdNum && distributionThresholdNum > 0) {
-    warnings.push(`Dividend pool waiting for distribution: ${dividendPoolNum} >= ${distributionThresholdNum}`);
+    warnings.push(`TOT dividend pool waiting for distribution: ${dividendPoolNum} >= ${distributionThresholdNum}`);
+  }
+  if (usdtDividendPoolNum >= usdtDistributionThresholdNum && usdtDistributionThresholdNum > 0) {
+    warnings.push(`USDT dividend pool waiting for distribution: ${usdtDividendPoolNum} >= ${usdtDistributionThresholdNum}`);
   }
   if (keeperStatus && keeperStatus.status && keeperStatus.status !== "success") {
     warnings.push(`Last keeper run status: ${keeperStatus.status}`);
@@ -147,8 +158,10 @@ async function main() {
       linkedNexus,
       totReserve: totReserveNum,
       usdtReserve: usdtReserveNum,
-      dividendPool: dividendPoolNum,
-      distributionThreshold: distributionThresholdNum,
+      totDividendPool: dividendPoolNum,
+      totDistributionThreshold: distributionThresholdNum,
+      usdtDividendPool: usdtDividendPoolNum,
+      usdtDistributionThreshold: usdtDistributionThresholdNum,
       deflationCountdownSeconds: Number(countdown),
       lastDeflationTime: new Date(lastDeflationTs).toISOString(),
       deflationDelayHours,
