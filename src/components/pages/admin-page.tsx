@@ -6,15 +6,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
+import { formatAddress, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
 
 function parseNodeId(value: string): bigint | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   if (!/^\d+$/.test(trimmed)) return null;
   return BigInt(trimmed);
+}
+
+function parsePositiveInteger(value: string): number | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0 || !Number.isInteger(numeric)) return null;
+  return numeric;
+}
+
+function parseBps(value: string): bigint | null {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 10000) return null;
+  return BigInt(Math.trunc(numeric));
 }
 
 export function AdminPage() {
@@ -25,13 +39,20 @@ export function AdminPage() {
 
   const [loading, setLoading] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState("");
+  
+  // NFTA 单笔/批量
   const [transferNodeId, setTransferNodeId] = useState("");
   const [transferTo, setTransferTo] = useState("");
   const [claimNodeId, setClaimNodeId] = useState("");
   const [bulkTransferInput, setBulkTransferInput] = useState("");
   const [bulkClaimInput, setBulkClaimInput] = useState("");
   const [bulkResult, setBulkResult] = useState("");
+
+  // 基础参数
   const [tofClaimFeeBps, setTofClaimFeeBps] = useState("");
+  const [tofBurnBps, setTofBurnBps] = useState("");
+
+  // 奖励池与分红
   const [rewardFundAmount, setRewardFundAmount] = useState("");
   const [nftbTotDividendAmount, setNftbTotDividendAmount] = useState("");
   const [nftbUsdtDividendAmount, setNftbUsdtDividendAmount] = useState("");
@@ -39,6 +60,42 @@ export function AdminPage() {
   const [predictionRateTier1, setPredictionRateTier1] = useState("40");
   const [predictionRateTier2, setPredictionRateTier2] = useState("50");
   const [predictionRateTier3, setPredictionRateTier3] = useState("60");
+
+  // 提现费率按等级
+  const [withdrawLevel, setWithdrawLevel] = useState("0");
+  const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
+
+  // Tier 配置
+  const [nftaTierId, setNftaTierId] = useState("0");
+  const [nftaPrice, setNftaPrice] = useState("");
+  const [nftaDailyYield, setNftaDailyYield] = useState("");
+  const [nftaMaxSupply, setNftaMaxSupply] = useState("");
+  const [nftaActive, setNftaActive] = useState("true");
+
+  const [nftbTierId, setNftbTierId] = useState("0");
+  const [nftbPrice, setNftbPrice] = useState("");
+  const [nftbWeight, setNftbWeight] = useState("");
+  const [nftbMaxSupply, setNftbMaxSupply] = useState("");
+  const [nftbDividendBps, setNftbDividendBps] = useState("");
+  const [nftbActive, setNftbActive] = useState("true");
+
+  // 钱包管理
+  const [treasuryAddr, setTreasuryAddr] = useState("");
+  const [zeroLineAddr, setZeroLineAddr] = useState("");
+  const [communityAddr, setCommunityAddr] = useState("");
+  const [foundationAddr, setFoundationAddr] = useState("");
+  const [institutionAddr, setInstitutionAddr] = useState("");
+  const [projectAddr, setProjectAddr] = useState("");
+
+  // 分发器管理
+  const [distributorAddr, setDistributorAddr] = useState("");
+  const [distributorStatus, setDistributorStatus] = useState("true");
+
+  // 直接注册购买
+  const [registerUserAddr, setRegisterUserAddr] = useState("");
+  const [registerTierId, setRegisterTierId] = useState("");
+  const [registerReferrerAddr, setRegisterReferrerAddr] = useState("");
+  const [registerType, setRegisterType] = useState("nfta");
 
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
@@ -48,18 +105,32 @@ export function AdminPage() {
   const refresh = async () => {
     if (!nexus) return;
     try {
-      const [owner, claimFee, flowRate1, flowRate2, flowRate3] = await Promise.all([
+      const [owner, claimFee, burnBps, flowRate1, flowRate2, flowRate3, treasury, zLine, comm, found, inst, proj] = await Promise.all([
         nexus.owner(),
         nexus.tofClaimFeeBps(),
+        nexus.tofBurnBps(),
         nexus.predictionFlowBpsByTier(1),
         nexus.predictionFlowBpsByTier(2),
         nexus.predictionFlowBpsByTier(3),
+        nexus.treasury(),
+        nexus.zeroLineWallet(),
+        nexus.communityWallet(),
+        nexus.foundationWallet(),
+        nexus.institutionWallet(),
+        nexus.projectWallet(),
       ]);
       setOwnerAddress(owner);
       setTofClaimFeeBps(claimFee.toString());
+      setTofBurnBps(burnBps.toString());
       setPredictionRateTier1(flowRate1.toString());
       setPredictionRateTier2(flowRate2.toString());
       setPredictionRateTier3(flowRate3.toString());
+      setTreasuryAddr(treasury);
+      setZeroLineAddr(zLine);
+      setCommunityAddr(comm);
+      setFoundationAddr(found);
+      setInstitutionAddr(inst);
+      setProjectAddr(proj);
     } catch {
       toast({ title: "读取失败", description: "请检查合约连接状态", variant: "destructive" });
     }
@@ -205,12 +276,6 @@ export function AdminPage() {
     return ethers.parseUnits(value, 18);
   };
 
-  const parseBps = (value: string) => {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 10000) return null;
-    return BigInt(Math.trunc(numeric));
-  };
-
   const onDistributeNftbTot = async () => {
     if (!nexus) return;
     const amount = parsePositiveAmount(nftbTotDividendAmount);
@@ -276,17 +341,154 @@ export function AdminPage() {
     }
   };
 
+  // ===== NFTA Tier 配置 =====
+  const onConfigureNftaTier = async () => {
+    if (!nexus) return;
+    const tierId = parsePositiveInteger(nftaTierId);
+    const price = parsePositiveAmount(nftaPrice);
+    const yield_ = parsePositiveAmount(nftaDailyYield);
+    const maxSup = parsePositiveInteger(nftaMaxSupply);
+    if (tierId === null || price === null || yield_ === null || maxSup === null) {
+      toast({ title: "参数错误", description: "所有字段必须有效", variant: "destructive" });
+      return;
+    }
+    await runTx(
+      "配置NFTA Tier",
+      nexus.configureNftaTier(BigInt(tierId), price, yield_, BigInt(maxSup), nftaActive === "true")
+    );
+  };
+
+  // ===== NFTB Tier 配置 =====
+  const onConfigureNftbTier = async () => {
+    if (!nexus) return;
+    const tierId = parsePositiveInteger(nftbTierId);
+    const price = parsePositiveAmount(nftbPrice);
+    const weight = parsePositiveInteger(nftbWeight);
+    const maxSup = parsePositiveInteger(nftbMaxSupply);
+    const divBps = parseBps(nftbDividendBps);
+    if (tierId === null || price === null || weight === null || maxSup === null || divBps === null) {
+      toast({ title: "参数错误", description: "所有字段必须有效", variant: "destructive" });
+      return;
+    }
+    await runTx(
+      "配置NFTB Tier",
+      nexus.configureNftbTier(BigInt(tierId), price, BigInt(weight), BigInt(maxSup), divBps, nftbActive === "true")
+    );
+  };
+
+  // ===== 注册购买 =====
+  const onRegisterPurchase = async () => {
+    if (!nexus) return;
+    if (!ethers.isAddress(registerUserAddr.trim())) {
+      toast({ title: "参数错误", description: "用户地址无效", variant: "destructive" });
+      return;
+    }
+    const tierId = parsePositiveInteger(registerTierId);
+    if (tierId === null) {
+      toast({ title: "参数错误", description: "Tier ID 必须是正整数", variant: "destructive" });
+      return;
+    }
+    const referrer = registerReferrerAddr.trim() ? registerReferrerAddr.trim() : ethers.ZeroAddress;
+    if (!ethers.isAddress(referrer)) {
+      toast({ title: "参数错误", description: "推荐人地址无效", variant: "destructive" });
+      return;
+    }
+    
+    if (registerType === "nfta") {
+      await runTx(
+        "注册NFTA购买",
+        nexus.registerNftaPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
+      );
+    } else {
+      await runTx(
+        "注册NFTB购买",
+        nexus.registerNftbPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
+      );
+    }
+  };
+
+  // ===== 提现费率 =====
+  const onSetWithdrawFee = async () => {
+    if (!nexus) return;
+    const level = Number(withdrawLevel);
+    if (!Number.isFinite(level) || level < 0 || level > 5) {
+      toast({ title: "参数错误", description: "等级必须在0-5之间", variant: "destructive" });
+      return;
+    }
+    const bps = parseBps(withdrawFeeBps);
+    if (bps === null) {
+      toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置提现费率", nexus.setWithdrawFeeBps(level, bps));
+  };
+
+  // ===== TOF 燃烧比率 =====
+  const onSetTofBurnBps = async () => {
+    if (!nexus) return;
+    const bps = parseBps(tofBurnBps);
+    if (bps === null) {
+      toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置TOF燃烧比率", nexus.setTofBurnBps(bps));
+  };
+
+  // ===== Treasury =====
+  const onSetTreasury = async () => {
+    if (!nexus) return;
+    if (!ethers.isAddress(treasuryAddr.trim())) {
+      toast({ title: "参数错误", description: "地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置Treasury", nexus.setTreasury(treasuryAddr.trim()));
+  };
+
+  // ===== 钱包地址 =====
+  const onSetWallets = async () => {
+    if (!nexus) return;
+    const addrs = [zeroLineAddr, communityAddr, foundationAddr, institutionAddr].map((a) => a.trim());
+    if (!addrs.every((a) => ethers.isAddress(a))) {
+      toast({ title: "参数错误", description: "所有地址都必须有效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置钱包地址", nexus.setWallets(...addrs.map((a) => a) as Parameters<typeof nexus.setWallets>));
+  };
+
+  // ===== 项目方钱包 =====
+  const onSetProjectWallet = async () => {
+    if (!nexus) return;
+    if (!ethers.isAddress(projectAddr.trim())) {
+      toast({ title: "参数错误", description: "地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置项目方钱包", nexus.setProjectWallet(projectAddr.trim()));
+  };
+
+  // ===== 分发器管理 =====
+  const onSetDistributor = async () => {
+    if (!nexus) return;
+    if (!ethers.isAddress(distributorAddr.trim())) {
+      toast({ title: "参数错误", description: "地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx(
+      "设置分发器",
+      nexus.setDistributor(distributorAddr.trim(), distributorStatus === "true")
+    );
+  };
+
   return (
     <div className="space-y-6 overflow-hidden">
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>管理员面板</CardTitle>
           <CardDescription>
-            Owner: {ownerAddress ? `${ownerAddress.slice(0, 10)}...${ownerAddress.slice(-6)}` : "-"} ｜ 当前钱包: {isOwner ? "管理员" : "只读"}
+            Owner: {formatAddress(ownerAddress)} ｜ 当前钱包: {isOwner ? "✅ 管理员" : "👁️ 只读"}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          {!isConnected ? "请先连接钱包。" : "基于最新合约接口（含NFTA转卡与最高级收益规则）"}
+          {!isConnected ? "请先连接钱包。" : "完整功能覆盖 - 所有 onlyOwner 操作已支持"}
         </CardContent>
       </Card>
 
@@ -384,6 +586,144 @@ export function AdminPage() {
             <Input value={predictionRateTier2} onChange={(e) => setPredictionRateTier2(e.target.value)} placeholder="中级费率 bps" />
             <Input value={predictionRateTier3} onChange={(e) => setPredictionRateTier3(e.target.value)} placeholder="高级费率 bps" />
             <Button disabled={!isOwner || loading || !nexus} onClick={onSetPredictionFlowRates}>更新预测流水费率</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Tier 配置</CardTitle>
+          <CardDescription>配置NFTA/NFTB等级参数</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <div className="text-sm font-semibold mb-2">NFTA Tier 配置</div>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
+              <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="Tier ID (0=新建)" />
+              <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (USDT)" />
+              <Input value={nftaDailyYield} onChange={(e) => setNftaDailyYield(e.target.value)} placeholder="日收益 (TOT)" />
+              <Input value={nftaMaxSupply} onChange={(e) => setNftaMaxSupply(e.target.value)} placeholder="最大供应" />
+              <Select value={nftaActive} onValueChange={setNftaActive}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">激活</SelectItem>
+                  <SelectItem value="false">禁用</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button disabled={!isOwner || loading || !nexus} onClick={onConfigureNftaTier} variant="outline">保存</Button>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-semibold mb-2">NFTB Tier 配置</div>
+            <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+              <Input value={nftbTierId} onChange={(e) => setNftbTierId(e.target.value)} placeholder="Tier ID (0=新建)" />
+              <Input value={nftbPrice} onChange={(e) => setNftbPrice(e.target.value)} placeholder="价格 (USDT)" />
+              <Input value={nftbWeight} onChange={(e) => setNftbWeight(e.target.value)} placeholder="权重" />
+              <Input value={nftbMaxSupply} onChange={(e) => setNftbMaxSupply(e.target.value)} placeholder="最大供应" />
+              <Input value={nftbDividendBps} onChange={(e) => setNftbDividendBps(e.target.value)} placeholder="分红 bps" />
+              <Select value={nftbActive} onValueChange={setNftbActive}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">激活</SelectItem>
+                  <SelectItem value="false">禁用</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button disabled={!isOwner || loading || !nexus} onClick={onConfigureNftbTier} variant="outline">保存</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>直接注册购买</CardTitle>
+          <CardDescription>为用户直接注册节点购买（无链下支付）</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="用户地址" />
+              <Input value={registerTierId} onChange={(e) => setRegisterTierId(e.target.value)} placeholder="Tier ID" />
+              <Input value={registerReferrerAddr} onChange={(e) => setRegisterReferrerAddr(e.target.value)} placeholder="推荐人(可选)" />
+              <Select value={registerType} onValueChange={setRegisterType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nfta">NFTA</SelectItem>
+                  <SelectItem value="nftb">NFTB</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button disabled={!isOwner || loading || !nexus} onClick={onRegisterPurchase} className="flex-1">
+                注册 {registerType === "nfta" ? "NFTA" : "NFTB"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>费率管理</CardTitle>
+          <CardDescription>设置 TOF 费率和提现等级费用</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 燃烧比率 bps" />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetTofBurnBps}>设置TOF燃烧比率</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Select value={withdrawLevel} onValueChange={setWithdrawLevel}>
+              <SelectTrigger><SelectValue placeholder="等级" /></SelectTrigger>
+              <SelectContent>
+                {[0, 1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={l.toString()}>{`Lv${l}`}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="提现费率 bps" />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetWithdrawFee}>设置提现费率</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>钱包与治理</CardTitle>
+          <CardDescription>管理Treasury、分布钱包、分发器</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={treasuryAddr} onChange={(e) => setTreasuryAddr(e.target.value)} placeholder="Treasury 地址" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetTreasury}>设置</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+            <Input value={zeroLineAddr} onChange={(e) => setZeroLineAddr(e.target.value)} placeholder="0号线" />
+            <Input value={communityAddr} onChange={(e) => setCommunityAddr(e.target.value)} placeholder="社区建设" />
+            <Input value={foundationAddr} onChange={(e) => setFoundationAddr(e.target.value)} placeholder="基金会" />
+            <Input value={institutionAddr} onChange={(e) => setInstitutionAddr(e.target.value)} placeholder="机构" />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetWallets}>批量设置</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={projectAddr} onChange={(e) => setProjectAddr(e.target.value)} placeholder="项目方钱包" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetProjectWallet}>设置</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={distributorAddr} onChange={(e) => setDistributorAddr(e.target.value)} placeholder="分发器地址" />
+            <Select value={distributorStatus} onValueChange={setDistributorStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">授权</SelectItem>
+                <SelectItem value="false">撤销</SelectItem>
+              </SelectContent>
+            </Select>
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetDistributor}>设置</Button>
           </div>
         </CardContent>
       </Card>

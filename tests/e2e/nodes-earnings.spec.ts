@@ -38,10 +38,14 @@ async function openEarningsTab(page: Page) {
   await expect(page.getByText(/Withdrawable \(TOT\)|可提取收益/i).first()).toBeVisible()
 }
 
+async function openHome(page: Page) {
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await expect(page.getByRole("button", { name: /Nodes|节点/i }).first()).toBeVisible({ timeout: 20000 })
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript({ path: mockWalletScript })
-  await page.goto("/")
-  await page.waitForLoadState("networkidle")
+  await openHome(page)
 })
 
 test("NFTA 购买流程可执行", async ({ page }) => {

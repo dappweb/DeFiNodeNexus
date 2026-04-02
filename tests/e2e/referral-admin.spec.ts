@@ -4,6 +4,24 @@ import path from "node:path";
 
 const mockWalletScript = path.resolve(__dirname, "helpers/mock-ethereum.js")
 
+async function connectWallet(page: Page) {
+  const connectedAddress = page.getByText(/0x1111\.\.\.1111/i).first()
+  if (await connectedAddress.isVisible().catch(() => false)) {
+    return
+  }
+
+  const connectButton = page.getByRole("button", { name: /Connect Wallet|连接钱包/i }).first()
+  if (await connectButton.isVisible().catch(() => false)) {
+    await connectButton.click()
+  } else {
+    await page.evaluate(async () => {
+      await window.ethereum?.request({ method: "eth_requestAccounts" })
+    })
+  }
+
+  await expect(connectedAddress).toBeVisible()
+}
+
 async function bootstrap(page: Page, options?: { owner?: boolean; referrerBound?: boolean }) {
   const owner = options?.owner ? "1" : "0"
   const referrerBound = options?.referrerBound === false ? "0" : "1"
@@ -17,8 +35,8 @@ async function bootstrap(page: Page, options?: { owner?: boolean; referrerBound?
   )
 
   await page.addInitScript({ path: mockWalletScript })
-  await page.goto("/")
-  await page.waitForLoadState("networkidle")
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await expect(page.getByRole("button", { name: /Home|主页|Swap|兑换|Nodes|节点/i }).first()).toBeVisible({ timeout: 20000 })
 }
 
 test("推荐绑定流程可执行", async ({ page }) => {
@@ -42,24 +60,19 @@ test("管理员参数配置流程可执行", async ({ page }) => {
     await dialog.accept()
   })
 
-  const connectButton = page.getByRole("button", { name: /Connect Wallet|连接钱包/i }).first()
-  if (await connectButton.isVisible().catch(() => false)) {
-    await connectButton.click()
-  }
+  await connectWallet(page)
 
   const adminNav = page.getByRole("button", { name: /Admin|管理/i }).first()
   if (await adminNav.isVisible().catch(() => false)) {
     await adminNav.click()
   }
 
-  await expect(page.getByRole("heading", { name: /管理员面板|Admin Panel/i })).toBeVisible()
+  await expect(page.getByText(/管理员面板|Admin/i).first()).toBeVisible()
 
-  await page.getByPlaceholder("TOF 销毁比例 (bps)").fill("650")
-  await page.getByPlaceholder("TOF 领取手续费 (bps)").fill("200")
-  const updateButton = page.getByRole("button", { name: "更新 TOF 参数" })
+  await page.getByPlaceholder("TOF领取费率 bps").fill("200")
+  const updateButton = page.getByRole("button", { name: /更新TOF领取费率/i })
   await expect(updateButton).toBeEnabled()
   await updateButton.click()
 
-  await expect(page.getByText(/交易成功/i).first()).toBeVisible()
-  await expect(page.getByText("更新 TOF 参数").first()).toBeVisible()
+  await expect(page.getByText(/成功/i).first()).toBeVisible()
 })

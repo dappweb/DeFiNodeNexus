@@ -38,6 +38,7 @@
       tofBurnBps: 500n,
       tofClaimFeeBps: 7000n,
       tofClaimFeeFlat: 1n * 10n ** 18n,
+      predictionFlowBpsByTier: new Map([[1, 40n], [2, 50n], [3, 60n]]),
       withdrawFeeBpsByLevel: new Map([[0, 0n], [1, 500n], [2, 800n], [3, 1000n], [4, 1200n], [5, 1500n]])
     },
     swapConfig: {
@@ -172,6 +173,7 @@
     institutionWallet: async () => state.nexusConfig.institution,
     tofBurnBps: async () => state.nexusConfig.tofBurnBps,
     tofClaimFeeBps: async () => state.nexusConfig.tofClaimFeeBps,
+    predictionFlowBpsByTier: async (tierId) => state.nexusConfig.predictionFlowBpsByTier.get(Number(tierId)) ?? 0n,
     tofClaimFeeFlat: async () => state.nexusConfig.tofClaimFeeFlat,
     withdrawFeeBpsByLevel: async (level) => state.nexusConfig.withdrawFeeBpsByLevel.get(Number(level)) ?? 0n,
     setTreasury: async (addr) => createTx(async () => {
@@ -188,6 +190,9 @@
     }),
     setTofClaimFeeBps: async (value) => createTx(async () => {
       state.nexusConfig.tofClaimFeeBps = BigInt(value)
+    }),
+    setPredictionFlowRateBps: async (tierId, value) => createTx(async () => {
+      state.nexusConfig.predictionFlowBpsByTier.set(Number(tierId), BigInt(value))
     }),
     setTofClaimFeeFlat: async (value) => createTx(async () => {
       state.nexusConfig.tofClaimFeeFlat = BigInt(value)

@@ -14,6 +14,7 @@ import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
 import { useERC20Contract, useNexusContract, useSwapContract } from "@/hooks/use-contract";
+import { formatBalance, UI_PARAMS } from "@/lib/ui-config";
 import {
   Dialog,
   DialogContent,

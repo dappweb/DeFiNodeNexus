@@ -10,6 +10,7 @@ import { useLanguage } from "@/components/language-provider";
 import { useToast } from "@/hooks/use-toast";
 import { useNexusContract } from "@/hooks/use-contract";
 import { useWeb3 } from "@/lib/web3-provider";
+import { formatAddress, formatBalance } from "@/lib/ui-config";
 
 type TeamMember = {
   address: string;

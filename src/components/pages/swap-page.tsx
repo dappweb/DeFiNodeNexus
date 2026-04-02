@@ -11,6 +11,8 @@ import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
 import { execTx, useERC20Contract, useSwapContract } from "@/hooks/use-contract";
+import { formatBalance, formatPercent } from "@/lib/ui-config";
+import { toFriendlyError } from "@/lib/api-common";
 
 type SwapSide = "BUY" | "SELL";
 

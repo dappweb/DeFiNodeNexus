@@ -12,6 +12,8 @@ import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
 import { execTx } from "@/hooks/use-contract";
 import { useNexusContract } from "@/hooks/use-contract";
+import { getNftaTierName, getNftbTierName, formatBalance, formatDatetime } from "@/lib/ui-config";
+import { toFriendlyError } from "@/lib/api-common";
 
 type EarningRecord = {
   key: string;

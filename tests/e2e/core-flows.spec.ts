@@ -40,10 +40,14 @@ async function fillSwapAmount(page: Page, amount: string) {
   await amountInput.fill(amount)
 }
 
+async function openHome(page: Page) {
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await expect(page.getByRole("button", { name: /Swap|兑换/i }).first()).toBeVisible({ timeout: 20000 })
+}
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript({ path: mockWalletScript })
-  await page.goto("/")
-  await page.waitForLoadState("networkidle")
+  await openHome(page)
 })
 
 test("钱包连接流程可执行", async ({ page }) => {

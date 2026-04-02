@@ -22,8 +22,8 @@ test("关键页面无严重无障碍问题", async ({ page }) => {
   })
   await page.addInitScript({ path: mockWalletScript })
 
-  await page.goto("/")
-  await page.waitForLoadState("networkidle")
+  await page.goto("/", { waitUntil: "domcontentloaded" })
+  await test.expect(page.getByRole("button", { name: /Nodes|节点/i }).first()).toBeVisible({ timeout: 20000 })
   await expectNoSeriousA11yViolations(page)
 
   await page.getByRole("button", { name: /Nodes|节点/i }).first().click()
