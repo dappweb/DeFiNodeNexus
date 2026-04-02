@@ -95,6 +95,7 @@ type NodesSummaryResponse = {
 };
 
 const toTierId = (id: number | bigint) => Number(id);
+const WAD = 10n ** 18n;
 
 export function NodesPage() {
   const { t } = useLanguage();
@@ -120,6 +121,7 @@ export function NodesPage() {
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
   const [nftaClaimFeeBps, setNftaClaimFeeBps] = useState<bigint>(0n);
+  const [tofPerUsdt, setTofPerUsdt] = useState<bigint>(0n);
   const zeroValue = ethers.parseUnits("0", 0);
   const NODES_SUMMARY_TIMEOUT_MS = 12_000;
   const NODES_SUMMARY_MAX_RETRIES = 2;
@@ -234,8 +236,14 @@ export function NodesPage() {
       );
 
       if (nexus) {
-        const feeBps = BigInt(await nexus.tofClaimFeeBps());
+        const [feeBpsRaw, tofPerUsdtRaw] = await Promise.all([
+          nexus.tofClaimFeeBps(),
+          nexus.tofPerUsdt(),
+        ]);
+        const feeBps = BigInt(feeBpsRaw);
+        const tofRate = BigInt(tofPerUsdtRaw);
         setNftaClaimFeeBps(feeBps);
+        setTofPerUsdt(tofRate);
       }
     } catch (error) {
       console.error("Failed to load node data", error);
@@ -338,10 +346,23 @@ export function NodesPage() {
           return;
         }
         if (!tof) return;
+
+        let tofRate = tofPerUsdt;
+        if (tofRate <= 0n) {
+          tofRate = BigInt(await nexus.tofPerUsdt());
+          setTofPerUsdt(tofRate);
+        }
+
+        const tofCost = (tier.price * tofRate) / WAD;
+        if (tofCost <= 0n) {
+          toast({ title: t("toastBuyNftbFailed"), description: t("toastUnknownTxError"), variant: "destructive" });
+          return;
+        }
+
         const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
-        if (allowance < tier.price) {
+        if (allowance < tofCost) {
           setNftbStage("approving");
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tier.price));
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tofCost));
           if (!approveRes.success) {
             toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
@@ -704,7 +725,12 @@ export function NodesPage() {
                 <p className="text-sm text-muted-foreground py-4 text-center">{t("nftbNoTiers")}</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {nftbTiers.map((tier) => (
+                  {nftbTiers.map((tier) => {
+                    const displayPrice = nftbPayToken === "TOF"
+                      ? (tier.price * tofPerUsdt) / WAD
+                      : tier.price;
+
+                    return (
                     <button
                       key={tier.id}
                       className={`rounded-xl border-2 p-4 text-left transition-colors hover:bg-muted/30 ${
@@ -724,7 +750,7 @@ export function NodesPage() {
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">{t("labelPrice")}</span>
-                          <span className="font-medium">{ethers.formatUnits(tier.price, 18)} {nftbPayToken}</span>
+                          <span className="font-medium">{ethers.formatUnits(displayPrice, 18)} {nftbPayToken}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">{t("labelWeight")}</span>
@@ -740,7 +766,7 @@ export function NodesPage() {
                         </div>
                       </div>
                     </button>
-                  ))}
+                  )})}
                 </div>
               )}
               <div className="space-y-2 pt-1">

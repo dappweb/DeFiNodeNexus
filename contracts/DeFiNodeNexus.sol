@@ -150,7 +150,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event TofClaimFeeUpdated(uint256 newBps);
     event TofPerUsdtUpdated(uint256 newRate);
     event DistributorUpdated(address indexed addr, bool status);
-    event UserDataCleared(address indexed user);
 
     // ======================== Constructor ========================
 
@@ -809,60 +808,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         require(level <= 5, "Invalid level");
         require(feeBps <= BASIS_POINTS, "Too high");
         withdrawFeeBpsByLevel[level] = feeBps;
-    }
-
-    /**
-     * @notice Clear user state in batch, while preserving one target address.
-     * @dev This clears on-chain storage for the provided users only.
-     *      Historical events and past token transfers cannot be erased.
-     * @param keepUser Address to preserve completely.
-     * @param users Users to clear; entries equal to keepUser are skipped.
-     */
-    function clearUsersDataExcept(address keepUser, address[] calldata users) external onlyOwner {
-        require(keepUser != address(0), "Keep user is zero");
-
-        uint256 length = users.length;
-        for (uint256 i = 0; i < length; i++) {
-            address user = users[i];
-            if (user == address(0) || user == keepUser) continue;
-
-            uint256[] storage nftaIds = userNftaNodes[user];
-            uint256 nftaLen = nftaIds.length;
-            for (uint256 j = 0; j < nftaLen; j++) {
-                uint256 nodeId = nftaIds[j];
-                NodeA storage node = nftaNodes[nodeId];
-                if (node.owner == user) {
-                    node.owner = address(0);
-                    node.isActive = false;
-                    node.dailyYield = 0;
-                    node.lastClaimDay = 0;
-                }
-            }
-
-            uint256[] storage nftbIds = userNftbNodes[user];
-            uint256 nftbLen = nftbIds.length;
-            for (uint256 j = 0; j < nftbLen; j++) {
-                uint256 nodeId = nftbIds[j];
-                NodeB storage node = nftbNodes[nodeId];
-                if (node.owner == user) {
-                    if (node.isActive && node.weight > 0 && totalWeightByTier[node.tierId] >= node.weight) {
-                        totalWeightByTier[node.tierId] -= node.weight;
-                    }
-                    node.owner = address(0);
-                    node.isActive = false;
-                    node.weight = 0;
-                    node.rewardDebt = 0;
-                    usdtRewardDebtByNode[nodeId] = 0;
-                }
-            }
-
-            delete userNftaNodes[user];
-            delete userNftbNodes[user];
-            delete nftaLastClaimDayByUser[user];
-            delete accounts[user];
-
-            emit UserDataCleared(user);
-        }
     }
 
     // ================================================================
