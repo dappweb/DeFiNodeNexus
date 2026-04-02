@@ -33,87 +33,108 @@ export function TeamPage() {
   const [myReferrer, setMyReferrer] = useState<string | null>(null);
 
   const refreshData = useCallback(async () => {
-    if (!nexus || !address) return;
-
-    const account = await nexus.accounts(address);
-    setDirectReferrals(account.directReferrals);
-    const referrer = String(account.referrer);
-    setMyReferrer(referrer && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase() ? referrer : null);
-
-    if (!provider) {
-      setMembers([]);
+    if (!nexus || !address) {
+      setDirectReferrals(0n);
       setTeamMemberCount(0);
       setDirectDepositTotal(0n);
       setTeamDepositTotal(0n);
+      setMembers([]);
+      setMyReferrer(null);
       return;
     }
 
-    const userLower = address.toLowerCase();
-    const latestBlock = await provider.getBlockNumber();
-    const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null), 0, latestBlock);
-
-    const childrenByReferrer = new Map<string, Set<string>>();
-    for (const ev of allBindEvents as any[]) {
-      const user = String(ev.args.user).toLowerCase();
-      const referrer = String(ev.args.referrer).toLowerCase();
-      if (!childrenByReferrer.has(referrer)) {
-        childrenByReferrer.set(referrer, new Set<string>());
+    try {
+      const account = await nexus.accounts(address);
+      setDirectReferrals(account.directReferrals);
+      const referrer = String(account.referrer);
+      if (referrer && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase()) {
+        setMyReferrer(ethers.getAddress(referrer));
+      } else {
+        setMyReferrer(null);
       }
-      childrenByReferrer.get(referrer)!.add(user);
+
+      if (!provider) {
+        setMembers([]);
+        setTeamMemberCount(0);
+        setDirectDepositTotal(0n);
+        setTeamDepositTotal(0n);
+        return;
+      }
+
+      const userLower = address.toLowerCase();
+      const latestBlock = await provider.getBlockNumber();
+      const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null), 0, latestBlock);
+
+      const childrenByReferrer = new Map<string, Set<string>>();
+      for (const ev of allBindEvents as any[]) {
+        const user = String(ev.args.user).toLowerCase();
+        const referrer = String(ev.args.referrer).toLowerCase();
+        if (!childrenByReferrer.has(referrer)) {
+          childrenByReferrer.set(referrer, new Set<string>());
+        }
+        childrenByReferrer.get(referrer)!.add(user);
+      }
+
+      const directSet = childrenByReferrer.get(userLower) ?? new Set<string>();
+      const directAddresses = Array.from(directSet);
+
+      const downlineSet = new Set<string>();
+      const queue = [...directAddresses];
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        if (downlineSet.has(current)) continue;
+        downlineSet.add(current);
+        const children = childrenByReferrer.get(current);
+        if (!children) continue;
+        for (const child of children) {
+          if (!downlineSet.has(child)) queue.push(child);
+        }
+      }
+      setTeamMemberCount(downlineSet.size);
+
+      const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
+        nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null), 0, latestBlock),
+        nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null), 0, latestBlock),
+      ]);
+
+      let nextDirectDeposit = 0n;
+      let nextTeamDeposit = 0n;
+      const handlePurchase = (ev: any) => {
+        const buyer = String(ev.args.user).toLowerCase();
+        const price = BigInt(ev.args.price);
+        if (directSet.has(buyer)) {
+          nextDirectDeposit += price;
+        }
+        if (downlineSet.has(buyer)) {
+          nextTeamDeposit += price;
+        }
+      };
+      for (const ev of nftaPurchaseEvents as any[]) handlePurchase(ev);
+      for (const ev of nftbPurchaseEvents as any[]) handlePurchase(ev);
+
+      setDirectDepositTotal(nextDirectDeposit);
+      setTeamDepositTotal(nextTeamDeposit);
+
+      const memberCalls = directAddresses.map(async (memberAddr) => {
+        const memberAccount = await nexus.accounts(memberAddr);
+
+        return {
+          address: memberAddr,
+          totalNodes: memberAccount.totalNodes,
+          pendingTot: memberAccount.pendingTot,
+        } as TeamMember;
+      });
+
+      const memberList = await Promise.all(memberCalls);
+      setMembers(memberList);
+    } catch {
+      setDirectReferrals(0n);
+      setTeamMemberCount(0);
+      setDirectDepositTotal(0n);
+      setTeamDepositTotal(0n);
+      setMembers([]);
+      setMyReferrer(null);
     }
-
-    const directSet = childrenByReferrer.get(userLower) ?? new Set<string>();
-    const directAddresses = Array.from(directSet);
-
-    const downlineSet = new Set<string>();
-    const queue = [...directAddresses];
-    while (queue.length > 0) {
-      const current = queue.shift()!;
-      if (downlineSet.has(current)) continue;
-      downlineSet.add(current);
-      const children = childrenByReferrer.get(current);
-      if (!children) continue;
-      for (const child of children) {
-        if (!downlineSet.has(child)) queue.push(child);
-      }
-    }
-    setTeamMemberCount(downlineSet.size);
-
-    const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
-      nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null), 0, latestBlock),
-      nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null), 0, latestBlock),
-    ]);
-
-    let nextDirectDeposit = 0n;
-    let nextTeamDeposit = 0n;
-    const handlePurchase = (ev: any) => {
-      const buyer = String(ev.args.user).toLowerCase();
-      const price = BigInt(ev.args.price);
-      if (directSet.has(buyer)) {
-        nextDirectDeposit += price;
-      }
-      if (downlineSet.has(buyer)) {
-        nextTeamDeposit += price;
-      }
-    };
-    for (const ev of nftaPurchaseEvents as any[]) handlePurchase(ev);
-    for (const ev of nftbPurchaseEvents as any[]) handlePurchase(ev);
-
-    setDirectDepositTotal(nextDirectDeposit);
-    setTeamDepositTotal(nextTeamDeposit);
-
-    const memberCalls = directAddresses.map(async (memberAddr) => {
-      const memberAccount = await nexus.accounts(memberAddr);
-
-      return {
-        address: memberAddr,
-        totalNodes: memberAccount.totalNodes,
-        pendingTot: memberAccount.pendingTot,
-      } as TeamMember;
-    });
-
-    const memberList = await Promise.all(memberCalls);
-    setMembers(memberList);
   }, [nexus, address, provider]);
 
   useEffect(() => {
@@ -121,7 +142,10 @@ export function TeamPage() {
   }, [refreshData]);
 
   useEffect(() => {
-    if (!address || typeof window === "undefined") return;
+    if (!address || typeof window === "undefined") {
+      setInviteUrl("");
+      return;
+    }
     setInviteUrl(`${window.location.origin}/?ref=${address}`);
   }, [address]);
 
