@@ -1,7 +1,9 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // 'standalone' bundles all dependencies for self-hosted Node.js deployment.
+  // After `npm run build`, run: node .next/standalone/server.js
+  output: 'standalone',
   env: {
     NEXT_PUBLIC_SEPOLIA_RPC_URL:
       process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL || "",
@@ -34,7 +36,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true, // Cloudflare Pages does not support Next.js default image optimization
+    unoptimized: true, // disable built-in image optimization (no sharp installed on the server)
     remotePatterns: [
       {
         protocol: 'https',

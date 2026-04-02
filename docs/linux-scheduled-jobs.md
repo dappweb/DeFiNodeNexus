@@ -150,3 +150,115 @@ journalctl -u definode-health.service -n 100 --no-pager
 - `KEEPER_LOCK_FILE` 建议使用 Linux 绝对路径（`/var/lock/definode-keeper.lock`）。
 - `keeper.env` 必须限制为 `600` 权限，私钥不能明文提交。
 - 预测流水分红（任务 4）建议在 Admin 页面操作后在日志中记录金额和 tx hash，用于审计。
+
+---
+
+## 9. Ubuntu 生产服务器完整部署（Next.js Web App）
+
+更新时间：2026-04-02
+
+### 9.1 新增产出文件
+
+| 文件 | 说明 |
+|---|---|
+| `deploy/linux/definode-web.service` | Next.js standalone 进程的 systemd service |
+| `deploy/linux/nginx-definode.conf` | Nginx 反向代理配置（含 HTTPS 注释模板） |
+| `deploy/linux/setup.sh` | Ubuntu 一键安装脚本（幂等，可重复执行） |
+| `deploy/linux/.env.production.example` | 生产环境变量模板 |
+
+### 9.2 服务目录结构
+
+```
+/opt/definode/DeFiNodeNexus/   ← 项目根目录（git clone 到此）
+/etc/definode/web.env          ← 生产环境变量（web app + keeper 共用）
+/etc/systemd/system/           ← definode-web.service / keeper / health units
+/etc/nginx/sites-available/definode  ← nginx 配置
+/var/log/definode/             ← 日志目录
+runtime/keeper/                ← keeper 状态文件（相对项目根）
+runtime/health/                ← 健康报告（相对项目根）
+```
+
+### 9.3 快速部署（一键脚本）
+
+```bash
+# 1. 先填写环境变量
+sudo mkdir -p /etc/definode
+sudo cp /opt/definode/DeFiNodeNexus/deploy/linux/.env.production.example /etc/definode/web.env
+sudo nano /etc/definode/web.env   # 填入 RPC URL、私钥等
+sudo chmod 600 /etc/definode/web.env
+sudo chown definode:definode /etc/definode/web.env  # 用户创建后再 chown
+
+# 2. 运行安装脚本（需 root）
+cd /opt/definode/DeFiNodeNexus
+sudo bash deploy/linux/setup.sh
+```
+
+### 9.4 构建原理（standalone 模式）
+
+`next.config.ts` 已设置 `output: 'standalone'`，构建后生成：
+
+```
+.next/standalone/server.js    ← 独立 Node.js 入口，无需 node_modules 支持
+.next/standalone/.next/       ← 服务端代码
+.next/static/                 ← 静态资源（需手动复制进 standalone，setup.sh 已处理）
+```
+
+systemd 直接执行：
+```
+ExecStart=/usr/bin/node .next/standalone/server.js
+```
+
+Nginx 对 `/_next/static/` 路径直接 serve 磁盘文件，不经过 Node.js，性能更高。
+
+### 9.5 手动重新部署（代码更新）
+
+```bash
+cd /opt/definode/DeFiNodeNexus
+git pull
+npm ci
+npm run build
+cp -r .next/static .next/standalone/.next/static
+cp -r public .next/standalone/public
+sudo systemctl restart definode-web.service
+```
+
+### 9.6 HTTPS（Let's Encrypt）
+
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+# certbot 会自动修改 nginx 配置并启用 HTTPS
+# 证书自动续期（90 天）：
+sudo systemctl status certbot.timer
+```
+
+### 9.7 所有 systemd 单元一览
+
+| 单元 | 类型 | 功能 | 触发方式 |
+|---|---|---|---|
+| `definode-web.service` | service | 运行 Next.js Web 应用 | 开机自启，永久运行 |
+| `definode-keeper.service` | oneshot | 执行 keeper 一次 | 由 timer 触发 |
+| `definode-keeper.timer` | timer | 每 10 分钟触发 keeper | 开机 2 分钟后首次 |
+| `definode-health.service` | oneshot | 执行健康检查一次 | 由 timer 触发 |
+| `definode-health.timer` | timer | 每天 08:00 触发健康检查 | 持久，错过则补跑 |
+
+### 9.8 常用运维命令
+
+```bash
+# 查看 web 服务状态
+systemctl status definode-web.service
+journalctl -u definode-web.service -f
+
+# 查看所有定时器
+systemctl list-timers --all | grep definode
+
+# 手动触发一次 keeper
+sudo systemctl start definode-keeper.service
+journalctl -u definode-keeper.service -n 50 --no-pager
+
+# 手动触发一次健康检查
+sudo systemctl start definode-health.service
+
+# 查看健康报告
+cat /opt/definode/DeFiNodeNexus/runtime/health/latest-health-check.json | python3 -m json.tool
+```
