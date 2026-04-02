@@ -42,19 +42,51 @@ export function HomePage() {
   const [tofPrice, setTofPrice] = useState("0");
   const [isAddingTokens, setIsAddingTokens] = useState(false);
 
+  const copyText = async (text: string) => {
+    if (typeof window === "undefined") return false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  };
+
   const handleCopyContractAddress = async (token: "TOT" | "TOF") => {
     const contractAddress = CONTRACTS[token];
-    try {
-      await navigator.clipboard.writeText(contractAddress);
+
+    const copied = await copyText(contractAddress);
+    if (copied) {
       toast({
         title: t("contractAddressCopied"),
         description: `${token} ${t("contractAddressCopiedDesc")}`,
       });
-    } catch {
-      toast({
-        title: t("toastUnknownTxError"),
-      });
+      return;
     }
+
+    toast({
+      title: t("contractAddressCopyFailed"),
+      description: t("contractAddressCopyFailedDesc"),
+    });
   };
 
   const typeColors: Record<string, string> = {
