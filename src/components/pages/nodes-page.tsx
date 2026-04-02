@@ -351,11 +351,15 @@ export function NodesPage() {
         if (tofRate <= 0n) {
           tofRate = BigInt(await nexus.tofPerUsdt());
           setTofPerUsdt(tofRate);
+          if (tofRate <= 0n) {
+            toast({ title: t("toastBuyNftbFailed"), description: t("toastTofRateNotInitialized"), variant: "destructive" });
+            return;
+          }
         }
 
         const tofCost = (tier.price * tofRate) / WAD;
         if (tofCost <= 0n) {
-          toast({ title: t("toastBuyNftbFailed"), description: t("toastUnknownTxError"), variant: "destructive" });
+          toast({ title: t("toastBuyNftbFailed"), description: t("toastTofRateNotInitialized"), variant: "destructive" });
           return;
         }
 
@@ -403,7 +407,8 @@ export function NodesPage() {
 
   const claimAllNfta = async () => {
     if (!nexus || !address) return;
-    if (totalNftaPending <= 0n) {
+    const claimAmount = totalNftaPending;
+    if (claimAmount <= 0n) {
       toast({ title: t("toastClaimFailed"), description: t("toastNoClaimableRewards"), variant: "destructive" });
       return;
     }
@@ -411,7 +416,7 @@ export function NodesPage() {
     setNftaStage("checking");
     try {
       const claimFeeBps = BigInt(await nexus.tofClaimFeeBps());
-      const requiredTof = (totalNftaPending * claimFeeBps) / 10000n;
+      const requiredTof = (claimAmount * claimFeeBps) / 10000n;
 
       if (requiredTof > 0n) {
         if (!tof) {
@@ -440,12 +445,54 @@ export function NodesPage() {
       }
 
       setNftaStage("confirming");
-      const res = await execTx(() => nexus.claimAllNftaYield());
-      if (!res.success) {
-        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
+      const claimRes = await execTx(() => nexus.claimAllNftaYield());
+      if (!claimRes.success) {
+        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
         return;
       }
-      toast({ title: t("toastNftaClaimed"), description: res.hash?.slice(0, 10) + "..." });
+
+      const level = Number(await nexus.getUserLevel(address));
+      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
+      const withdrawTofFee = (claimAmount * withdrawFeeBps) / 10000n;
+
+      if (withdrawTofFee > 0n) {
+        if (!tof) {
+          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+
+        const [tofBalance, allowance] = await Promise.all([
+          tof.balanceOf(address),
+          tof.allowance(address, CONTRACTS.NEXUS),
+        ]);
+
+        if (tofBalance < withdrawTofFee) {
+          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+
+        if (allowance < withdrawTofFee) {
+          setNftaStage("approving");
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, withdrawTofFee));
+          if (!approveRes.success) {
+            toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+            await refreshData(false);
+            return;
+          }
+        }
+      }
+
+      setNftaStage("confirming");
+      const withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
+      if (!withdrawRes.success) {
+        toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+        await refreshData(false);
+        return;
+      }
+
+      toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
       await refreshData(false);
     } finally {
       setNftaStage("idle");
@@ -454,19 +501,60 @@ export function NodesPage() {
   };
 
   const claimAllNftb = async () => {
-    if (!nexus) return;
-    if (totalNftbPending <= 0n) {
+    if (!nexus || !address) return;
+    const claimAmount = totalNftbPending;
+    if (claimAmount <= 0n) {
       toast({ title: t("toastClaimFailed"), description: t("toastNoClaimableRewards"), variant: "destructive" });
       return;
     }
     setLoading(true);
     try {
-      const res = await execTx(() => nexus.claimAllNftbDividends());
-      if (!res.success) {
-        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
+      const claimRes = await execTx(() => nexus.claimAllNftbDividends());
+      if (!claimRes.success) {
+        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
         return;
       }
-      toast({ title: t("toastNftbClaimed"), description: res.hash?.slice(0, 10) + "..." });
+
+      const level = Number(await nexus.getUserLevel(address));
+      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
+      const withdrawTofFee = (claimAmount * withdrawFeeBps) / 10000n;
+
+      if (withdrawTofFee > 0n) {
+        if (!tof) {
+          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+
+        const [tofBalance, allowance] = await Promise.all([
+          tof.balanceOf(address),
+          tof.allowance(address, CONTRACTS.NEXUS),
+        ]);
+
+        if (tofBalance < withdrawTofFee) {
+          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+
+        if (allowance < withdrawTofFee) {
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, withdrawTofFee));
+          if (!approveRes.success) {
+            toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+            await refreshData(false);
+            return;
+          }
+        }
+      }
+
+      const withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
+      if (!withdrawRes.success) {
+        toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+        await refreshData(false);
+        return;
+      }
+
+      toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
       await refreshData(false);
     } finally {
       setLoading(false);
