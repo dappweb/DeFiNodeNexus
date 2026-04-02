@@ -121,8 +121,45 @@ export function NodesPage() {
   const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
   const [nftaClaimFeeBps, setNftaClaimFeeBps] = useState<bigint>(0n);
   const zeroValue = ethers.parseUnits("0", 0);
+  const NODES_SUMMARY_TIMEOUT_MS = 12_000;
+  const NODES_SUMMARY_MAX_RETRIES = 2;
 
   const toBigInt = (value: string) => BigInt(value);
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const fetchNodesSummaryWithRetry = useCallback(async (query: string) => {
+    let lastError: unknown = null;
+
+    for (let attempt = 0; attempt <= NODES_SUMMARY_MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), NODES_SUMMARY_TIMEOUT_MS);
+      try {
+        const response = await fetch(`/api/nodes/summary${query}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(payload?.detail || payload?.message || "Failed to load node summary");
+        }
+
+        return payload as NodesSummaryResponse;
+      } catch (error) {
+        lastError = error;
+        const isLastAttempt = attempt === NODES_SUMMARY_MAX_RETRIES;
+        if (!isLastAttempt) {
+          const backoffMs = 300 * 2 ** attempt + Math.floor(Math.random() * 200);
+          await sleep(backoffMs);
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Failed to load node summary");
+  }, []);
 
   const refreshData = useCallback(async (showLoading = true) => {
     if (showLoading) {
@@ -146,14 +183,7 @@ export function NodesPage() {
 
     try {
       const query = address ? `?address=${encodeURIComponent(address)}` : "";
-      const response = await fetch(`/api/nodes/summary${query}`, { cache: "no-store" });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload?.detail || payload?.message || "Failed to load node summary");
-      }
-
-      const data = payload as NodesSummaryResponse;
+      const data = await fetchNodesSummaryWithRetry(query);
 
       setNftaTiers(
         data.nftaTiers.map((tier) => ({
@@ -216,7 +246,7 @@ export function NodesPage() {
       }
       setInitialLoaded(true);
     }
-  }, [address, t]);
+  }, [address, t, nexus, fetchNodesSummaryWithRetry]);
 
   useEffect(() => {
     refreshData();

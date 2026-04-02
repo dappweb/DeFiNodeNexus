@@ -5,8 +5,12 @@ import { CONTRACTS, NEXUS_ABI } from "@/lib/contracts";
 export const runtime = "nodejs";
 
 const MAX_TIER_SCAN = 4;
+const SUMMARY_CACHE_TTL_MS = 6_000;
+const RPC_RETRY_COUNT = 2;
+const EVENT_SCAN_LOOKBACK_BLOCKS = Number(process.env.NODES_EVENT_SCAN_LOOKBACK_BLOCKS || "120000");
 
 let cachedProvider: ethers.Provider | null = null;
+const summaryCache = new Map<string, { expiresAt: number; payload: unknown }>();
 
 function isUsableRpcUrl(value: string | undefined): value is string {
   if (!value?.trim()) return false;
@@ -58,6 +62,49 @@ function normalizeAddress(value: string) {
   return value.toLowerCase();
 }
 
+function getCacheKey(address: string | null) {
+  return address ? `addr:${normalizeAddress(address)}` : "addr:public";
+}
+
+function getCachedSummary(key: string) {
+  const cached = summaryCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    summaryCache.delete(key);
+    return null;
+  }
+  return cached.payload;
+}
+
+function setCachedSummary(key: string, payload: unknown) {
+  summaryCache.set(key, {
+    payload,
+    expiresAt: Date.now() + SUMMARY_CACHE_TTL_MS,
+  });
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withRpcRetry<T>(fn: () => Promise<T>, retries = RPC_RETRY_COUNT): Promise<T> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries) {
+        const delay = 250 * (attempt + 1);
+        await sleep(delay);
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("RPC call failed");
+}
+
+function isFulfilled<T>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> {
+  return result.status === "fulfilled";
+}
+
 export async function GET(request: Request) {
   if (!CONTRACTS.NEXUS) {
     return NextResponse.json(
@@ -73,12 +120,19 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const addressParam = searchParams.get("address")?.trim();
     const address = addressParam && ethers.isAddress(addressParam) ? addressParam : null;
+    const cacheKey = getCacheKey(address);
+    const cachedPayload = getCachedSummary(cacheKey);
+    if (cachedPayload) {
+      return NextResponse.json(cachedPayload);
+    }
 
     const provider = getReadonlyProvider();
     const nexus = new ethers.Contract(CONTRACTS.NEXUS, NEXUS_ABI, provider);
 
-    const nextNftaTierId = Number(await nexus.nextNftaTierId());
-    const nextNftbTierId = Number(await nexus.nextNftbTierId());
+    const [nextNftaTierId, nextNftbTierId] = await Promise.all([
+      withRpcRetry(async () => Number(await nexus.nextNftaTierId())),
+      withRpcRetry(async () => Number(await nexus.nextNftbTierId())),
+    ]);
 
     const nftaScanCount = Math.max(MAX_TIER_SCAN, nextNftaTierId > 1 ? nextNftaTierId - 1 : 0);
     const nftbScanCount = Math.max(MAX_TIER_SCAN, nextNftbTierId > 1 ? nextNftbTierId - 1 : 0);
@@ -86,14 +140,14 @@ export async function GET(request: Request) {
     const nftaCandidateIds = Array.from({ length: nftaScanCount }, (_, i) => i + 1);
     const nftbCandidateIds = Array.from({ length: nftbScanCount }, (_, i) => i + 1);
 
-    const [nftaTierList, nftbTierList] = await Promise.all([
-      Promise.all(
+    const [nftaTierResults, nftbTierResults] = await Promise.all([
+      Promise.allSettled(
         nftaCandidateIds.map(async (id) => {
-          const tier = await nexus.nftaTiers(id);
+          const tier = await withRpcRetry(() => nexus.nftaTiers(id));
           if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.currentSupply === 0n) {
             return null;
           }
-          const remaining = await nexus.getNftaTierRemaining(id);
+          const remaining = await withRpcRetry(() => nexus.getNftaTierRemaining(id));
           return {
             id,
             price: toStringValue(tier.price),
@@ -105,13 +159,13 @@ export async function GET(request: Request) {
           };
         })
       ),
-      Promise.all(
+      Promise.allSettled(
         nftbCandidateIds.map(async (id) => {
-          const tier = await nexus.nftbTiers(id);
+          const tier = await withRpcRetry(() => nexus.nftbTiers(id));
           if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.usdtMinted === 0n && tier.tofMinted === 0n) {
             return null;
           }
-          const remaining = await nexus.getNftbTierRemaining(id);
+          const remaining = await withRpcRetry(() => nexus.getNftbTierRemaining(id));
           return {
             id,
             price: toStringValue(tier.price),
@@ -127,6 +181,10 @@ export async function GET(request: Request) {
         })
       ),
     ]);
+
+    const nftaTierList = nftaTierResults.filter(isFulfilled).map((result) => result.value);
+
+    const nftbTierList = nftbTierResults.filter(isFulfilled).map((result) => result.value);
 
     let nftaNodes: Array<{
       nodeId: string;
@@ -147,19 +205,20 @@ export async function GET(request: Request) {
 
     if (address) {
       const [nftaIds, nftbIds] = await Promise.all([
-        nexus.getUserNftaNodes(address),
-        nexus.getUserNftbNodes(address),
+        withRpcRetry(() => nexus.getUserNftaNodes(address)),
+        withRpcRetry(() => nexus.getUserNftbNodes(address)),
       ]);
 
       const candidateNodeIdSet = new Set<string>([...nftaIds, ...nftbIds].map((id: bigint) => id.toString()));
 
       if (candidateNodeIdSet.size === 0) {
-        const latestBlock = await provider.getBlockNumber();
+        const latestBlock = await withRpcRetry(() => provider.getBlockNumber());
+        const fromBlock = Math.max(0, latestBlock - EVENT_SCAN_LOOKBACK_BLOCKS);
         const [nftaPurchasedEvents, nftbPurchasedEvents, nftaIncomingTransfers, nftaOutgoingTransfers] = await Promise.all([
-          nexus.queryFilter(nexus.filters.NftaPurchased(address, null, null), 0, latestBlock),
-          nexus.queryFilter(nexus.filters.NftbPurchased(address, null, null), 0, latestBlock),
-          nexus.queryFilter(nexus.filters.NftaCardTransferred(null, address, null), 0, latestBlock),
-          nexus.queryFilter(nexus.filters.NftaCardTransferred(address, null, null), 0, latestBlock),
+          withRpcRetry(() => nexus.queryFilter(nexus.filters.NftaPurchased(address, null, null), fromBlock, latestBlock)),
+          withRpcRetry(() => nexus.queryFilter(nexus.filters.NftbPurchased(address, null, null), fromBlock, latestBlock)),
+          withRpcRetry(() => nexus.queryFilter(nexus.filters.NftaCardTransferred(null, address, null), fromBlock, latestBlock)),
+          withRpcRetry(() => nexus.queryFilter(nexus.filters.NftaCardTransferred(address, null, null), fromBlock, latestBlock)),
         ]);
 
         for (const event of nftaPurchasedEvents as any[]) {
@@ -179,11 +238,11 @@ export async function GET(request: Request) {
       const candidateNodeIds = Array.from(candidateNodeIdSet).map((id) => BigInt(id));
       const userAddr = normalizeAddress(address);
 
-      const nodeCandidates = await Promise.all(
+      const nodeCandidateResults = await Promise.allSettled(
         candidateNodeIds.map(async (id) => {
           const [nodeA, nodeB] = await Promise.all([
-            nexus.nftaNodes(id),
-            nexus.nftbNodes(id),
+            withRpcRetry(() => nexus.nftaNodes(id)),
+            withRpcRetry(() => nexus.nftbNodes(id)),
           ]);
 
           const nftaOwner = normalizeAddress(String(nodeA.owner));
@@ -213,12 +272,16 @@ export async function GET(request: Request) {
         })
       );
 
+      const nodeCandidates = nodeCandidateResults
+        .filter((result): result is PromiseFulfilledResult<{ nodeId: bigint; nfta: { tierId: bigint; dailyYield: bigint; lastClaimDay: bigint; isActive: boolean; } | null; nftb: { tierId: bigint; weight: bigint; isActive: boolean; } | null; }> => result.status === "fulfilled")
+        .map((result) => result.value);
+
       const [rawNftaNodes, rawNftbNodes] = await Promise.all([
-        Promise.all(
+        Promise.allSettled(
           nodeCandidates
             .filter((item) => item.nfta !== null)
             .map(async (item) => {
-              const pending = await nexus.pendingNftaYield(item.nodeId);
+              const pending = await withRpcRetry(() => nexus.pendingNftaYield(item.nodeId));
               return {
                 nodeId: item.nodeId,
                 tierId: item.nfta!.tierId,
@@ -228,12 +291,12 @@ export async function GET(request: Request) {
                 pending,
               };
             })
-        ),
-        Promise.all(
+        ).then((results) => results.filter((result): result is PromiseFulfilledResult<{ nodeId: bigint; tierId: bigint; dailyYield: bigint; lastClaimDay: bigint; isActive: boolean; pending: bigint; }> => result.status === "fulfilled").map((result) => result.value)),
+        Promise.allSettled(
           nodeCandidates
             .filter((item) => item.nftb !== null)
             .map(async (item) => {
-              const pending = await nexus.pendingNftbDividend(item.nodeId);
+              const pending = await withRpcRetry(() => nexus.pendingNftbDividend(item.nodeId));
               return {
                 nodeId: item.nodeId,
                 tierId: item.nftb!.tierId,
@@ -242,7 +305,7 @@ export async function GET(request: Request) {
                 pending,
               };
             })
-        ),
+        ).then((results) => results.filter((result): result is PromiseFulfilledResult<{ nodeId: bigint; tierId: bigint; weight: bigint; isActive: boolean; pending: bigint; }> => result.status === "fulfilled").map((result) => result.value)),
       ]);
 
       let highestPendingNodeId: bigint | null = null;
@@ -273,12 +336,16 @@ export async function GET(request: Request) {
       }));
     }
 
-    return NextResponse.json({
+    const responsePayload = {
       nftaTiers: nftaTierList.filter((tier) => tier !== null),
       nftbTiers: nftbTierList.filter((tier) => tier !== null),
       nftaNodes,
       nftbNodes,
-    });
+    };
+
+    setCachedSummary(cacheKey, responsePayload);
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown on-chain error";
     return NextResponse.json(
