@@ -5,7 +5,7 @@ import { ethers } from "ethers";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Megaphone, TrendingUp, TrendingDown, Coins, Database, Layers } from "lucide-react";
+import { Megaphone, TrendingUp, TrendingDown, Coins, Database, Layers, Copy } from "lucide-react";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useLanguage } from "@/components/language-provider";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -41,6 +41,21 @@ export function HomePage() {
   const [totPrice, setTotPrice] = useState("0");
   const [tofPrice, setTofPrice] = useState("0");
   const [isAddingTokens, setIsAddingTokens] = useState(false);
+
+  const handleCopyContractAddress = async (token: "TOT" | "TOF") => {
+    const contractAddress = CONTRACTS[token];
+    try {
+      await navigator.clipboard.writeText(contractAddress);
+      toast({
+        title: t("contractAddressCopied"),
+        description: `${token} ${t("contractAddressCopiedDesc")}`,
+      });
+    } catch {
+      toast({
+        title: t("toastUnknownTxError"),
+      });
+    }
+  };
 
   const typeColors: Record<string, string> = {
     update: "bg-blue-500/15 text-blue-500 border-blue-500/30",
@@ -261,6 +276,34 @@ export function HomePage() {
               <p className="w-full text-xs text-muted-foreground">{t("predictionEntryMissing")}</p>
             ) : null}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-5 w-5 text-primary" />
+            {t("tokenContractAddresses")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {(["TOT", "TOF"] as const).map((token) => (
+            <div key={token} className="rounded-lg border border-border/40 bg-muted/10 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">{token}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8"
+                  onClick={() => handleCopyContractAddress(token)}
+                >
+                  <Copy className="h-4 w-4 mr-1" />
+                  {t("copyAddress")}
+                </Button>
+              </div>
+              <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{CONTRACTS[token]}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

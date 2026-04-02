@@ -33,6 +33,10 @@ import { TeamPage } from "@/components/pages/team-page";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
+function sanitizeAddressInput(value: string) {
+  return value.replace(/[\s\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, "");
+}
+
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<PageTab>("home");
@@ -61,7 +65,7 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return;
 
     const search = new URLSearchParams(window.location.search);
-    const candidate = search.get("ref") || search.get("referrer") || search.get("invite");
+    const candidate = sanitizeAddressInput(search.get("ref") || search.get("referrer") || search.get("invite") || "");
 
     if (!candidate) {
       setReferrerFromUrl(null);
@@ -189,26 +193,26 @@ export default function DashboardPage() {
     const addressLower = address?.toLowerCase();
 
     setReferrerAddress((prev) => {
-      const trimmed = prev.trim();
-      const isSelf = Boolean(addressLower) && trimmed.toLowerCase() === addressLower;
-      const isValid = ethers.isAddress(trimmed);
+      const cleaned = sanitizeAddressInput(prev);
+      const isSelf = Boolean(addressLower) && cleaned.toLowerCase() === addressLower;
+      const isValid = ethers.isAddress(cleaned);
 
-      if (!trimmed && referrerFromUrl) {
+      if (!cleaned && referrerFromUrl) {
         const isUrlSelf = Boolean(addressLower) && referrerFromUrl.toLowerCase() === addressLower;
         if (!isUrlSelf) {
           return referrerFromUrl;
         }
       }
 
-      if (!trimmed && ownerAddress) {
+      if (!cleaned && ownerAddress) {
         return ownerAddress;
       }
 
-      if (!trimmed || !isValid || isSelf) {
+      if (!cleaned || !isValid || isSelf) {
         return ownerAddress ?? prev;
       }
 
-      return prev;
+      return cleaned;
     });
   }, [needsReferralBinding, ownerAddress, address, referrerFromUrl]);
 
@@ -229,17 +233,20 @@ export default function DashboardPage() {
 
   const handleBindReferrer = async () => {
     setReferrerError("");
-    const trimmed = referrerAddress.trim();
-    const fallbackOwner = ownerAddress?.trim() ?? "";
-    const finalReferrer = trimmed || fallbackOwner;
+    const sanitizedReferrer = sanitizeAddressInput(referrerAddress);
+    const fallbackOwner = sanitizeAddressInput(ownerAddress ?? "");
+    const finalReferrer = sanitizedReferrer || fallbackOwner;
 
     // Validate: must be valid Ethereum address
-    if (!finalReferrer || !/^0x[a-fA-F0-9]{40}$/.test(finalReferrer)) {
+    if (!finalReferrer || !ethers.isAddress(finalReferrer)) {
       setReferrerError(t('referralInvalidAddress'));
       return;
     }
+
+    const normalizedReferrer = ethers.getAddress(finalReferrer);
+
     // Cannot bind self
-    if (address && finalReferrer.toLowerCase() === address.toLowerCase()) {
+    if (address && normalizedReferrer.toLowerCase() === address.toLowerCase()) {
       setReferrerError(t('referralCannotSelf'));
       return;
     }
@@ -251,11 +258,13 @@ export default function DashboardPage() {
 
     setIsBindingReferrer(true);
     try {
-      const res = await execTx(nexus.bindReferrer(finalReferrer));
+      const res = await execTx(() => nexus.bindReferrer(normalizedReferrer));
       if (!res.success) {
         setReferrerError(res.error || t('referralInvalidAddress'));
         return;
       }
+
+      setReferrerAddress(normalizedReferrer);
 
       setReferrerBound(true);
       setReferralPromptDismissed(false);
@@ -491,9 +500,12 @@ export default function DashboardPage() {
                   <label className="text-sm font-medium">{t('referralAddressLabel')}</label>
                   <Input
                     value={referrerAddress}
-                    onChange={(e) => { setReferrerAddress(e.target.value); setReferrerError(""); }}
+                    onChange={(e) => { setReferrerAddress(sanitizeAddressInput(e.target.value)); setReferrerError(""); }}
                     placeholder={t('referralAddressPlaceholder')}
                     className="font-mono text-sm"
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                   />
                   {referrerError && (
                     <p className="text-xs text-destructive">{referrerError}</p>
@@ -503,7 +515,7 @@ export default function DashboardPage() {
                 {/* Confirm Button */}
                 <Button
                   onClick={handleBindReferrer}
-                  disabled={isBindingReferrer || (!referrerAddress.trim() && !ownerAddress?.trim())}
+                  disabled={isBindingReferrer || (!sanitizeAddressInput(referrerAddress) && !sanitizeAddressInput(ownerAddress ?? ""))}
                   className="w-full bg-primary hover:bg-primary/90 h-11 font-semibold"
                 >
                   {isBindingReferrer ? (

@@ -53,6 +53,26 @@ test("推荐绑定流程可执行", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Confirm & Activate|确认并激活/i })).toHaveCount(0)
 })
 
+test("推荐绑定可清理粘贴的隐藏回车字符", async ({ page }) => {
+  await bootstrap(page, { owner: false, referrerBound: false })
+
+  await expect(page.getByRole("heading", { name: /Bind Referrer|绑定推荐人/i })).toBeVisible()
+
+  const referrerInput = page.getByPlaceholder(/0x\.{3}|0x.../i)
+  await referrerInput.evaluate((node) => {
+    const input = node as HTMLInputElement
+    input.value = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\r"
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+  })
+
+  await expect(referrerInput).toHaveValue("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+
+  await page.getByRole("button", { name: /Confirm & Activate|确认并激活/i }).click()
+
+  await expect(page.getByText(/Referrer Bound Successfully|推荐人绑定成功/i).first()).toBeVisible()
+  await expect(page.getByText(/invalid ENS name|请输入有效的钱包地址/i)).toHaveCount(0)
+})
+
 test("管理员参数配置流程可执行", async ({ page }) => {
   await bootstrap(page, { owner: true, referrerBound: true })
 

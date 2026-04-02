@@ -182,7 +182,7 @@ export function EarningsPage() {
 
     setWithdrawing(true);
     try {
-      const res = await execTx(nexus.withdrawTot(pendingTot));
+      const res = await execTx(() => nexus.withdrawTot(pendingTot));
       if (!res.success) {
         toast({ title: t("toastWithdrawFailed"), description: res.error, variant: "destructive" });
         return;

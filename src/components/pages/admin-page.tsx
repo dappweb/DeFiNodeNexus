@@ -140,10 +140,10 @@ export function AdminPage() {
     refresh();
   }, [nexus, address]);
 
-  const runTx = async (action: string, txPromise: Promise<any>) => {
+  const runTx = async (action: string, txRequest: () => Promise<any>) => {
     setLoading(true);
     try {
-      const result = await execTx(txPromise);
+      const result = await execTx(txRequest);
       if (!result.success) {
         toast({ title: `${action}失败`, description: result.error || "未知错误", variant: "destructive" });
         return false;
@@ -167,7 +167,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "接收地址无效", variant: "destructive" });
       return;
     }
-    await runTx("NFTA转卡", nexus.transferNftaCard(transferTo.trim(), nodeId));
+    await runTx("NFTA转卡", () => nexus.transferNftaCard(transferTo.trim(), nodeId));
   };
 
   const onClaimNfta = async () => {
@@ -177,7 +177,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "节点ID必须是正整数", variant: "destructive" });
       return;
     }
-    await runTx("NFTA领取", nexus.claimNftaYield(nodeId));
+    await runTx("NFTA领取", () => nexus.claimNftaYield(nodeId));
   };
 
   const onBulkTransfer = async () => {
@@ -199,7 +199,7 @@ export function AdminPage() {
           continue;
         }
 
-        const tx = await execTx(nexus.transferNftaCard(addr, nodeId));
+        const tx = await execTx(() => nexus.transferNftaCard(addr, nodeId));
         if (tx.success) {
           results.push(`${line} => 成功 ${tx.hash?.slice(0, 12) || ""}`);
         } else {
@@ -231,7 +231,7 @@ export function AdminPage() {
           continue;
         }
 
-        const tx = await execTx(nexus.claimNftaYield(nodeId));
+        const tx = await execTx(() => nexus.claimNftaYield(nodeId));
         if (tx.success) {
           results.push(`${line} => 成功 ${tx.hash?.slice(0, 12) || ""}`);
         } else {
@@ -252,7 +252,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "TOF领取费率必须在0-10000之间", variant: "destructive" });
       return;
     }
-    await runTx("更新TOF领取费率", nexus.setTofClaimFeeBps(BigInt(Math.trunc(numeric))));
+    await runTx("更新TOF领取费率", () => nexus.setTofClaimFeeBps(BigInt(Math.trunc(numeric))));
   };
 
   const onFundRewardPool = async () => {
@@ -262,12 +262,12 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "注资数量必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("注资奖励池", nexus.fundRewardPool(ethers.parseUnits(rewardFundAmount, 18)));
+    await runTx("注资奖励池", () => nexus.fundRewardPool(ethers.parseUnits(rewardFundAmount, 18)));
   };
 
   const onDeflate = async () => {
     if (!swap) return;
-    await runTx("执行通缩", swap.deflate());
+    await runTx("执行通缩", () => swap.deflate());
   };
 
   const parsePositiveAmount = (value: string) => {
@@ -283,7 +283,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "NFTB TOT分红金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放NFTB TOT分红", nexus.distributeNftbDividends(amount));
+    await runTx("发放NFTB TOT分红", () => nexus.distributeNftbDividends(amount));
   };
 
   const onDistributeNftbUsdt = async () => {
@@ -293,7 +293,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "NFTB USDT分红金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放NFTB USDT分红", nexus.distributeNftbUsdtDividends(amount));
+    await runTx("发放NFTB USDT分红", () => nexus.distributeNftbUsdtDividends(amount));
   };
 
   const onDistributePredictionFlow = async () => {
@@ -303,7 +303,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "预测流水金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放预测流水分红", nexus.distributePredictionFlowUsdt(amount));
+    await runTx("发放预测流水分红", () => nexus.distributePredictionFlowUsdt(amount));
   };
 
   const onSetPredictionFlowRates = async () => {
@@ -319,17 +319,17 @@ export function AdminPage() {
 
     setLoading(true);
     try {
-      const tx1 = await execTx(nexus.setPredictionFlowRateBps(1, r1));
+      const tx1 = await execTx(() => nexus.setPredictionFlowRateBps(1, r1));
       if (!tx1.success) {
         toast({ title: "设置费率失败", description: tx1.error || "Tier1失败", variant: "destructive" });
         return;
       }
-      const tx2 = await execTx(nexus.setPredictionFlowRateBps(2, r2));
+      const tx2 = await execTx(() => nexus.setPredictionFlowRateBps(2, r2));
       if (!tx2.success) {
         toast({ title: "设置费率失败", description: tx2.error || "Tier2失败", variant: "destructive" });
         return;
       }
-      const tx3 = await execTx(nexus.setPredictionFlowRateBps(3, r3));
+      const tx3 = await execTx(() => nexus.setPredictionFlowRateBps(3, r3));
       if (!tx3.success) {
         toast({ title: "设置费率失败", description: tx3.error || "Tier3失败", variant: "destructive" });
         return;
@@ -354,7 +354,7 @@ export function AdminPage() {
     }
     await runTx(
       "配置NFTA Tier",
-      nexus.configureNftaTier(BigInt(tierId), price, yield_, BigInt(maxSup), nftaActive === "true")
+      () => nexus.configureNftaTier(BigInt(tierId), price, yield_, BigInt(maxSup), nftaActive === "true")
     );
   };
 
@@ -372,7 +372,7 @@ export function AdminPage() {
     }
     await runTx(
       "配置NFTB Tier",
-      nexus.configureNftbTier(BigInt(tierId), price, BigInt(weight), BigInt(maxSup), divBps, nftbActive === "true")
+      () => nexus.configureNftbTier(BigInt(tierId), price, BigInt(weight), BigInt(maxSup), divBps, nftbActive === "true")
     );
   };
 
@@ -397,12 +397,12 @@ export function AdminPage() {
     if (registerType === "nfta") {
       await runTx(
         "注册NFTA购买",
-        nexus.registerNftaPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
+        () => nexus.registerNftaPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
       );
     } else {
       await runTx(
         "注册NFTB购买",
-        nexus.registerNftbPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
+        () => nexus.registerNftbPurchase(registerUserAddr.trim(), BigInt(tierId), referrer)
       );
     }
   };
@@ -420,7 +420,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
       return;
     }
-    await runTx("设置提现费率", nexus.setWithdrawFeeBps(level, bps));
+    await runTx("设置提现费率", () => nexus.setWithdrawFeeBps(level, bps));
   };
 
   // ===== TOF 燃烧比率 =====
@@ -431,7 +431,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
       return;
     }
-    await runTx("设置TOF燃烧比率", nexus.setTofBurnBps(bps));
+    await runTx("设置TOF燃烧比率", () => nexus.setTofBurnBps(bps));
   };
 
   // ===== Treasury =====
@@ -441,7 +441,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "地址无效", variant: "destructive" });
       return;
     }
-    await runTx("设置Treasury", nexus.setTreasury(treasuryAddr.trim()));
+    await runTx("设置Treasury", () => nexus.setTreasury(treasuryAddr.trim()));
   };
 
   // ===== 钱包地址 =====
@@ -452,7 +452,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "所有地址都必须有效", variant: "destructive" });
       return;
     }
-    await runTx("设置钱包地址", nexus.setWallets(...addrs.map((a) => a) as Parameters<typeof nexus.setWallets>));
+    await runTx("设置钱包地址", () => nexus.setWallets(...addrs.map((a) => a) as Parameters<typeof nexus.setWallets>));
   };
 
   // ===== 项目方钱包 =====
@@ -462,7 +462,7 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "地址无效", variant: "destructive" });
       return;
     }
-    await runTx("设置项目方钱包", nexus.setProjectWallet(projectAddr.trim()));
+    await runTx("设置项目方钱包", () => nexus.setProjectWallet(projectAddr.trim()));
   };
 
   // ===== 分发器管理 =====
@@ -474,7 +474,7 @@ export function AdminPage() {
     }
     await runTx(
       "设置分发器",
-      nexus.setDistributor(distributorAddr.trim(), distributorStatus === "true")
+      () => nexus.setDistributor(distributorAddr.trim(), distributorStatus === "true")
     );
   };
 

@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+# =============================================================================
+# DeFiNodeNexus — 一键部署 / 更新脚本
+# 适用环境: Ubuntu 24.04 · Node.js 20 · PM2 · Nginx
+# 应用目录: /home/ubuntu/DeFiNodeNexus
+# 应用端口: 9002  (Nginx 反代 80 → 9002)
+#
+# 用法:
+#   bash deploy.sh              # 拉取最新代码 + 构建 + 重载
+#   bash deploy.sh --skip-pull  # 仅构建 + 重载（不拉取 git）
+#   bash deploy.sh --startup    # 额外配置 PM2 开机自启
+#   bash deploy.sh --help       # 显示帮助
+# =============================================================================
+set -euo pipefail
+
+# ── 配置 ──────────────────────────────────────────────────────────────────────
+APP_DIR="/home/ubuntu/DeFiNodeNexus"
+APP_NAME="definodenexus"
+APP_PORT="9002"
+NGINX_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
+NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
+NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
+
+# ── 参数解析 ──────────────────────────────────────────────────────────────────
+SKIP_PULL=false
+SETUP_STARTUP=false
+
+for arg in "$@"; do
+  case "$arg" in
+    --skip-pull)   SKIP_PULL=true ;;
+    --startup)     SETUP_STARTUP=true ;;
+    --help|-h)
+      echo "用法: bash deploy.sh [--skip-pull] [--startup] [--help]"
+      echo "  --skip-pull   跳过 git pull，仅重新构建"
+      echo "  --startup     配置 PM2 开机自启（需 sudo）"
+      exit 0
+      ;;
+  esac
+done
+
+# ── 彩色输出 ──────────────────────────────────────────────────────────────────
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+step()  { echo -e "\n${GREEN}==>${NC} $*"; }
+warn()  { echo -e "${YELLOW}  ! $*${NC}"; }
+error() { echo -e "${RED}  ✗ $*${NC}"; exit 1; }
+
+# ── 前置检查 ──────────────────────────────────────────────────────────────────
+step "[0/6] 前置检查"
+[[ -d "$APP_DIR" ]]       || error "应用目录不存在: $APP_DIR"
+command -v node &>/dev/null || error "Node.js 未安装"
+command -v npm  &>/dev/null || error "npm 未安装"
+command -v pm2  &>/dev/null || error "PM2 未安装 (npm install -g pm2)"
+echo "  node $(node -v), npm $(npm -v), pm2 $(pm2 -v)"
+
+cd "$APP_DIR"
+
+# 检查环境变量文件
+if [[ ! -f "$APP_DIR/.env" ]] && [[ ! -f "$APP_DIR/.env.local" ]]; then
+  warn ".env 和 .env.local 均不存在，构建可能跳过合约地址校验"
+fi
+
+# ── 拉取最新代码 ──────────────────────────────────────────────────────────────
+if [[ "$SKIP_PULL" == false ]]; then
+  step "[1/6] 拉取最新代码"
+  if [[ -d "$APP_DIR/.git" ]]; then
+    CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    git pull --ff-only
+    NEW_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    if [[ "$CURRENT_COMMIT" == "$NEW_COMMIT" ]]; then
+      warn "代码无变化 ($CURRENT_COMMIT)，仍继续构建以确保配置最新"
+    else
+      echo "  $CURRENT_COMMIT → $NEW_COMMIT"
+    fi
+  else
+    warn "非 git 仓库目录，跳过 pull"
+  fi
+else
+  step "[1/6] 跳过 git pull (--skip-pull)"
+fi
+
+# ── 安装依赖 ──────────────────────────────────────────────────────────────────
+step "[2/6] 安装 npm 依赖"
+# 优先使用 npm ci（更快、更可靠），package-lock.json 存在才能用
+if [[ -f "package-lock.json" ]]; then
+  npm ci --prefer-offline --no-audit --no-fund
+else
+  npm install --no-audit --no-fund
+fi
+
+# ── 构建 ──────────────────────────────────────────────────────────────────────
+step "[3/6] 构建 Next.js (output: standalone)"
+BUILD_START=$(date +%s)
+npm run build
+BUILD_END=$(date +%s)
+echo "  构建耗时: $((BUILD_END - BUILD_START))s"
+
+# postbuild 已自动复制 static/ 和 public/，此处做二次保障
+if [[ ! -d ".next/standalone/.next/static" ]]; then
+  warn "postbuild 未复制静态文件，手动补充..."
+  cp -r .next/static .next/standalone/.next/static
+fi
+if [[ ! -d ".next/standalone/public" ]] && [[ -d "public" ]]; then
+  cp -r public .next/standalone/public
+fi
+
+# ── PM2 重载 ──────────────────────────────────────────────────────────────────
+step "[4/6] 重载应用进程 (PM2 零停机重载)"
+if pm2 list | grep -q "$APP_NAME"; then
+  # 已有进程：用 ecosystem 文件 reload（热重载，中断时间 <1s）
+  pm2 reload ecosystem.config.js --update-env
+else
+  # 首次启动
+  warn "PM2 中未找到进程 '$APP_NAME'，首次启动..."
+  pm2 start ecosystem.config.js
+fi
+
+# 持久化 PM2 进程列表（用于自启）
+pm2 save
+
+# ── Nginx 更新 ────────────────────────────────────────────────────────────────
+step "[5/6] 检查 Nginx 配置"
+# 保证目录有 Nginx 可读权限
+sudo chmod o+x /home/ubuntu 2>/dev/null || true
+
+# 若 Nginx 站点配置文件不存在，更新部署
+if [[ ! -f "$NGINX_CONF_DST" ]]; then
+  warn "Nginx 配置不存在，从模板安装..."
+  sudo install -m 644 "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
+  [[ ! -L "$NGINX_LINK" ]] && sudo ln -s "$NGINX_CONF_DST" "$NGINX_LINK"
+  [[ -L "/etc/nginx/sites-enabled/default" ]] && sudo rm -f "/etc/nginx/sites-enabled/default" || true
+fi
+
+sudo nginx -t && sudo systemctl reload nginx
+echo "  Nginx 已重载"
+
+# ── 健康检查 ──────────────────────────────────────────────────────────────────
+step "[6/6] 健康检查"
+sleep 2
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$APP_PORT/" || echo "000")
+NGINX_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/" || echo "000")
+
+echo "  应用直连 (:$APP_PORT): HTTP $HTTP_CODE"
+echo "  Nginx 代理 (:80):     HTTP $NGINX_CODE"
+
+if [[ "$HTTP_CODE" != "200" ]] && [[ "$HTTP_CODE" != "308" ]] && [[ "$HTTP_CODE" != "301" ]]; then
+  warn "应用响应异常 ($HTTP_CODE)，请检查日志: pm2 logs $APP_NAME --lines 50"
+else
+  echo -e "\n${GREEN}  ✓ 部署成功！${NC}"
+fi
+
+# ── PM2 开机自启（可选）─────────────────────────────────────────────────────
+if [[ "$SETUP_STARTUP" == true ]]; then
+  step "[可选] 配置 PM2 开机自启"
+  sudo env PATH="$PATH:/usr/bin" \
+    "$(command -v pm2)" startup systemd -u ubuntu --hp /home/ubuntu
+  pm2 save
+  echo "  PM2 开机自启已配置"
+fi
+
+# ── 完成 ──────────────────────────────────────────────────────────────────────
+echo ""
+echo "============================================================"
+echo -e "  ${GREEN}部署完成${NC}"
+echo "  公网地址 : http://$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo "  应用日志 : pm2 logs $APP_NAME"
+echo "  进程状态 : pm2 list"
+echo "  Nginx 日志: sudo tail -f /var/log/nginx/access.log"
+echo "============================================================"

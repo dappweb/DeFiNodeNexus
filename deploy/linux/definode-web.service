@@ -9,6 +9,9 @@ User=definode
 Group=definode
 WorkingDirectory=/opt/definode/DeFiNodeNexus
 EnvironmentFile=/etc/definode/web.env
+Environment=PORT=9002
+Environment=HOSTNAME=0.0.0.0
+Environment=NODE_ENV=production
 # standalone output: run server.js directly (no npm needed at runtime)
 ExecStart=/usr/bin/node .next/standalone/server.js
 Restart=on-failure

@@ -1,5 +1,7 @@
 import type {NextConfig} from 'next';
 
+const isDev = process.env.NODE_ENV !== 'production'
+
 const nextConfig: NextConfig = {
   // 'standalone' bundles all dependencies for self-hosted Node.js deployment.
   // After `npm run build`, run: node .next/standalone/server.js
@@ -18,17 +20,19 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_USDT_ADDRESS:
       process.env.NEXT_PUBLIC_USDT_ADDRESS || process.env.USDT_TOKEN_ADDRESS || "",
   },
-  allowedDevOrigins: [
-    'http://localhost:9002',
-    'http://127.0.0.1:9002',
-    'http://192.168.50.118:9002',
-    'localhost:9002',
-    '127.0.0.1:9002',
-    'http://localhost',
-    'http://127.0.0.1',
-    'localhost',
-    '127.0.0.1',
-  ],
+  ...(isDev && {
+    allowedDevOrigins: [
+      'http://localhost:9002',
+      'http://127.0.0.1:9002',
+      'http://192.168.50.118:9002',
+      'localhost:9002',
+      '127.0.0.1:9002',
+      'http://localhost',
+      'http://127.0.0.1',
+      'localhost',
+      '127.0.0.1',
+    ],
+  }),
   typescript: {
     ignoreBuildErrors: true,
   },

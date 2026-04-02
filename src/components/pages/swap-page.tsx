@@ -186,7 +186,7 @@ export function SwapPage() {
         const allowance = await usdt.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
-          const approveRes = await execTx(usdt.approve(CONTRACTS.SWAP, input));
+          const approveRes = await execTx(() => usdt.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
@@ -198,7 +198,7 @@ export function SwapPage() {
         const quote = await swap.quoteBuy(input);
         const minTotOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         setTxStage("submitting");
-        const txRes = await execTx(swap.buyTot(input, minTotOut));
+        const txRes = await execTx(() => swap.buyTot(input, minTotOut));
         if (!txRes.success) {
           toast({ title: t("toastBuyFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
@@ -211,7 +211,7 @@ export function SwapPage() {
         const allowance = await tot.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
-          const approveRes = await execTx(tot.approve(CONTRACTS.SWAP, input));
+          const approveRes = await execTx(() => tot.approve(CONTRACTS.SWAP, input));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
@@ -223,7 +223,7 @@ export function SwapPage() {
         const quote = await swap.quoteSell(input);
         const minUsdtOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         setTxStage("submitting");
-        const txRes = await execTx(swap.sellTot(input, minUsdtOut));
+        const txRes = await execTx(() => swap.sellTot(input, minUsdtOut));
         if (!txRes.success) {
           toast({ title: t("toastSellFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);

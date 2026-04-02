@@ -238,7 +238,7 @@ export function NodesPage() {
       const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
       if (allowance < tier.price) {
         setNftaStage("approving");
-        const approveRes = await execTx(usdt.approve(CONTRACTS.NEXUS, tier.price));
+        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price));
         if (!approveRes.success) {
           toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
           return;
@@ -248,7 +248,7 @@ export function NodesPage() {
       setNftaStage("purchasing");
       const parsedReferrer = referrer.trim();
       const finalReferrer = ethers.isAddress(parsedReferrer) ? parsedReferrer : ethers.ZeroAddress;
-      const res = await execTx(nexus.buyNfta(BigInt(tier.id), finalReferrer));
+      const res = await execTx(() => nexus.buyNfta(BigInt(tier.id), finalReferrer));
       if (!res.success) {
         toast({ title: t("toastBuyNftaFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
@@ -288,14 +288,14 @@ export function NodesPage() {
         const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
           setNftbStage("approving");
-          const approveRes = await execTx(usdt.approve(CONTRACTS.NEXUS, tier.price));
+          const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price));
           if (!approveRes.success) {
             toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer));
+        const res = await execTx(() => nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer));
         if (!res.success) {
           toast({ title: t("toastBuyNftbFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
           return;
@@ -311,14 +311,14 @@ export function NodesPage() {
         const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
           setNftbStage("approving");
-          const approveRes = await execTx(tof.approve(CONTRACTS.NEXUS, tier.price));
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tier.price));
           if (!approveRes.success) {
             toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer));
+        const res = await execTx(() => nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer));
         if (!res.success) {
           toast({ title: t("toastBuyNftbFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
           return;
@@ -380,7 +380,7 @@ export function NodesPage() {
 
         if (allowance < requiredTof) {
           setNftaStage("approving");
-          const approveRes = await execTx(tof.approve(CONTRACTS.NEXUS, requiredTof));
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
           if (!approveRes.success) {
             toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
@@ -389,7 +389,7 @@ export function NodesPage() {
       }
 
       setNftaStage("confirming");
-      const res = await execTx(nexus.claimAllNftaYield());
+      const res = await execTx(() => nexus.claimAllNftaYield());
       if (!res.success) {
         toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
@@ -410,7 +410,7 @@ export function NodesPage() {
     }
     setLoading(true);
     try {
-      const res = await execTx(nexus.claimAllNftbDividends());
+      const res = await execTx(() => nexus.claimAllNftbDividends());
       if (!res.success) {
         toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
@@ -432,7 +432,7 @@ export function NodesPage() {
 
     setLoading(true);
     try {
-      const res = await execTx(nexus.transferNftaCard(target, nodeId));
+      const res = await execTx(() => nexus.transferNftaCard(target, nodeId));
       if (!res.success) {
         toast({ title: "转让失败", description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
