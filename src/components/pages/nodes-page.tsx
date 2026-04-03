@@ -122,6 +122,7 @@ export function NodesPage() {
   const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
   const [nftaClaimFeeBps, setNftaClaimFeeBps] = useState<bigint>(0n);
   const [tofPerUsdt, setTofPerUsdt] = useState<bigint>(0n);
+  const [withdrawableTot, setWithdrawableTot] = useState<bigint>(0n);
   const zeroValue = ethers.parseUnits("0", 0);
   const NODES_SUMMARY_TIMEOUT_MS = 12_000;
   const NODES_SUMMARY_MAX_RETRIES = 2;
@@ -175,6 +176,7 @@ export function NodesPage() {
       setNftaNodes([]);
       setNftbNodes([]);
       setNftaClaimFeeBps(0n);
+      setWithdrawableTot(0n);
       setLoadError(t("toastContractMissingDesc"));
       if (showLoading) {
         setIsRefreshing(false);
@@ -235,6 +237,13 @@ export function NodesPage() {
         }))
       );
 
+      if (nexus && address) {
+        const account = await nexus.accounts(address);
+        setWithdrawableTot(account.pendingTot);
+      } else {
+        setWithdrawableTot(0n);
+      }
+
       if (nexus) {
         const [feeBpsRaw, tofPerUsdtRaw] = await Promise.all([
           nexus.tofClaimFeeBps(),
@@ -259,6 +268,49 @@ export function NodesPage() {
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  const getWithdrawTofFee = useCallback(async (amount: bigint) => {
+    if (!nexus || !address || amount <= 0n) return 0n;
+
+    const level = Number(await nexus.getUserLevel(address));
+    const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
+    return (amount * withdrawFeeBps) / 10000n;
+  }, [address, nexus]);
+
+  const ensureTofReady = useCallback(async (
+    requiredTof: bigint,
+    failTitle: string,
+    insufficientDescription: string,
+    stage: "idle" | "checking" | "approving" | "purchasing" | "confirming" = "approving",
+  ) => {
+    if (requiredTof <= 0n) return true;
+
+    if (!tof || !address) {
+      toast({ title: failTitle, description: t("toastTofTokenUnavailable"), variant: "destructive" });
+      return false;
+    }
+
+    const [tofBalance, allowance] = await Promise.all([
+      tof.balanceOf(address),
+      tof.allowance(address, CONTRACTS.NEXUS),
+    ]);
+
+    if (tofBalance < requiredTof) {
+      toast({ title: failTitle, description: insufficientDescription, variant: "destructive" });
+      return false;
+    }
+
+    if (allowance < requiredTof) {
+      setNftaStage(stage);
+      const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
+      if (!approveRes.success) {
+        toast({ title: t("toastTofApproveFailed"), description: approveRes.error || t("toastUnknownTxError"), variant: "destructive" });
+        return false;
+      }
+    }
+
+    return true;
+  }, [address, t, toast, tof]);
 
   const buyNfta = async () => {
     if (!isConnected || !address || !nexus || selectedNftaTier === null) return;
@@ -838,7 +890,7 @@ export function NodesPage() {
                       <div className="space-y-1.5">
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">{t("labelPrice")}</span>
-                          <span className="font-medium">{ethers.formatUnits(displayPrice, 18)} {nftbPayToken}</span>
+                          <span className="font-medium whitespace-nowrap notranslate" translate="no">{ethers.formatUnits(displayPrice, 18)} {nftbPayToken}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">{t("labelWeight")}</span>
@@ -849,8 +901,8 @@ export function NodesPage() {
                           <span className="font-medium text-blue-500">{Number(tier.dividendBps) / 100}%</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1 pt-1 text-xs text-muted-foreground">
-                          <span>{t("usdtRemainingShort")} <span className="text-foreground">{tier.usdtRemaining.toString()}</span></span>
-                          <span>{t("tofRemainingShort")} <span className="text-foreground">{tier.tofRemaining.toString()}</span></span>
+                          <span className="whitespace-nowrap notranslate" translate="no">{t("usdtRemainingShort")} <span className="text-foreground">{tier.usdtRemaining.toString()}</span></span>
+                          <span className="whitespace-nowrap notranslate" translate="no">{t("tofRemainingShort")} <span className="text-foreground">{tier.tofRemaining.toString()}</span></span>
                         </div>
                       </div>
                     </button>
