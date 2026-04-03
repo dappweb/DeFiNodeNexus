@@ -97,6 +97,7 @@ type NodesSummaryResponse = {
 
 const toTierId = (id: number | bigint) => Number(id);
 const WAD = 10n ** 18n;
+const DEFAULT_TOF_PER_USDT = 200n * WAD;
 const DEFAULT_NFTA_TIERS: NftaTier[] = createDefaultSerializedNftaTiers().map((tier) => ({
   id: tier.id,
   price: BigInt(tier.price),
@@ -143,7 +144,7 @@ export function NodesPage() {
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
   const [nftaClaimFeeBps, setNftaClaimFeeBps] = useState<bigint>(0n);
-  const [tofPerUsdt, setTofPerUsdt] = useState<bigint>(0n);
+  const [tofPerUsdt, setTofPerUsdt] = useState<bigint>(DEFAULT_TOF_PER_USDT);
   const [withdrawableTot, setWithdrawableTot] = useState<bigint>(0n);
   const zeroValue = ethers.parseUnits("0", 0);
   const NODES_SUMMARY_TIMEOUT_MS = 12_000;
@@ -274,7 +275,7 @@ export function NodesPage() {
         const feeBps = BigInt(feeBpsRaw);
         const tofRate = BigInt(tofPerUsdtRaw);
         setNftaClaimFeeBps(feeBps);
-        setTofPerUsdt(tofRate);
+        setTofPerUsdt(tofRate > 0n ? tofRate : DEFAULT_TOF_PER_USDT);
       }
     } catch (error) {
       console.error("Failed to load node data", error);
