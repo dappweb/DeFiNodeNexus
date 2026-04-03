@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { ethers } from "ethers";
 import { CONTRACTS, NEXUS_ABI } from "@/lib/contracts";
+import {
+  createDefaultSerializedNftaTiers,
+  createDefaultSerializedNftbTiers,
+} from "@/lib/node-tier-config";
 
 export const runtime = "nodejs";
 
-const MAX_TIER_SCAN = 4;
 const SUMMARY_CACHE_TTL_MS = 6_000;
 const RPC_RETRY_COUNT = 2;
 const EVENT_SCAN_LOOKBACK_BLOCKS = Number(process.env.NODES_EVENT_SCAN_LOOKBACK_BLOCKS || "120000");
+const DEFAULT_NFTA_TIERS = createDefaultSerializedNftaTiers();
+const DEFAULT_NFTB_TIERS = createDefaultSerializedNftbTiers();
 
 let cachedProvider: ethers.Provider | null = null;
 const summaryCache = new Map<string, { expiresAt: number; payload: unknown }>();
@@ -129,30 +134,14 @@ export async function GET(request: Request) {
     const provider = getReadonlyProvider();
     const nexus = new ethers.Contract(CONTRACTS.NEXUS, NEXUS_ABI, provider);
 
-    const [nextNftaTierId, nextNftbTierId] = await Promise.all([
-      withRpcRetry(async () => Number(await nexus.nextNftaTierId())),
-      withRpcRetry(async () => Number(await nexus.nextNftbTierId())),
-    ]);
-
-    const nftaScanCount = Math.max(MAX_TIER_SCAN, nextNftaTierId > 1 ? nextNftaTierId - 1 : 0);
-    const nftbScanCount = Math.max(MAX_TIER_SCAN, nextNftbTierId > 1 ? nextNftbTierId - 1 : 0);
-
-    const nftaCandidateIds = Array.from({ length: nftaScanCount }, (_, i) => i + 1);
-    const nftbCandidateIds = Array.from({ length: nftbScanCount }, (_, i) => i + 1);
-
     const [nftaTierResults, nftbTierResults] = await Promise.all([
       Promise.allSettled(
-        nftaCandidateIds.map(async (id) => {
+        DEFAULT_NFTA_TIERS.map(async (baseTier) => {
+          const id = baseTier.id;
           const tier = await withRpcRetry(() => nexus.nftaTiers(id));
-          if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.currentSupply === 0n) {
-            return null;
-          }
           const remaining = await withRpcRetry(() => nexus.getNftaTierRemaining(id));
           return {
             id,
-            price: toStringValue(tier.price),
-            dailyYield: toStringValue(tier.dailyYield),
-            maxSupply: toStringValue(tier.maxSupply),
             currentSupply: toStringValue(tier.currentSupply),
             isActive: tier.isActive,
             remaining: toStringValue(remaining),
@@ -160,20 +149,14 @@ export async function GET(request: Request) {
         })
       ),
       Promise.allSettled(
-        nftbCandidateIds.map(async (id) => {
+        DEFAULT_NFTB_TIERS.map(async (baseTier) => {
+          const id = baseTier.id;
           const tier = await withRpcRetry(() => nexus.nftbTiers(id));
-          if (!tier.isActive && tier.price === 0n && tier.maxSupply === 0n && tier.usdtMinted === 0n && tier.tofMinted === 0n) {
-            return null;
-          }
           const remaining = await withRpcRetry(() => nexus.getNftbTierRemaining(id));
           return {
             id,
-            price: toStringValue(tier.price),
-            weight: toStringValue(tier.weight),
-            maxSupply: toStringValue(tier.maxSupply),
             usdtMinted: toStringValue(tier.usdtMinted),
             tofMinted: toStringValue(tier.tofMinted),
-            dividendBps: toStringValue(tier.dividendBps),
             isActive: tier.isActive,
             usdtRemaining: toStringValue(remaining[0]),
             tofRemaining: toStringValue(remaining[1]),
@@ -182,9 +165,23 @@ export async function GET(request: Request) {
       ),
     ]);
 
-    const nftaTierList = nftaTierResults.filter(isFulfilled).map((result) => result.value);
+    const nftaTierOverrides = new Map(
+      nftaTierResults.filter(isFulfilled).map((result) => [result.value.id, result.value])
+    );
 
-    const nftbTierList = nftbTierResults.filter(isFulfilled).map((result) => result.value);
+    const nftbTierOverrides = new Map(
+      nftbTierResults.filter(isFulfilled).map((result) => [result.value.id, result.value])
+    );
+
+    const nftaTierList = DEFAULT_NFTA_TIERS.map((tier) => ({
+      ...tier,
+      ...(nftaTierOverrides.get(tier.id) ?? {}),
+    }));
+
+    const nftbTierList = DEFAULT_NFTB_TIERS.map((tier) => ({
+      ...tier,
+      ...(nftbTierOverrides.get(tier.id) ?? {}),
+    }));
 
     let nftaNodes: Array<{
       nodeId: string;
@@ -337,8 +334,8 @@ export async function GET(request: Request) {
     }
 
     const responsePayload = {
-      nftaTiers: nftaTierList.filter((tier) => tier !== null),
-      nftbTiers: nftbTierList.filter((tier) => tier !== null),
+      nftaTiers: nftaTierList,
+      nftbTiers: nftbTierList,
       nftaNodes,
       nftbNodes,
     };

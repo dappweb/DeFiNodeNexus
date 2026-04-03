@@ -13,6 +13,7 @@ import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
 import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
+import { createDefaultSerializedNftaTiers, createDefaultSerializedNftbTiers } from "@/lib/node-tier-config";
 import { getNftaTierName, getNftbTierName, formatAddress, formatBalance } from "@/lib/ui-config";
 
 type NftaTier = {
@@ -96,6 +97,27 @@ type NodesSummaryResponse = {
 
 const toTierId = (id: number | bigint) => Number(id);
 const WAD = 10n ** 18n;
+const DEFAULT_NFTA_TIERS: NftaTier[] = createDefaultSerializedNftaTiers().map((tier) => ({
+  id: tier.id,
+  price: BigInt(tier.price),
+  dailyYield: BigInt(tier.dailyYield),
+  maxSupply: BigInt(tier.maxSupply),
+  currentSupply: BigInt(tier.currentSupply),
+  isActive: tier.isActive,
+  remaining: BigInt(tier.remaining),
+}));
+const DEFAULT_NFTB_TIERS: NftbTier[] = createDefaultSerializedNftbTiers().map((tier) => ({
+  id: tier.id,
+  price: BigInt(tier.price),
+  weight: BigInt(tier.weight),
+  maxSupply: BigInt(tier.maxSupply),
+  usdtMinted: BigInt(tier.usdtMinted),
+  tofMinted: BigInt(tier.tofMinted),
+  dividendBps: BigInt(tier.dividendBps),
+  isActive: tier.isActive,
+  usdtRemaining: BigInt(tier.usdtRemaining),
+  tofRemaining: BigInt(tier.tofRemaining),
+}));
 
 export function NodesPage() {
   const { t } = useLanguage();
@@ -106,8 +128,8 @@ export function NodesPage() {
   const tof = useERC20Contract(CONTRACTS.TOF);
 
   const [loading, setLoading] = useState(false);
-  const [nftaTiers, setNftaTiers] = useState<NftaTier[]>([]);
-  const [nftbTiers, setNftbTiers] = useState<NftbTier[]>([]);
+  const [nftaTiers, setNftaTiers] = useState<NftaTier[]>(DEFAULT_NFTA_TIERS);
+  const [nftbTiers, setNftbTiers] = useState<NftbTier[]>(DEFAULT_NFTB_TIERS);
   const [nftaNodes, setNftaNodes] = useState<NodeAItem[]>([]);
   const [nftbNodes, setNftbNodes] = useState<NodeBItem[]>([]);
   const [selectedNftaTier, setSelectedNftaTier] = useState<number | null>(null);
@@ -171,8 +193,8 @@ export function NodesPage() {
     setLoadError("");
 
     if (!CONTRACTS.NEXUS) {
-      setNftaTiers([]);
-      setNftbTiers([]);
+      setNftaTiers(DEFAULT_NFTA_TIERS);
+      setNftbTiers(DEFAULT_NFTB_TIERS);
       setNftaNodes([]);
       setNftbNodes([]);
       setNftaClaimFeeBps(0n);
@@ -599,6 +621,7 @@ export function NodesPage() {
 
   const nftbDisabledReason = useMemo(() => {
     if (loading) return t("disabledTxProcessing");
+    if (!nexus) return t("toastContractMissingDesc");
     if (!isConnected) return t("disabledConnectWallet");
     if (selectedNftbTier === null) return t("disabledSelectNftbTier");
     if (!selectedNftbTierData?.isActive) return t("disabledTierInactive");
@@ -607,7 +630,7 @@ export function NodesPage() {
       : (selectedNftbTierData?.tofRemaining ?? 0n);
     if (remaining <= 0n) return `${nftbPayToken} ${t("disabledQuotaSoldOut")}`;
     return "";
-  }, [loading, isConnected, selectedNftbTier, selectedNftbTierData, nftbPayToken, t]);
+  }, [loading, nexus, isConnected, selectedNftbTier, selectedNftbTierData, nftbPayToken, t]);
 
   const showEmptyActionHint = totalNftaPending === 0n && totalNftbPending === 0n && nftaNodes.length === 0 && nftbNodes.length === 0;
   const toFriendlyTxError = useCallback((message?: string) => {
@@ -843,7 +866,7 @@ export function NodesPage() {
               <div className="space-y-2 pt-1">
                 <Button
                   onClick={buyNftb}
-                  disabled={!isConnected || loading || selectedNftbTier === null || !canBuySelectedNftb}
+                  disabled={!isConnected || !nexus || loading || selectedNftbTier === null || !canBuySelectedNftb}
                   className="w-full"
                 >
                   {loading ? (nftbStageText || t("processing")) : `${t("buyNftbBtn")} (${nftbPayToken})`}
