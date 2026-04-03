@@ -10,8 +10,8 @@ import { TrendingUp, Wallet, CalendarDays, Coins } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
-import { execTx } from "@/hooks/use-contract";
-import { useNexusContract } from "@/hooks/use-contract";
+import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
+import { CONTRACTS } from "@/lib/contracts";
 import { getNftaTierName, getNftbTierName, formatBalance, formatDatetime } from "@/lib/ui-config";
 import { toFriendlyError } from "@/lib/api-common";
 
@@ -29,6 +29,7 @@ export function EarningsPage() {
   const { t } = useLanguage();
   const { address, provider } = useWeb3();
   const nexus = useNexusContract();
+  const tof = useERC20Contract(CONTRACTS.TOF);
   const { toast } = useToast();
 
   const [filter, setFilter] = useState("all");
@@ -178,10 +179,39 @@ export function EarningsPage() {
   const withdrawableIncome = useMemo(() => pendingTot, [pendingTot]);
 
   const handleWithdrawAll = async () => {
-    if (!nexus || pendingTot <= 0n) return;
+    if (!nexus || !address || pendingTot <= 0n) return;
 
     setWithdrawing(true);
     try {
+      const level = Number(await nexus.getUserLevel(address));
+      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
+      const requiredTof = (pendingTot * withdrawFeeBps) / 10000n;
+
+      if (requiredTof > 0n) {
+        if (!tof) {
+          toast({ title: t("toastWithdrawFailed"), description: t("toastTofTokenUnavailable"), variant: "destructive" });
+          return;
+        }
+
+        const [tofBalance, allowance] = await Promise.all([
+          tof.balanceOf(address),
+          tof.allowance(address, CONTRACTS.NEXUS),
+        ]);
+
+        if (tofBalance < requiredTof) {
+          toast({ title: t("toastWithdrawFailed"), description: t("toastTofBalanceInsufficientForWithdraw"), variant: "destructive" });
+          return;
+        }
+
+        if (allowance < requiredTof) {
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
+          if (!approveRes.success) {
+            toast({ title: t("toastTofApproveFailed"), description: approveRes.error, variant: "destructive" });
+            return;
+          }
+        }
+      }
+
       const res = await execTx(() => nexus.withdrawTot(pendingTot));
       if (!res.success) {
         toast({ title: t("toastWithdrawFailed"), description: res.error, variant: "destructive" });

@@ -468,72 +468,22 @@ export function NodesPage() {
     setNftaStage("checking");
     try {
       const claimFeeBps = BigInt(await nexus.tofClaimFeeBps());
-      const requiredTof = (claimAmount * claimFeeBps) / 10000n;
+      const claimTofFee = (claimAmount * claimFeeBps) / 10000n;
+      const withdrawTofFee = await getWithdrawTofFee(claimAmount);
+      const totalRequiredTof = claimTofFee + withdrawTofFee;
 
-      if (requiredTof > 0n) {
-        if (!tof) {
-          toast({ title: t("toastClaimFailed"), description: t("toastTofTokenUnavailable"), variant: "destructive" });
-          return;
-        }
-
-        const [tofBalance, allowance] = await Promise.all([
-          tof.balanceOf(address),
-          tof.allowance(address, CONTRACTS.NEXUS),
-        ]);
-
-        if (tofBalance < requiredTof) {
-          toast({ title: t("toastClaimFailed"), description: t("toastTofBalanceInsufficient"), variant: "destructive" });
-          return;
-        }
-
-        if (allowance < requiredTof) {
-          setNftaStage("approving");
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
-          if (!approveRes.success) {
-            toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
-            return;
-          }
-        }
-      }
+      const tofReady = await ensureTofReady(
+        totalRequiredTof,
+        t("toastClaimFailed"),
+        t("toastNeedMoreTofForClaimAndWithdraw")
+      );
+      if (!tofReady) return;
 
       setNftaStage("confirming");
       const claimRes = await execTx(() => nexus.claimAllNftaYield());
       if (!claimRes.success) {
         toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
         return;
-      }
-
-      const level = Number(await nexus.getUserLevel(address));
-      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
-      const withdrawTofFee = (claimAmount * withdrawFeeBps) / 10000n;
-
-      if (withdrawTofFee > 0n) {
-        if (!tof) {
-          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-
-        const [tofBalance, allowance] = await Promise.all([
-          tof.balanceOf(address),
-          tof.allowance(address, CONTRACTS.NEXUS),
-        ]);
-
-        if (tofBalance < withdrawTofFee) {
-          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-
-        if (allowance < withdrawTofFee) {
-          setNftaStage("approving");
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, withdrawTofFee));
-          if (!approveRes.success) {
-            toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-            await refreshData(false);
-            return;
-          }
-        }
       }
 
       setNftaStage("confirming");
@@ -561,42 +511,18 @@ export function NodesPage() {
     }
     setLoading(true);
     try {
+      const withdrawTofFee = await getWithdrawTofFee(claimAmount);
+      const tofReady = await ensureTofReady(
+        withdrawTofFee,
+        t("toastClaimFailed"),
+        t("toastTofBalanceInsufficientForWithdraw")
+      );
+      if (!tofReady) return;
+
       const claimRes = await execTx(() => nexus.claimAllNftbDividends());
       if (!claimRes.success) {
         toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
         return;
-      }
-
-      const level = Number(await nexus.getUserLevel(address));
-      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
-      const withdrawTofFee = (claimAmount * withdrawFeeBps) / 10000n;
-
-      if (withdrawTofFee > 0n) {
-        if (!tof) {
-          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-
-        const [tofBalance, allowance] = await Promise.all([
-          tof.balanceOf(address),
-          tof.allowance(address, CONTRACTS.NEXUS),
-        ]);
-
-        if (tofBalance < withdrawTofFee) {
-          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-
-        if (allowance < withdrawTofFee) {
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, withdrawTofFee));
-          if (!approveRes.success) {
-            toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-            await refreshData(false);
-            return;
-          }
-        }
       }
 
       const withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
@@ -717,7 +643,7 @@ export function NodesPage() {
           <CardDescription>{t("nodesOnChainDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-lg border-l-4 border-l-primary border border-border bg-primary/5 px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">{t("nftaPendingLabel")}</p>
               <p className="text-lg font-semibold text-primary">{formatTot(totalNftaPending)}</p>
@@ -726,6 +652,11 @@ export function NodesPage() {
             <div className="rounded-lg border-l-4 border-l-blue-500 border border-border bg-blue-500/5 px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">{t("nftbPendingLabel")}</p>
               <p className="text-lg font-semibold text-blue-500">{formatTot(totalNftbPending)}</p>
+              <p className="text-xs text-muted-foreground">TOT</p>
+            </div>
+            <div className="rounded-lg border-l-4 border-l-amber-500 border border-border bg-amber-500/5 px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">{t("withdrawableEarnings")}</p>
+              <p className="text-lg font-semibold text-amber-500">{formatTot(withdrawableTot)}</p>
               <p className="text-xs text-muted-foreground">TOT</p>
             </div>
           </div>
