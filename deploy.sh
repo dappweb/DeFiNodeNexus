@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # DeFiNodeNexus — 一键部署 / 更新脚本
-# 适用环境: Ubuntu 24.04 · Node.js 20 · PM2 · Nginx
+# 适用环境: Ubuntu 24.04 · Node.js 20 · PM2 · OpenResty / Nginx
 # 应用目录: /home/ubuntu/DeFiNodeNexus
-# 应用端口: 9002  (Nginx 反代 80 → 9002)
+# 应用端口: 9002  (OpenResty / Nginx 反代 80 → 9002)
 #
 # 用法:
 #   bash deploy.sh              # 拉取最新代码 + 构建 + 重载
@@ -17,9 +17,9 @@ set -euo pipefail
 APP_DIR="/home/ubuntu/DeFiNodeNexus"
 APP_NAME="definodenexus"
 APP_PORT="9002"
-NGINX_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
-NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
-NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
+PROXY_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
+PROXY_CONF_DST="/etc/nginx/sites-available/definodexus"
+PROXY_LINK="/etc/nginx/sites-enabled/definodexus"
 
 # ── 参数解析 ──────────────────────────────────────────────────────────────────
 SKIP_PULL=false
@@ -118,29 +118,39 @@ fi
 pm2 save
 
 # ── Nginx 更新 ────────────────────────────────────────────────────────────────
-step "[5/6] 检查 Nginx 配置"
-# 保证目录有 Nginx 可读权限
+step "[5/6] 检查反向代理配置 (OpenResty 优先)"
+# 保证目录有反向代理可读权限
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
-# 若 Nginx 站点配置文件不存在，更新部署
-if [[ ! -f "$NGINX_CONF_DST" ]]; then
-  warn "Nginx 配置不存在，从模板安装..."
-  sudo install -m 644 "$NGINX_CONF_SRC" "$NGINX_CONF_DST"
-  [[ ! -L "$NGINX_LINK" ]] && sudo ln -s "$NGINX_CONF_DST" "$NGINX_LINK"
+# 若站点配置文件不存在，更新部署
+if [[ ! -f "$PROXY_CONF_DST" ]]; then
+  warn "反向代理配置不存在，从模板安装..."
+  sudo install -m 644 "$PROXY_CONF_SRC" "$PROXY_CONF_DST"
+  [[ ! -L "$PROXY_LINK" ]] && sudo ln -s "$PROXY_CONF_DST" "$PROXY_LINK"
   [[ -L "/etc/nginx/sites-enabled/default" ]] && sudo rm -f "/etc/nginx/sites-enabled/default" || true
 fi
 
-sudo nginx -t && sudo systemctl reload nginx
-echo "  Nginx 已重载"
+sudo nginx -t
+
+OPENRESTY_MASTER_PID="$(pgrep -o -f '/usr/local/openresty|openresty -g daemon off' || true)"
+if [[ -n "$OPENRESTY_MASTER_PID" ]]; then
+  sudo kill -HUP "$OPENRESTY_MASTER_PID"
+  echo "  OpenResty 已重载 (PID: $OPENRESTY_MASTER_PID)"
+elif systemctl is-active --quiet nginx; then
+  sudo systemctl reload nginx
+  echo "  Nginx 已重载"
+else
+  warn "未检测到 OpenResty 进程，且 nginx.service 未运行；仅完成配置校验"
+fi
 
 # ── 健康检查 ──────────────────────────────────────────────────────────────────
 step "[6/6] 健康检查"
 sleep 2
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$APP_PORT/" || echo "000")
-NGINX_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/" || echo "000")
+PROXY_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost/" || echo "000")
 
 echo "  应用直连 (:$APP_PORT): HTTP $HTTP_CODE"
-echo "  Nginx 代理 (:80):     HTTP $NGINX_CODE"
+echo "  反向代理 (:80):       HTTP $PROXY_CODE"
 
 if [[ "$HTTP_CODE" != "200" ]] && [[ "$HTTP_CODE" != "308" ]] && [[ "$HTTP_CODE" != "301" ]]; then
   warn "应用响应异常 ($HTTP_CODE)，请检查日志: pm2 logs $APP_NAME --lines 50"
@@ -164,5 +174,5 @@ echo -e "  ${GREEN}部署完成${NC}"
 echo "  公网地址 : http://$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
 echo "  应用日志 : pm2 logs $APP_NAME"
 echo "  进程状态 : pm2 list"
-echo "  Nginx 日志: sudo tail -f /var/log/nginx/access.log"
+echo "  代理日志 : sudo tail -f /var/log/nginx/access.log"
 echo "============================================================"
