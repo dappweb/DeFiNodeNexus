@@ -480,7 +480,14 @@ export function NodesPage() {
   }, [nftbStage, t]);
 
   const claimAllNfta = async () => {
-    if (!nexus || !address) return;
+    if (!isConnected || !address) {
+      toast({ title: t("toastClaimFailed"), description: t("disabledConnectWallet"), variant: "destructive" });
+      return;
+    }
+    if (!nexus) {
+      toast({ title: t("toastClaimFailed"), description: t("toastContractMissingDesc"), variant: "destructive" });
+      return;
+    }
     const claimAmount = totalNftaPending;
     if (claimAmount <= 0n) {
       toast({ title: t("toastClaimFailed"), description: t("toastNoClaimableRewards"), variant: "destructive" });
@@ -525,7 +532,14 @@ export function NodesPage() {
   };
 
   const claimAllNftb = async () => {
-    if (!nexus || !address) return;
+    if (!isConnected || !address) {
+      toast({ title: t("toastClaimFailed"), description: t("disabledConnectWallet"), variant: "destructive" });
+      return;
+    }
+    if (!nexus) {
+      toast({ title: t("toastClaimFailed"), description: t("toastContractMissingDesc"), variant: "destructive" });
+      return;
+    }
     const claimAmount = totalNftbPending;
     if (claimAmount <= 0n) {
       toast({ title: t("toastClaimFailed"), description: t("toastNoClaimableRewards"), variant: "destructive" });
@@ -898,7 +912,7 @@ export function NodesPage() {
                 <Button
                   size="sm"
                   onClick={claimAllNfta}
-                  disabled={!isConnected || loading || nftaNodes.length === 0 || totalNftaPending <= 0n}
+                  disabled={!isConnected || !nexus || loading || nftaNodes.length === 0 || totalNftaPending <= 0n}
                 >
                   {t("claimNftaBtn")}
                 </Button>
@@ -975,7 +989,7 @@ export function NodesPage() {
                 <Button
                   size="sm"
                   onClick={claimAllNftb}
-                  disabled={!isConnected || loading || nftbNodes.length === 0 || totalNftbPending <= 0n}
+                  disabled={!isConnected || !nexus || loading || nftbNodes.length === 0 || totalNftbPending <= 0n}
                 >
                   {t("claimNftbBtn")}
                 </Button>
