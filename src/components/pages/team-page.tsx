@@ -54,54 +54,59 @@ export function TeamPage() {
       }
 
       const userLower = address.toLowerCase();
-      const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null));
 
-      const childrenByReferrer = new Map<string, Set<string>>();
-      for (const ev of allBindEvents as any[]) {
-        const user = String(ev.args.user).toLowerCase();
-        const referrer = String(ev.args.referrer).toLowerCase();
-        if (!childrenByReferrer.has(referrer)) {
-          childrenByReferrer.set(referrer, new Set<string>());
+      const getDirectChildren = async (referrerAddress: string) => {
+        const events = await nexus.queryFilter(nexus.filters.ReferrerBound(null, referrerAddress));
+        const set = new Set<string>();
+        for (const ev of events as any[]) {
+          set.add(String(ev.args.user).toLowerCase());
         }
-        childrenByReferrer.get(referrer)!.add(user);
-      }
+        return Array.from(set);
+      };
 
-      const directSet = childrenByReferrer.get(userLower) ?? new Set<string>();
-      const directAddresses = Array.from(directSet);
+      const directAddresses = await getDirectChildren(userLower);
+      const directSet = new Set(directAddresses);
 
-      const downlineSet = new Set<string>();
+      const downlineSet = new Set<string>(directAddresses);
       const queue = [...directAddresses];
       while (queue.length > 0) {
         const current = queue.shift()!;
-        if (downlineSet.has(current)) continue;
-        downlineSet.add(current);
-        const children = childrenByReferrer.get(current);
-        if (!children) continue;
+        const children = await getDirectChildren(current);
         for (const child of children) {
-          if (!downlineSet.has(child)) queue.push(child);
+          if (downlineSet.has(child)) continue;
+          downlineSet.add(child);
+          queue.push(child);
         }
       }
       setTeamMemberCount(downlineSet.size);
 
-      const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
-        nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null)),
-        nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null)),
-      ]);
-
-      let nextDirectDeposit = 0n;
-      let nextTeamDeposit = 0n;
-      const handlePurchase = (ev: any) => {
-        const buyer = String(ev.args.user).toLowerCase();
-        const price = BigInt(ev.args.price);
-        if (directSet.has(buyer)) {
-          nextDirectDeposit += price;
-        }
-        if (downlineSet.has(buyer)) {
-          nextTeamDeposit += price;
-        }
+      const getUserPurchaseTotal = async (userAddress: string) => {
+        const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
+          nexus.queryFilter(nexus.filters.NftaPurchased(userAddress, null, null)),
+          nexus.queryFilter(nexus.filters.NftbPurchased(userAddress, null, null)),
+        ]);
+        let total = 0n;
+        for (const ev of nftaPurchaseEvents as any[]) total += BigInt(ev.args.price);
+        for (const ev of nftbPurchaseEvents as any[]) total += BigInt(ev.args.price);
+        return total;
       };
-      for (const ev of nftaPurchaseEvents as any[]) handlePurchase(ev);
-      for (const ev of nftbPurchaseEvents as any[]) handlePurchase(ev);
+
+      const directTotals = await Promise.allSettled(directAddresses.map((member) => getUserPurchaseTotal(member)));
+      let nextDirectDeposit = 0n;
+      for (const result of directTotals) {
+        if (result.status === "fulfilled") {
+          nextDirectDeposit += result.value;
+        }
+      }
+
+      const downlineAddresses = Array.from(downlineSet);
+      const teamTotals = await Promise.allSettled(downlineAddresses.map((member) => getUserPurchaseTotal(member)));
+      let nextTeamDeposit = 0n;
+      for (const result of teamTotals) {
+        if (result.status === "fulfilled") {
+          nextTeamDeposit += result.value;
+        }
+      }
 
       setDirectDepositTotal(nextDirectDeposit);
       setTeamDepositTotal(nextTeamDeposit);
@@ -110,7 +115,7 @@ export function TeamPage() {
         const memberAccount = await nexus.accounts(memberAddr);
 
         return {
-          address: memberAddr,
+          address: ethers.getAddress(memberAddr),
           totalNodes: memberAccount.totalNodes,
           pendingTot: memberAccount.pendingTot,
         } as TeamMember;
