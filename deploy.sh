@@ -19,6 +19,7 @@ APP_NAME="definodenexus"
 APP_PORT="9002"
 PROXY_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
 OPENRESTY_CONF_DST="/etc/openresty/conf.d/definodexus.conf"
+OPENRESTY_1PANEL_CONF_DST="/opt/1panel/docker/compose/openresty/conf.d/definodexus.conf"
 NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
 NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
 
@@ -124,7 +125,10 @@ step "[5/6] 检查反向代理配置 (OpenResty 优先)"
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
 # 每次部署都同步模板，确保缓存/代理策略及时生效
-if [[ -d "/etc/openresty/conf.d" ]]; then
+if [[ -d "/opt/1panel/docker/compose/openresty/conf.d" ]]; then
+  sudo install -m 644 "$PROXY_CONF_SRC" "$OPENRESTY_1PANEL_CONF_DST"
+  echo "  已同步 1Panel OpenResty 配置: $OPENRESTY_1PANEL_CONF_DST"
+elif [[ -d "/etc/openresty/conf.d" ]]; then
   sudo install -m 644 "$PROXY_CONF_SRC" "$OPENRESTY_CONF_DST"
   echo "  已同步 OpenResty 配置: $OPENRESTY_CONF_DST"
 else
@@ -138,8 +142,13 @@ sudo nginx -t
 
 OPENRESTY_MASTER_PID="$(pgrep -o -f '/usr/local/openresty|openresty -g daemon off' || true)"
 if [[ -n "$OPENRESTY_MASTER_PID" ]]; then
-  sudo kill -HUP "$OPENRESTY_MASTER_PID"
-  echo "  OpenResty 已重载 (PID: $OPENRESTY_MASTER_PID)"
+  if sudo docker ps --format '{{.Names}}' | grep -q '^openresty-1panel$'; then
+    sudo docker exec openresty-1panel openresty -s reload >/dev/null
+    echo "  1Panel OpenResty 容器已重载"
+  else
+    sudo kill -HUP "$OPENRESTY_MASTER_PID"
+    echo "  OpenResty 已重载 (PID: $OPENRESTY_MASTER_PID)"
+  fi
 elif systemctl is-active --quiet nginx; then
   sudo systemctl reload nginx
   echo "  Nginx 已重载"
