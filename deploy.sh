@@ -18,8 +18,9 @@ APP_DIR="/home/ubuntu/DeFiNodeNexus"
 APP_NAME="definodenexus"
 APP_PORT="9002"
 PROXY_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
-PROXY_CONF_DST="/etc/nginx/sites-available/definodexus"
-PROXY_LINK="/etc/nginx/sites-enabled/definodexus"
+OPENRESTY_CONF_DST="/etc/openresty/conf.d/definodexus.conf"
+NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
+NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
 
 # ── 参数解析 ──────────────────────────────────────────────────────────────────
 SKIP_PULL=false
@@ -122,12 +123,15 @@ step "[5/6] 检查反向代理配置 (OpenResty 优先)"
 # 保证目录有反向代理可读权限
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
-# 若站点配置文件不存在，更新部署
-if [[ ! -f "$PROXY_CONF_DST" ]]; then
-  warn "反向代理配置不存在，从模板安装..."
-  sudo install -m 644 "$PROXY_CONF_SRC" "$PROXY_CONF_DST"
-  [[ ! -L "$PROXY_LINK" ]] && sudo ln -s "$PROXY_CONF_DST" "$PROXY_LINK"
+# 每次部署都同步模板，确保缓存/代理策略及时生效
+if [[ -d "/etc/openresty/conf.d" ]]; then
+  sudo install -m 644 "$PROXY_CONF_SRC" "$OPENRESTY_CONF_DST"
+  echo "  已同步 OpenResty 配置: $OPENRESTY_CONF_DST"
+else
+  sudo install -m 644 "$PROXY_CONF_SRC" "$NGINX_CONF_DST"
+  [[ ! -L "$NGINX_LINK" ]] && sudo ln -s "$NGINX_CONF_DST" "$NGINX_LINK"
   [[ -L "/etc/nginx/sites-enabled/default" ]] && sudo rm -f "/etc/nginx/sites-enabled/default" || true
+  echo "  已同步 Nginx 配置: $NGINX_CONF_DST"
 fi
 
 sudo nginx -t

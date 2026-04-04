@@ -4,6 +4,7 @@ import { LanguageProvider } from '@/components/language-provider';
 import { Web3Provider } from '@/lib/web3-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
+import { RuntimeStabilityGuard } from '@/components/runtime-stability-guard';
 
 export const metadata: Metadata = {
   title: 'Truth Oracle',
@@ -26,6 +27,7 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <Web3Provider>
             <LanguageProvider>
+              <RuntimeStabilityGuard />
               {children}
               <Toaster />
             </LanguageProvider>
