@@ -175,7 +175,7 @@ fi
 echo ""
 echo "============================================================"
 echo -e "  ${GREEN}部署完成${NC}"
-echo "  公网地址 : http://$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+echo "  访问地址 : http://t1.test2dapp.xyz"
 echo "  应用日志 : pm2 logs $APP_NAME"
 echo "  进程状态 : pm2 list"
 echo "  代理日志 : sudo tail -f /var/log/nginx/access.log"

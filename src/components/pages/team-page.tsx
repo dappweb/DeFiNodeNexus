@@ -142,7 +142,8 @@ export function TeamPage() {
       setInviteUrl("");
       return;
     }
-    setInviteUrl(`${window.location.origin}/?ref=${address}`);
+    const appOrigin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || window.location.origin;
+    setInviteUrl(`${appOrigin}/?ref=${address}`);
   }, [address]);
 
   const copyText = async (text: string) => {
