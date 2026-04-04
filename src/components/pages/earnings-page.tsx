@@ -10,7 +10,7 @@ import { TrendingUp, Wallet, CalendarDays, Coins } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useToast } from "@/hooks/use-toast";
-import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
+import { execTx, useERC20Contract, useNexusContract, useReadonlyNexusContract } from "@/hooks/use-contract";
 import { CONTRACTS } from "@/lib/contracts";
 import { getNftaTierName, getNftbTierName, formatBalance, formatDatetime } from "@/lib/ui-config";
 import { toFriendlyError } from "@/lib/api-common";
@@ -29,6 +29,7 @@ export function EarningsPage() {
   const { t } = useLanguage();
   const { address, provider } = useWeb3();
   const nexus = useNexusContract();
+  const readonlyNexus = useReadonlyNexusContract();
   const tof = useERC20Contract(CONTRACTS.TOF);
   const { toast } = useToast();
 
@@ -40,27 +41,49 @@ export function EarningsPage() {
   const [withdrawing, setWithdrawing] = useState(false);
 
   const refreshData = useCallback(async () => {
-    if (!nexus || !address) return;
+    const readContract = readonlyNexus || nexus;
+    if (!readContract || !address) return;
 
-    const account = await nexus.accounts(address);
-    setPendingTot(account.pendingTot);
-    setClaimedTot(account.claimedTot);
-
-    if (!provider) {
+    try {
+      const account = await readContract.accounts(address);
+      setPendingTot(BigInt(account.pendingTot));
+      setClaimedTot(BigInt(account.claimedTot));
+    } catch (error) {
+      console.error("Failed to load earnings account state", error);
+      setPendingTot(0n);
+      setClaimedTot(0n);
       setRecords([]);
       return;
     }
 
-    const latestBlock = await provider.getBlockNumber();
-    const fromBlock = Math.max(0, latestBlock - 80_000);
+    const eventsProvider = provider ?? (readContract.runner && "provider" in readContract.runner ? readContract.runner.provider ?? null : null);
+    if (!eventsProvider) {
+      setRecords([]);
+      return;
+    }
 
-    const [yieldEvents, divEvents, usdtDivEvents, teamEvents, wdEvents] = await Promise.all([
-      nexus.queryFilter(nexus.filters.NftaYieldClaimed(address), fromBlock, latestBlock),
-      nexus.queryFilter(nexus.filters.NftbDividendClaimed(address), fromBlock, latestBlock),
-      nexus.queryFilter(nexus.filters.NftbUsdtDividendClaimed(address), fromBlock, latestBlock),
-      nexus.queryFilter(nexus.filters.TeamCommissionPaid(address), fromBlock, latestBlock),
-      nexus.queryFilter(nexus.filters.TotWithdrawn(address), fromBlock, latestBlock),
-    ]);
+    let yieldEvents: any[] = [];
+    let divEvents: any[] = [];
+    let usdtDivEvents: any[] = [];
+    let teamEvents: any[] = [];
+    let wdEvents: any[] = [];
+
+    try {
+      const latestBlock = await eventsProvider.getBlockNumber();
+      const fromBlock = Math.max(0, latestBlock - 80_000);
+
+      [yieldEvents, divEvents, usdtDivEvents, teamEvents, wdEvents] = await Promise.all([
+        readContract.queryFilter(readContract.filters.NftaYieldClaimed(address), fromBlock, latestBlock),
+        readContract.queryFilter(readContract.filters.NftbDividendClaimed(address), fromBlock, latestBlock),
+        readContract.queryFilter(readContract.filters.NftbUsdtDividendClaimed(address), fromBlock, latestBlock),
+        readContract.queryFilter(readContract.filters.TeamCommissionPaid(address), fromBlock, latestBlock),
+        readContract.queryFilter(readContract.filters.TotWithdrawn(address), fromBlock, latestBlock),
+      ]);
+    } catch (error) {
+      console.error("Failed to load earnings events", error);
+      setRecords([]);
+      return;
+    }
 
     const mapped: EarningRecord[] = [];
     const blockTimestamps = new Map<number, number>();
@@ -69,7 +92,7 @@ export function EarningsPage() {
       if (blockTimestamps.has(blockNumber)) {
         return blockTimestamps.get(blockNumber)!;
       }
-      const block = await provider.getBlock(blockNumber);
+      const block = await eventsProvider.getBlock(blockNumber);
       const ts = block?.timestamp ?? 0;
       blockTimestamps.set(blockNumber, ts);
       return ts;
@@ -147,7 +170,7 @@ export function EarningsPage() {
 
     mapped.sort((a, b) => b.block - a.block);
     setRecords(mapped.slice(0, 50));
-  }, [nexus, address, provider]);
+  }, [readonlyNexus, nexus, address, provider]);
 
   useEffect(() => {
     refreshData();

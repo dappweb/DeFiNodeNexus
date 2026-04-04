@@ -121,9 +121,9 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
     mapping(uint256 => uint256) public accUsdtDividendPerWeightByTier;
     mapping(uint256 => uint256) public usdtRewardDebtByNode;
+    uint256 public tofPerUsdt;          // TOF amount per 1 USDT (scaled by 1e18)
     mapping(uint256 => uint256) public predictionFlowBpsByTier;
     mapping(address => uint256) public nftaLastClaimDayByUser;
-    uint256 public tofPerUsdt;          // TOF amount per 1 USDT (scaled by 1e18)
 
     // ======================== Events ========================
 

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Users, UserPlus, Coins, Copy, Link2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
 import { useToast } from "@/hooks/use-toast";
-import { useNexusContract } from "@/hooks/use-contract";
+import { useReadonlyNexusContract } from "@/hooks/use-contract";
 import { useWeb3 } from "@/lib/web3-provider";
 import { formatAddress, formatBalance } from "@/lib/ui-config";
 
@@ -21,8 +21,8 @@ type TeamMember = {
 export function TeamPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
-  const { address, provider } = useWeb3();
-  const nexus = useNexusContract();
+  const { address } = useWeb3();
+  const nexus = useReadonlyNexusContract();
 
   const [directReferrals, setDirectReferrals] = useState<bigint>(BigInt(0));
   const [teamMemberCount, setTeamMemberCount] = useState(0);
@@ -53,17 +53,8 @@ export function TeamPage() {
         setMyReferrer(null);
       }
 
-      if (!provider) {
-        setMembers([]);
-        setTeamMemberCount(0);
-        setDirectDepositTotal(0n);
-        setTeamDepositTotal(0n);
-        return;
-      }
-
       const userLower = address.toLowerCase();
-      const latestBlock = await provider.getBlockNumber();
-      const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null), 0, latestBlock);
+      const allBindEvents = await nexus.queryFilter(nexus.filters.ReferrerBound(null, null));
 
       const childrenByReferrer = new Map<string, Set<string>>();
       for (const ev of allBindEvents as any[]) {
@@ -93,8 +84,8 @@ export function TeamPage() {
       setTeamMemberCount(downlineSet.size);
 
       const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
-        nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null), 0, latestBlock),
-        nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null), 0, latestBlock),
+        nexus.queryFilter(nexus.filters.NftaPurchased(null, null, null)),
+        nexus.queryFilter(nexus.filters.NftbPurchased(null, null, null)),
       ]);
 
       let nextDirectDeposit = 0n;
@@ -135,7 +126,7 @@ export function TeamPage() {
       setMembers([]);
       setMyReferrer(null);
     }
-  }, [nexus, address, provider]);
+  }, [nexus, address]);
 
   useEffect(() => {
     refreshData();

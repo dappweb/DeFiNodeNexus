@@ -164,8 +164,8 @@ async function addProjectTokensToWallet(walletProvider: Eip1193Provider) {
   const tofAddress = process.env.NEXT_PUBLIC_TOF_ADDRESS;
 
   const tokens: { address: string; symbol: string; decimals: number; name: string }[] = [];
-  if (totAddress) tokens.push({ address: totAddress, symbol: 'TOT', decimals: 18, name: 'Truth Oracle Token' });
-  if (tofAddress) tokens.push({ address: tofAddress, symbol: 'TOF', decimals: 18, name: 'Truth Oracle Fund' });
+  if (totAddress) tokens.push({ address: totAddress, symbol: 'TOT', decimals: 18, name: 'TOT Token' });
+  if (tofAddress) tokens.push({ address: tofAddress, symbol: 'TOF', decimals: 18, name: 'TOF Token' });
 
   for (const token of tokens) {
     try {

@@ -580,7 +580,7 @@ export function NodesPage() {
     if (!nexus) return;
     const target = (nftaTransferToByNode[nodeId.toString()] || "").trim();
     if (!ethers.isAddress(target)) {
-      toast({ title: "转让失败", description: "请输入有效钱包地址", variant: "destructive" });
+      toast({ title: t("toastTransferFailed"), description: t("toastTransferInvalidAddress"), variant: "destructive" });
       return;
     }
 
@@ -588,10 +588,10 @@ export function NodesPage() {
     try {
       const res = await execTx(() => nexus.transferNftaCard(target, nodeId));
       if (!res.success) {
-        toast({ title: "转让失败", description: toFriendlyTxError(res.error), variant: "destructive" });
+        toast({ title: t("toastTransferFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
       }
-      toast({ title: "转让成功", description: res.hash?.slice(0, 10) + "..." });
+      toast({ title: t("toastTransferSuccess"), description: res.hash?.slice(0, 10) + "..." });
       setNftaTransferToByNode((prev) => ({ ...prev, [nodeId.toString()]: "" }));
       await refreshData(false);
     } finally {
@@ -906,7 +906,9 @@ export function NodesPage() {
                   <CardTitle className="text-base">{t("myNftaTitle")}</CardTitle>
                   {nftaNodes.length > 0 && (
                     <CardDescription className="mt-0.5">
-                      共 {nftaNodes.length} 张 · 待领取 <span className="text-primary font-medium">{formatTot(totalNftaPending)} TOT</span>
+                        {t("myNodeSummary")
+                          .replace("{count}", String(nftaNodes.length))
+                          .replace("{amount}", formatTot(totalNftaPending))}
                     </CardDescription>
                   )}
                 </div>
@@ -934,7 +936,7 @@ export function NodesPage() {
                 nftaNodes.map((node) => (
                   <div key={node.nodeId.toString()} className="rounded-xl border border-border hover:bg-muted/20 transition-colors p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-sm">节点 #{node.nodeId.toString()} · {getNftaTierName(node.tierId)}</span>
+                      <span className="font-medium text-sm">{t("nodeLabel")} #{node.nodeId.toString()} · {getNftaTierName(node.tierId)}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${node.isActive ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"}`}>
                         {node.isActive ? t("nodeRunning") : t("nodePaused")}
                       </span>
@@ -958,7 +960,7 @@ export function NodesPage() {
                             [node.nodeId.toString()]: e.target.value,
                           }))
                         }
-                        placeholder="输入接收地址进行转让"
+                        placeholder={t("transferAddressPlaceholder")}
                         className="h-8 text-xs"
                       />
                       <Button
@@ -967,7 +969,7 @@ export function NodesPage() {
                         onClick={() => transferNfta(node.nodeId)}
                         disabled={!isConnected || loading}
                       >
-                        转让
+                        {t("transferBtn")}
                       </Button>
                     </div>
                   </div>
@@ -983,7 +985,9 @@ export function NodesPage() {
                   <CardTitle className="text-base">{t("myNftbTitle")}</CardTitle>
                   {nftbNodes.length > 0 && (
                     <CardDescription className="mt-0.5">
-                      共 {nftbNodes.length} 张 · 待领取 <span className="text-blue-500 font-medium">{formatTot(totalNftbPending)} TOT</span>
+                        {t("myNodeSummary")
+                          .replace("{count}", String(nftbNodes.length))
+                          .replace("{amount}", formatTot(totalNftbPending))}
                     </CardDescription>
                   )}
                 </div>
@@ -1006,7 +1010,7 @@ export function NodesPage() {
                 nftbNodes.map((node) => (
                   <div key={node.nodeId.toString()} className="rounded-xl border border-border hover:bg-muted/20 transition-colors p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-sm">节点 #{node.nodeId.toString()} · {getNftbTierName(node.tierId)}</span>
+                      <span className="font-medium text-sm">{t("nodeLabel")} #{node.nodeId.toString()} · {getNftbTierName(node.tierId)}</span>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${node.isActive ? "bg-green-500/10 text-green-600" : "bg-muted text-muted-foreground"}`}>
                         {node.isActive ? t("nodeRunning") : t("nodePaused")}
                       </span>
