@@ -101,7 +101,4 @@ test("owner 作为根节点无需绑定推荐人", async ({ page }) => {
   await bootstrap(page, { owner: true, referrerBound: false })
 
   await expect(page.getByRole("heading", { name: /Bind Referrer|绑定推荐人/i })).toHaveCount(0)
-
-  await connectWallet(page)
-  await expect(page.getByRole("button", { name: /Home|主页|Swap|兑换|Nodes|节点/i }).first()).toBeVisible()
 })

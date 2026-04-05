@@ -172,13 +172,14 @@ export default function DashboardPage() {
     : MOCK_USER_DATA.walletAddress;
 
   // Owner detection — auto-show admin panel for on-chain contract owner
-  const isOwner = isConnected && address
-    ? ownerAddress !== null && address.toLowerCase() === ownerAddress.toLowerCase()
+  const isOwner = isConnected && address && ownerAddress !== null
+    ? address.toLowerCase() === ownerAddress.toLowerCase()
     : false;
 
   const shouldShowAdmin = isOwner || isOperatorManager;
 
   // Referral binding required: connected + not owner + not yet bound
+  // Root node (owner) never needs referral binding
   const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
   const shouldBlockForReferral = needsReferralBinding && !referralPromptDismissed;
 
