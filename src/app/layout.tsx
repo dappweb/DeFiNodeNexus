@@ -1,10 +1,10 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { LanguageProvider } from '@/components/language-provider';
-import { Web3Provider } from '@/lib/web3-provider';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 import { RuntimeStabilityGuard } from '@/components/runtime-stability-guard';
+import { Web3Providers } from '@/components/web3-providers';
 
 export const metadata: Metadata = {
   title: 'Truth Oracle',
@@ -25,13 +25,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-background text-foreground min-h-screen">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <Web3Provider>
+          <Web3Providers>
             <LanguageProvider>
               <RuntimeStabilityGuard />
               {children}
               <Toaster />
             </LanguageProvider>
-          </Web3Provider>
+          </Web3Providers>
         </ThemeProvider>
       </body>
     </html>

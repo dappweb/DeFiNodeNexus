@@ -24,12 +24,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { AdminPage } from "@/components/pages/admin-page";
-import { EarningsPage } from "@/components/pages/earnings-page";
-import { HomePage } from "@/components/pages/home-page";
-import { NodesPage } from "@/components/pages/nodes-page";
-import { SwapPage } from "@/components/pages/swap-page";
-import { TeamPage } from "@/components/pages/team-page";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
@@ -380,16 +375,7 @@ export default function DashboardPage() {
             <ThemeToggle />
 
             {!isConnected ? (
-              <Button
-                onClick={connect}
-                disabled={isConnecting}
-                size="sm"
-                className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-2.5 sm:px-4 font-semibold cyan-glow text-xs"
-              >
-                <LinkIcon size={14} className="mr-1 sm:mr-1.5" />
-                <span className="hidden sm:inline">{isConnecting ? t("connecting") : t("connectWallet")}</span>
-                <span className="sm:hidden">{isConnecting ? "..." : t("connect")}</span>
-              </Button>
+              <WalletConnectButton />
             ) : (
               <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20 max-w-[10.5rem] sm:max-w-none">
                 <button

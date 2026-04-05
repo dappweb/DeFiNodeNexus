@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-04-03T22:06:09.572Z",
+  "totalUsers": 3,
+  "users": [
+    {
+      "address": "0x7123A25d205190e6844712Cb18e39d6DD5316143",
+      "referrer": "0x744447d8580EB900b199e852C132F626247a36F7",
+      "level": 0,
+      "directReferrals": 1,
+      "totalNodes": 3,
+      "pendingTot": "0.0",
+      "claimedTot": "0.0",
+      "withdrawnTot": "0.0"
+    },
+    {
+      "address": "0x744447d8580EB900b199e852C132F626247a36F7",
+      "referrer": null,
+      "level": 0,
+      "directReferrals": 1,
+      "totalNodes": 0,
+      "pendingTot": "0.0",
+      "claimedTot": "0.0",
+      "withdrawnTot": "0.0"
+    },
+    {
+      "address": "0xdC161B1a8406ed5B380574Be58D620dD429006D8",
+      "referrer": "0x7123A25d205190e6844712Cb18e39d6DD5316143",
+      "level": 0,
+      "directReferrals": 0,
+      "totalNodes": 0,
+      "pendingTot": "0.0",
+      "claimedTot": "0.0",
+      "withdrawnTot": "0.0"
+    }
+  ],
+  "statistics": {
+    "totalUsers": 3,
+    "totalDirectReferrals": 2,
+    "totalPendingTot": "0.00",
+    "totalClaimedTot": "0.00",
+    "levelDistribution": {
+      "0": 3,
+      "1": 0,
+      "2": 0,
+      "3": 0,
+      "4": 0,
+      "5": 0
+    }
+  }
+}
