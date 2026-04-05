@@ -1,3 +1,5 @@
+"use client";
+
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { sepolia } from 'wagmi/chains';
 import { QueryClient } from '@tanstack/react-query';
@@ -8,7 +10,7 @@ export const config = getDefaultConfig({
   appName: 'Truth Oracle',
   projectId,
   chains: [sepolia],
-  ssr: true,
+  ssr: false,
 });
 
 export const queryClient = new QueryClient();

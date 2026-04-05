@@ -3,6 +3,7 @@ import type {NextConfig} from 'next';
 const isDev = process.env.NODE_ENV !== 'production'
 
 const nextConfig: NextConfig = {
+  distDir: isDev ? '.next-dev' : '.next',
   // 'standalone' bundles all dependencies for self-hosted Node.js deployment.
   // After `npm run build`, run: node .next/standalone/server.js
   output: 'standalone',

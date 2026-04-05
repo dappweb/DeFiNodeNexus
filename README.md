@@ -77,6 +77,17 @@ npm install
 npm run dev
 ```
 
+## 本地与 Vercel 保持一致
+
+1. 先把 Vercel 环境变量拉到本地：`npm run vercel:env:pull`
+2. 校验本地关键变量是否与线上部署口径一致：`npm run vercel:env:check`
+3. 用生产构建方式在本地启动，而不是仅使用开发模式：`npm run dev:vercel`
+
+说明：
+- `npm run dev` 使用 `next dev --turbopack`，用于开发效率，不保证与 Vercel 生产环境完全一致。
+- `npm run dev:vercel` 会先做环境校验，再执行生产构建并用 `next start -p 9002` 启动，更接近 Vercel 实际行为。
+- `postbuild` 已改为 Node 脚本，Windows 本地构建也能与线上一样复制 standalone 产物。
+
 ## Cloudflare 部署配置
 
 - **构建命令**: `npm run pages:build`
