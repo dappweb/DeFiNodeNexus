@@ -40,7 +40,7 @@ export function WalletConnectButton() {
                   <button
                     onClick={openConnectModal}
                     type="button"
-                    className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-2.5 sm:px-4 font-semibold cyan-glow text-xs flex items-center gap-1 sm:gap-1.5"
+                    className="bg-accent text-accent-foreground hover:bg-accent/90 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold cyan-glow text-xs sm:text-sm flex items-center gap-1 sm:gap-1.5"
                   >
                     <LinkIcon size={14} />
                     <span className="hidden sm:inline">连接钱包</span>
@@ -51,7 +51,7 @@ export function WalletConnectButton() {
 
               if (chain.unsupported) {
                 return (
-                  <button onClick={openChainModal} type="button">
+                  <button onClick={openChainModal} type="button" className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm">
                     Wrong network
                   </button>
                 );
@@ -61,7 +61,7 @@ export function WalletConnectButton() {
                 <div style={{ display: 'flex', gap: 12 }}>
                   <button
                     onClick={openChainModal}
-                    style={{ display: 'flex', alignItems: 'center' }}
+                    className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm flex items-center"
                     type="button"
                   >
                     {chain.hasIcon && (
@@ -87,7 +87,7 @@ export function WalletConnectButton() {
                     {chain.name}
                   </button>
 
-                  <button onClick={openAccountModal} type="button">
+                  <button onClick={openAccountModal} type="button" className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm">
                     {account.displayName}
                     {account.displayBalance
                       ? ` (${account.displayBalance})`
