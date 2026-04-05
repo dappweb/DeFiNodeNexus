@@ -25,6 +25,12 @@ import {
 import { useEffect, useState } from "react";
 
 import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { HomePage } from "@/components/pages/home-page";
+import { NodesPage } from "@/components/pages/nodes-page";
+import { SwapPage } from "@/components/pages/swap-page";
+import { EarningsPage } from "@/components/pages/earnings-page";
+import { TeamPage } from "@/components/pages/team-page";
+import { AdminPage } from "@/components/pages/admin-page";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
