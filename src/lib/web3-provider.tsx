@@ -1,15 +1,16 @@
 
 "use client";
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi';
+import { ethers } from 'ethers';
 
 interface Web3ContextType {
   address: `0x${string}` | undefined;
   isConnected: boolean;
   isConnecting: boolean;
-  provider: any;
-  signer: any;
+  provider: ethers.Provider | null;
+  signer: ethers.Signer | null;
   connect: () => void;
   addProjectTokens: () => Promise<void>;
   disconnect: () => void;
@@ -26,6 +27,23 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   const { connect } = useConnect();
   const { disconnect } = useDisconnect();
   const { data: walletClient } = useWalletClient();
+
+  // Convert viem WalletClient → ethers v6 BrowserProvider + Signer
+  const [ethersSigner, setEthersSigner] = useState<ethers.Signer | null>(null);
+  const [ethersProvider, setEthersProvider] = useState<ethers.Provider | null>(null);
+
+  useEffect(() => {
+    if (walletClient && typeof window !== 'undefined' && window.ethereum) {
+      const browserProvider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider);
+      setEthersProvider(browserProvider);
+      browserProvider.getSigner()
+        .then((s) => setEthersSigner(s))
+        .catch(() => setEthersSigner(null));
+    } else {
+      setEthersSigner(null);
+      setEthersProvider(null);
+    }
+  }, [walletClient]);
 
   const handleConnect = () => {
     // RainbowKit will handle connector selection via its modal
@@ -67,8 +85,8 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       address,
       isConnected,
       isConnecting,
-      provider: walletClient,
-      signer: walletClient,
+      provider: ethersProvider,
+      signer: ethersSigner,
       connect: handleConnect,
       addProjectTokens,
       disconnect,

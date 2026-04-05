@@ -409,6 +409,32 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* Dev-only: admin detection debug bar */}
+      {process.env.NODE_ENV === "development" && isConnected && (
+        <div className="bg-zinc-900 text-zinc-300 text-[11px] font-mono px-4 py-1 flex flex-wrap gap-x-4 gap-y-0.5 border-b border-zinc-700">
+          <span>
+            Connected:&nbsp;
+            <span className="text-yellow-300">{address ?? "—"}</span>
+          </span>
+          <span>
+            Owner (chain):&nbsp;
+            <span className="text-cyan-300">{ownerAddress ?? (ownerStatusLoaded ? "null" : "loading…")}</span>
+          </span>
+          <span>
+            Match:&nbsp;
+            {ownerStatusLoaded
+              ? isOwner
+                ? <span className="text-green-400 font-bold">✅ YES → Admin visible</span>
+                : <span className="text-red-400 font-bold">❌ NO → Admin hidden</span>
+              : <span className="text-zinc-500">checking…</span>
+            }
+          </span>
+          {isOperatorManager && (
+            <span className="text-purple-300">🔧 isDistributor = true</span>
+          )}
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
         <div className="mx-auto w-full max-w-7xl">

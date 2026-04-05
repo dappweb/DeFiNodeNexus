@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "@/lib/web3-provider";
-import { CONTRACTS, NEXUS_ABI, SWAP_ABI, ERC20_ABI } from "@/lib/contracts";
+import { CONTRACTS, NEXUS_ABI, SWAP_ABI, ERC20_ABI, TOF_ABI } from "@/lib/contracts";
 export { execTx } from "@/lib/tx";
 
 declare global {
@@ -100,5 +100,16 @@ export function useERC20Contract(address: string | undefined) {
     const signerOrProvider = signer || provider || getFallbackProvider();
     return new ethers.Contract(address, ERC20_ABI, signerOrProvider);
   }, [address, signer, provider]);
+}
+
+export function useTofTokenContract() {
+  const { signer, provider } = useWeb3();
+  return useMemo(() => {
+    if (!CONTRACTS.TOF) return null;
+    const mock = getE2EContractMock(CONTRACTS.TOF);
+    if (mock) return mock as ethers.Contract;
+    const signerOrProvider = signer || provider || getFallbackProvider();
+    return new ethers.Contract(CONTRACTS.TOF, TOF_ABI, signerOrProvider);
+  }, [signer, provider]);
 }
 

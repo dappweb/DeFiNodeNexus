@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWeb3 } from "@/lib/web3-provider";
-import { useNexusContract, useSwapContract, execTx } from "@/hooks/use-contract";
+import { useNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { formatAddress, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
 
@@ -36,6 +36,7 @@ export function AdminPage() {
   const { toast } = useToast();
   const nexus = useNexusContract();
   const swap = useSwapContract();
+  const tof = useTofTokenContract();
 
   const [loading, setLoading] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState("");
@@ -91,6 +92,11 @@ export function AdminPage() {
   const [distributorAddr, setDistributorAddr] = useState("");
   const [distributorStatus, setDistributorStatus] = useState("true");
 
+  // TOF 白名单
+  const [tofWhitelistAddr, setTofWhitelistAddr] = useState("");
+  const [tofWhitelistStatus, setTofWhitelistStatus] = useState("true");
+  const [tofWhitelistResult, setTofWhitelistResult] = useState<Record<string, boolean | null>>({});
+
   // 直接注册购买
   const [registerUserAddr, setRegisterUserAddr] = useState("");
   const [registerTierId, setRegisterTierId] = useState("");
@@ -101,6 +107,39 @@ export function AdminPage() {
     if (!address || !ownerAddress) return false;
     return address.toLowerCase() === ownerAddress.toLowerCase();
   }, [address, ownerAddress]);
+
+  const NEXUS_ADDR = process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "";
+  const SWAP_ADDR  = process.env.NEXT_PUBLIC_SWAP_ADDRESS  || "";
+
+  const checkTofWhitelist = async () => {
+    if (!tof) return;
+    const addrs = [NEXUS_ADDR, SWAP_ADDR, tofWhitelistAddr.trim()].filter(Boolean);
+    const results: Record<string, boolean | null> = {};
+    await Promise.all(addrs.map(async (a) => {
+      try { results[a] = Boolean(await tof.transferWhitelist(a)); }
+      catch { results[a] = null; }
+    }));
+    setTofWhitelistResult(results);
+  };
+
+  const onSetTofWhitelist = async () => {
+    if (!tof) return;
+    const addr = tofWhitelistAddr.trim();
+    if (!ethers.isAddress(addr)) {
+      toast({ title: "地址格式错误", variant: "destructive" }); return;
+    }
+    await runTx(`TOF白名单 ${addr.slice(0,8)}... ${tofWhitelistStatus === 'true' ? '加入' : '移除'}`,
+      () => tof.setTransferWhitelist(addr, tofWhitelistStatus === "true"));
+    checkTofWhitelist();
+  };
+
+  const onWhitelistNexusAndSwap = async () => {
+    if (!tof) return;
+    for (const addr of [NEXUS_ADDR, SWAP_ADDR].filter(Boolean)) {
+      await runTx(`TOF白名单加入 ${addr.slice(0,8)}...`, () => tof.setTransferWhitelist(addr, true));
+    }
+    checkTofWhitelist();
+  };
 
   const refresh = async () => {
     if (!nexus) return;
@@ -724,6 +763,62 @@ export function AdminPage() {
             </Select>
             <div />
             <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetDistributor}>设置</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== TOF 白名单管理 ===== */}
+      <Card className="border-red-500/40">
+        <CardHeader>
+          <CardTitle className="text-red-500">TOF 转账白名单</CardTitle>
+          <CardDescription>
+            提现/领取手续费需要 Nexus 合约和 Swap 合约在 TOF 白名单中。若提现报 &quot;TOF non-transferable&quot; 请先点「一键修复」。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* 一键修复按钮 */}
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              disabled={!isOwner || loading || !tof}
+              onClick={onWhitelistNexusAndSwap}
+              className="bg-red-600 hover:bg-red-500 text-white"
+            >
+              一键修复：将 Nexus + Swap 加入白名单
+            </Button>
+            <Button variant="outline" disabled={!tof} onClick={checkTofWhitelist}>查询白名单状态</Button>
+          </div>
+
+          {/* 白名单状态展示 */}
+          {Object.keys(tofWhitelistResult).length > 0 && (
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-xs font-mono space-y-1">
+              {Object.entries(tofWhitelistResult).map(([addr, ok]) => (
+                <div key={addr} className="flex items-center gap-2">
+                  <span className={ok ? "text-green-400" : ok === false ? "text-red-400" : "text-zinc-400"}>
+                    {ok === null ? "❓" : ok ? "✅" : "❌"}
+                  </span>
+                  <span className="truncate">{addr}</span>
+                  <span className="text-muted-foreground">{ok === null ? "查询失败" : ok ? "已授权" : "未授权"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 手动设置单个地址 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input
+              value={tofWhitelistAddr}
+              onChange={(e) => setTofWhitelistAddr(e.target.value)}
+              placeholder="合约地址 0x..."
+              className="md:col-span-2"
+            />
+            <Select value={tofWhitelistStatus} onValueChange={setTofWhitelistStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">加入白名单</SelectItem>
+                <SelectItem value="false">移除白名单</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" disabled={!isOwner || loading || !tof} onClick={onSetTofWhitelist}>设置</Button>
           </div>
         </CardContent>
       </Card>
