@@ -701,6 +701,10 @@ contract DeFiNodeNexus is Ownable {
     }
 
     function _bindReferrerIfNeeded(address user, address referrer) internal {
+        if (user == owner()) {
+            return;
+        }
+
         if (accounts[user].referrer == address(0) && referrer != address(0) && referrer != user) {
             _bindReferrer(user, referrer);
         }
@@ -708,6 +712,7 @@ contract DeFiNodeNexus is Ownable {
 
     function _bindReferrer(address user, address referrer) internal {
         require(user != address(0), "User is zero");
+        require(user != owner(), "Owner is root");
         require(referrer != address(0), "Referrer is zero");
         require(referrer != user, "Self referral");
         require(accounts[user].referrer == address(0), "Already bound");

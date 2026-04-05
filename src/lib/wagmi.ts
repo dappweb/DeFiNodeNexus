@@ -1,5 +1,4 @@
 import { getDefaultConfig } from '@rainbow-me/rainbowkit';
-import { metaMaskWallet, walletConnectWallet, injectedWallet } from '@rainbow-me/rainbowkit/wallets';
 import { sepolia } from 'wagmi/chains';
 import { QueryClient } from '@tanstack/react-query';
 
@@ -9,21 +8,6 @@ export const config = getDefaultConfig({
   appName: 'Truth Oracle',
   projectId,
   chains: [sepolia],
-  wallets: [
-    {
-      groupName: '已安装',
-      wallets: [
-        metaMaskWallet,
-        injectedWallet,
-      ],
-    },
-    {
-      groupName: '其他',
-      wallets: [
-        walletConnectWallet,
-      ],
-    },
-  ],
   ssr: true,
 });
 

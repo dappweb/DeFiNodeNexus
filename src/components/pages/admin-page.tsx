@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useWeb3 } from "@/lib/web3-provider";
 import { useNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { formatAddress, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
+import { ChevronDown } from "lucide-react";
 
 function parseNodeId(value: string): bigint | null {
   const trimmed = value.trim();
@@ -537,6 +540,23 @@ export function AdminPage() {
           <CardDescription>转卡与单节点领取</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看操作举例
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-1">
+                  <div><strong>举例1：转让节点</strong></div>
+                  <div>• 节点ID：<code className="bg-black/20 px-1 rounded">12345</code></div>
+                  <div>• 接收地址：<code className="bg-black/20 px-1 rounded">0x742d35Cc6634C0532925a3b844Bc87e9f88aEd39</code></div>
+                  <div className="mt-1"><strong>举例2：领取单个节点收益</strong></div>
+                  <div>• 节点ID：<code className="bg-black/20 px-1 rounded">12345</code></div>
+                  <div className="text-zinc-400 mt-1">✓ 节点ID为数字，接收地址需要有效的以太坊地址格式</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={transferNodeId} onChange={(e) => setTransferNodeId(e.target.value)} placeholder="节点ID" />
             <Input value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder="接收地址" />
@@ -556,6 +576,31 @@ export function AdminPage() {
           <CardDescription>转卡格式：地址,节点ID；领取格式：每行一个节点ID</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看批量操作示例
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3 space-y-2">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>批量转卡示例</strong>（每行一条，地址和节点ID用逗号分隔）：</div>
+                  <div className="bg-black/30 p-2 rounded font-mono text-xs whitespace-pre-wrap overflow-x-auto">
+{`0x742d35Cc6634C0532925a3b844Bc87e9f88aEd39,12345
+0x8fd379246834a3cDa7c1C2EACD957b5747539ca42,12346
+0xAbFD8f7d3b214b3B74dd6fA6C80dFe2f59C1c6ea,12347`}
+                  </div>
+                  <div className="mt-2"><strong>批量领取示例</strong>（每行一个节点ID）：</div>
+                  <div className="bg-black/30 p-2 rounded font-mono text-xs whitespace-pre-wrap">
+{`12345
+12346
+12347
+12348`}
+                  </div>
+                  <div className="text-zinc-400 mt-2">💡 提示：操作完成后会显示每笔交易的结果（成功/失败）</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Textarea value={bulkTransferInput} onChange={(e) => setBulkTransferInput(e.target.value)} className="min-h-[120px]" placeholder="0xabc...,123" />
@@ -578,6 +623,28 @@ export function AdminPage() {
           <CardDescription>TOF 领取费率、奖励池注资、Swap通缩</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看参数说明与示例
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-1">
+                  <div><strong>参数解释：</strong></div>
+                  <div>• <strong>TOF 领取费率</strong>：用户领取TOT时收取的手续费（bps单位，1 bps = 0.01%）</div>
+                  <div>• <strong>奖励池注资</strong>：向奖励池添加TOT代币，单位为TOT</div>
+                  <div>• <strong>执行通缩</strong>：触发Swap合约的4小时通缩逻辑（自动焚烧部分代币）</div>
+                  <div className="mt-2"><strong>常见配置示例：</strong></div>
+                  <div className="bg-black/30 p-2 rounded">
+                    • TOF费率: 500 (0.5%的手续费)<br/>
+                    • 奖励池注资: 10000 (增加1万TOT)<br/>
+                    • 通缩频率: 手动触发或定时触发
+                  </div>
+                  <div className="text-zinc-400 mt-1">✓ 费率范围：0-10000 bps（即0%-100%）</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF领取费率 bps" />
             <div />
@@ -602,6 +669,31 @@ export function AdminPage() {
           <CardDescription>TOT/USDT 分红发放、预测流水分红、预测流水费率设置</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看 NFTB 分红管理指南
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>分红类型说明：</strong></div>
+                  <div>• <strong>TOT分红</strong>：定期向NFTB持有人分配TOT代币</div>
+                  <div>• <strong>USDT分红</strong>：定期向NFTB持有人分配USDT稳定币</div>
+                  <div>• <strong>预测流水分红</strong>：根据用户预测活动的流水情况分配USDT</div>
+                  <div className="mt-2"><strong>预测流水费率说明：</strong></div>
+                  <div>• 3个Tier级别对应不同的流水转化率</div>
+                  <div>• 初级(Tier1): 40 bps、中级(Tier2): 50 bps、高级(Tier3): 60 bps</div>
+                  <div className="mt-2"><strong>操作示例：</strong></div>
+                  <div className="bg-black/30 p-2 rounded">
+                    • TOT分红: 输入1000表示向所有NFTB持有人分配1000个TOT<br/>
+                    • USDT分红: 输入5000表示分配5000个USDT<br/>
+                    • 预测流水: 输入2000表示分配2000个USDT作为预测奖励
+                  </div>
+                  <div className="text-zinc-400 mt-1">💡 分红会按照用户的权重自动分配</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={nftbTotDividendAmount} onChange={(e) => setNftbTotDividendAmount(e.target.value)} placeholder="NFTB TOT分红金额" />
             <div />
@@ -635,6 +727,31 @@ export function AdminPage() {
           <CardDescription>配置NFTA/NFTB等级参数</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-3">
+              <ChevronDown className="h-4 w-4" /> 查看 Tier 配置说明与举例
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3 space-y-2">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>NFTA Tier 配置参数说明：</strong></div>
+                  <div>• Tier ID：等级编号（0表示新建），如1、2、3等</div>
+                  <div>• 价格：购买价格（USDT，如100、500、1000）</div>
+                  <div>• 日收益：每天获得的TOT收益</div>
+                  <div>• 最大供应：该等级最多可发行多少个NFT</div>
+                  <div>• 激活状态：是否启用该等级</div>
+                  <div className="mt-2"><strong>举例</strong>：创建一个高级NFTA</div>
+                  <div className="bg-black/30 p-2 rounded text-xs">
+                    Tier ID: 3 | 价格: 1000 | 日收益: 10 | 最大供应: 100 | 激活: ✓
+                  </div>
+                  <div className="mt-2"><strong>NFTB Tier 配置参数说明：</strong></div>
+                  <div>• 权重：在分红中的权重系数</div>
+                  <div>• 分红bps：该等级的分红比率（0-10000，1 bps = 0.01%）</div>
+                  <div className="text-zinc-400 mt-1">💡 建议：分红bps对应Tier级别提升而增加，如Tier1:1000, Tier2:1500, Tier3:2000</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div>
             <div className="text-sm font-semibold mb-2">NFTA Tier 配置</div>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
@@ -680,6 +797,31 @@ export function AdminPage() {
           <CardDescription>为用户直接注册节点购买（无链下支付）</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看注册流程与示例
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>操作流程：</strong></div>
+                  <div>1️⃣ 选择注册类型（NFTA 或 NFTB）</div>
+                  <div>2️⃣ 输入用户钱包地址（要为其开户的用户）</div>
+                  <div>3️⃣ 输入 Tier ID（等级号，如1、2、3）</div>
+                  <div>4️⃣ 可选：输入推荐人地址（若无推荐人留空）</div>
+                  <div>5️⃣ 点击"注册"按钮完成注册</div>
+                  <div className="mt-2"><strong>实际示例</strong>：</div>
+                  <div className="bg-black/30 p-2 rounded">
+                    用户地址: 0x742d35Cc6634C0532925a3b844Bc87e9f88aEd39<br/>
+                    Tier ID: 1<br/>
+                    推荐人: 0x8fd379246834a3cDa7c1C2EACD957b5747539ca42<br/>
+                    类型: NFTA
+                  </div>
+                  <div className="text-zinc-400 mt-1">✓ 注册后该用户即可开始使用系统中的对应功能</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="用户地址" />
@@ -708,6 +850,31 @@ export function AdminPage() {
           <CardDescription>设置 TOF 费率和提现等级费用</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看费率配置详解
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>TOF 燃烧比率</strong></div>
+                  <div>• 用户领取收益时 TOF 代币被销毁的比例</div>
+                  <div>• 单位为 bps（基点），1 bps = 0.01%，10000 bps = 100%</div>
+                  <div className="mt-2"><strong>提现费率等级</strong></div>
+                  <div>• 6个等级（0-5），不同等级对应不同的提现手续费</div>
+                  <div>• 等级越高，提现费率可能越低或越高（根据业务规则）</div>
+                  <div className="mt-2"><strong>费率配置示例</strong>：</div>
+                  <div className="bg-black/30 p-2 rounded">
+                    • TOF燃烧比率: 1000 (1%的TOF会被销毁)<br/>
+                    • Lv0 提现费率: 500 (0.5%)<br/>
+                    • Lv1 提现费率: 400 (0.4%)<br/>
+                    • Lv2 提现费率: 300 (0.3%)
+                  </div>
+                  <div className="text-zinc-400 mt-1">✓ 费率值范围：0-10000 bps</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 燃烧比率 bps" />
             <div />
@@ -733,6 +900,26 @@ export function AdminPage() {
           <CardDescription>管理Treasury、分布钱包、分发器</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看钱包用途说明
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-1">
+                  <div><strong>各钱包用途：</strong></div>
+                  <div>• <strong>Treasury</strong>：项目金库，管理流动性和储备金</div>
+                  <div>• <strong>0号线</strong>：零号线分配钱包，用于特定渠道分配</div>
+                  <div>• <strong>社区建设</strong>：社区发展基金钱包</div>
+                  <div>• <strong>基金会</strong>：基金会管理钱包</div>
+                  <div>• <strong>机构</strong>：合作机构钱包</div>
+                  <div>• <strong>项目方</strong>：项目开发团队钱包</div>
+                  <div>• <strong>分发器</strong>：代理分发代币的合约/钱包，需单独授权</div>
+                  <div className="text-zinc-400 mt-2">💡 填入真实的以太坊地址，不要使用测试地址</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={treasuryAddr} onChange={(e) => setTreasuryAddr(e.target.value)} placeholder="Treasury 地址" />
             <div />
@@ -773,6 +960,26 @@ export function AdminPage() {
           <CardTitle className="text-red-500">TOF 转账白名单</CardTitle>
           <CardDescription>
             提现/领取手续费需要 Nexus 合约和 Swap 合约在 TOF 白名单中。若提现报 &quot;TOF non-transferable&quot; 请先点「一键修复」。
+                    <Collapsible defaultOpen={false}>
+                      <CollapsibleTrigger className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 mb-2">
+                        <ChevronDown className="h-4 w-4" /> 常见问题与快速解决
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mb-3">
+                        <Alert className="border-red-500/50 bg-red-500/5 text-xs">
+                          <AlertDescription className="space-y-2">
+                            <div><strong>❌ 问题：提现时出现 "TOF non-transferable" 错误</strong></div>
+                            <div>原因：Nexus 或 Swap 合约不在 TOF 白名单中</div>
+                            <div><strong>✅ 快速解决：</strong>点击「一键修复：将 Nexus + Swap 加入白名单」按钮</div>
+                            <div className="mt-2"><strong>⚙️ 手动操作流程：</strong></div>
+                            <div>1️⃣ 点击「查询白名单状态」查看当前状态</div>
+                            <div>2️⃣ 若显示 ❌ 则需要加入白名单</div>
+                            <div>3️⃣ 输入合约地址（如 Nexus 或自定义合约）</div>
+                            <div>4️⃣ 选择「加入白名单」并点「设置」</div>
+                            <div className="mt-2"><strong>💡 提示：</strong>激活新的合约时记得加入白名单，否则无法进行转账操作</div>
+                          </AlertDescription>
+                        </Alert>
+                      </CollapsibleContent>
+                    </Collapsible>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
