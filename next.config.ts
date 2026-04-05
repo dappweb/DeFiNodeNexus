@@ -2,24 +2,23 @@ import type {NextConfig} from 'next';
 
 const isDev = process.env.NODE_ENV !== 'production'
 
+// Trim helper: Vercel sometimes injects \r\n into env var values.
+const e = (key: string, fallback = "") =>
+  (process.env[key]?.trim() || process.env[key.replace(/^NEXT_PUBLIC_/, "")]?.trim() || fallback);
+
 const nextConfig: NextConfig = {
   distDir: isDev ? '.next-dev' : '.next',
   // 'standalone' bundles all dependencies for self-hosted Node.js deployment.
   // After `npm run build`, run: node .next/standalone/server.js
   output: 'standalone',
   env: {
-    NEXT_PUBLIC_SEPOLIA_RPC_URL:
-      process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL || "",
-    NEXT_PUBLIC_NEXUS_ADDRESS:
-      process.env.NEXT_PUBLIC_NEXUS_ADDRESS || process.env.NEXUS_ADDRESS || "",
-    NEXT_PUBLIC_SWAP_ADDRESS:
-      process.env.NEXT_PUBLIC_SWAP_ADDRESS || process.env.SWAP_ADDRESS || "",
-    NEXT_PUBLIC_TOT_ADDRESS:
-      process.env.NEXT_PUBLIC_TOT_ADDRESS || process.env.TOT_TOKEN_ADDRESS || "",
-    NEXT_PUBLIC_TOF_ADDRESS:
-      process.env.NEXT_PUBLIC_TOF_ADDRESS || process.env.TOF_TOKEN_ADDRESS || "",
-    NEXT_PUBLIC_USDT_ADDRESS:
-      process.env.NEXT_PUBLIC_USDT_ADDRESS || process.env.USDT_TOKEN_ADDRESS || "",
+    NEXT_PUBLIC_SEPOLIA_RPC_URL:   e("NEXT_PUBLIC_SEPOLIA_RPC_URL") || e("SEPOLIA_RPC_URL"),
+    NEXT_PUBLIC_NEXUS_ADDRESS:     e("NEXT_PUBLIC_NEXUS_ADDRESS")   || e("NEXUS_ADDRESS"),
+    NEXT_PUBLIC_SWAP_ADDRESS:      e("NEXT_PUBLIC_SWAP_ADDRESS")    || e("SWAP_ADDRESS"),
+    NEXT_PUBLIC_TOT_ADDRESS:       e("NEXT_PUBLIC_TOT_ADDRESS")     || e("TOT_TOKEN_ADDRESS"),
+    NEXT_PUBLIC_TOF_ADDRESS:       e("NEXT_PUBLIC_TOF_ADDRESS")     || e("TOF_TOKEN_ADDRESS"),
+    NEXT_PUBLIC_USDT_ADDRESS:      e("NEXT_PUBLIC_USDT_ADDRESS")    || e("USDT_TOKEN_ADDRESS"),
+    NEXT_PUBLIC_CONTRACT_OWNER:    e("NEXT_PUBLIC_CONTRACT_OWNER")  || e("CONTRACT_OWNER"),
   },
   ...(isDev && {
     allowedDevOrigins: [

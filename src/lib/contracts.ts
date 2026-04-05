@@ -13,12 +13,18 @@ const DEPLOYED = {
   USDT:  "0x02ED3072eB83e4E0654d30250102aA58cE977789",
 } as const;
 
+// Vercel (and some CI systems) sometimes injects \r\n into env var values
+// when they were set with Windows line endings. Trim to be safe.
+function envAddr(val: string | undefined, fallback: string): string {
+  return val?.trim() || fallback;
+}
+
 export const CONTRACTS = {
-  NEXUS: process.env.NEXT_PUBLIC_NEXUS_ADDRESS || DEPLOYED.NEXUS,
-  SWAP:  process.env.NEXT_PUBLIC_SWAP_ADDRESS  || DEPLOYED.SWAP,
-  TOT:   process.env.NEXT_PUBLIC_TOT_ADDRESS   || DEPLOYED.TOT,
-  TOF:   process.env.NEXT_PUBLIC_TOF_ADDRESS   || DEPLOYED.TOF,
-  USDT:  process.env.NEXT_PUBLIC_USDT_ADDRESS  || DEPLOYED.USDT,
+  NEXUS: envAddr(process.env.NEXT_PUBLIC_NEXUS_ADDRESS, DEPLOYED.NEXUS),
+  SWAP:  envAddr(process.env.NEXT_PUBLIC_SWAP_ADDRESS,  DEPLOYED.SWAP),
+  TOT:   envAddr(process.env.NEXT_PUBLIC_TOT_ADDRESS,   DEPLOYED.TOT),
+  TOF:   envAddr(process.env.NEXT_PUBLIC_TOF_ADDRESS,   DEPLOYED.TOF),
+  USDT:  envAddr(process.env.NEXT_PUBLIC_USDT_ADDRESS,  DEPLOYED.USDT),
 };
 
 export const NEXUS_ABI = [

@@ -35,7 +35,9 @@ function getFallbackProvider(): ethers.Provider {
           "https://rpc.sepolia.org",
           "https://1rpc.io/sepolia",
           process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
-        ].filter((value): value is string => Boolean(value && value.trim()))
+        ]
+          .map((v) => v?.trim())
+          .filter((value): value is string => Boolean(value))
       )
     );
 

@@ -47,6 +47,10 @@ export default function DashboardPage() {
   const nexus = useNexusContract();
   const { toast } = useToast();
 
+  // Env-var override: deployer can set NEXT_PUBLIC_CONTRACT_OWNER to their address.
+  // This allows instant admin detection without waiting for an on-chain RPC call.
+  const envOwnerAddress = process.env.NEXT_PUBLIC_CONTRACT_OWNER?.trim() || null;
+
   // Referral binding state
   const [referrerBound, setReferrerBound] = useState(false);
   const [referrerStatusLoaded, setReferrerStatusLoaded] = useState(false);
@@ -123,10 +127,20 @@ export default function DashboardPage() {
     const loadOwner = async () => {
       if (!cancelled) setOwnerStatusLoaded(false);
 
+      // Fast path: use env-var override without any RPC call.
+      if (envOwnerAddress) {
+        if (!cancelled) {
+          setOwnerAddress(envOwnerAddress);
+          setOwnerStatusLoaded(true);
+        }
+        return;
+      }
+
       if (!nexus) {
+        // Contract not ready yet — mark as loaded so UI doesn't block forever.
         if (!cancelled) {
           setOwnerAddress(null);
-          setOwnerStatusLoaded(false);
+          setOwnerStatusLoaded(true);
         }
         return;
       }
@@ -147,7 +161,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [nexus]);
+  }, [nexus, envOwnerAddress]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,9 +185,15 @@ export default function DashboardPage() {
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : MOCK_USER_DATA.walletAddress;
 
-  // Owner detection — auto-show admin panel for on-chain contract owner
-  const isOwner = isConnected && address && ownerAddress !== null
-    ? address.toLowerCase() === ownerAddress.toLowerCase()
+  // Owner detection — auto-show admin panel for on-chain contract owner.
+  // Checks both env-var override and on-chain ownerAddress.
+  const isOwner = isConnected && address
+    ? [
+        ownerAddress,
+        envOwnerAddress,
+      ]
+        .filter(Boolean)
+        .some((o) => o!.toLowerCase() === address.toLowerCase())
     : false;
 
   const shouldShowAdmin = isOwner || isOperatorManager;
@@ -421,6 +441,12 @@ export default function DashboardPage() {
             Owner (chain):&nbsp;
             <span className="text-cyan-300">{ownerAddress ?? (ownerStatusLoaded ? "null" : "loading…")}</span>
           </span>
+          {envOwnerAddress && (
+            <span>
+              Owner (env):&nbsp;
+              <span className="text-orange-300">{envOwnerAddress}</span>
+            </span>
+          )}
           <span>
             Match:&nbsp;
             {ownerStatusLoaded
