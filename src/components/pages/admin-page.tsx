@@ -106,6 +106,26 @@ export function AdminPage() {
   const [registerReferrerAddr, setRegisterReferrerAddr] = useState("");
   const [registerType, setRegisterType] = useState("nfta");
 
+  // Swap 流动性管理
+  const [addLiquidityTot, setAddLiquidityTot] = useState("");
+  const [addLiquidityUsdt, setAddLiquidityUsdt] = useState("");
+  const [removeLiquidityTot, setRemoveLiquidityTot] = useState("");
+  const [removeLiquidityUsdt, setRemoveLiquidityUsdt] = useState("");
+
+  // Swap 费率配置
+  const [buyFeeBps, setBuyFeeBps] = useState("");
+  const [sellFeeBps, setSellFeeBps] = useState("");
+  const [profitTaxBps, setProfitTaxBps] = useState("");
+  const [deflationBps, setDeflationBps] = useState("");
+  const [maxDailyBuy, setMaxDailyBuy] = useState("");
+  const [maxSellBps, setMaxSellBps] = useState("");
+  const [distributionThreshold, setDistributionThreshold] = useState("");
+
+  // Swap 应急与配置
+  const [emergencyTokenAddr, setEmergencyTokenAddr] = useState("");
+  const [emergencyAmount, setEmergencyAmount] = useState("");
+  const [newNexusAddr, setNewNexusAddr] = useState("");
+
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
     return address.toLowerCase() === ownerAddress.toLowerCase();
@@ -518,6 +538,130 @@ export function AdminPage() {
       "设置分发器",
       () => nexus.setDistributor(distributorAddr.trim(), distributorStatus === "true")
     );
+  };
+
+  // ===== Swap 流动性管理 =====
+  const onAddLiquidity = async () => {
+    if (!swap) return;
+    const tot = parsePositiveAmount(addLiquidityTot);
+    const usdt = parsePositiveAmount(addLiquidityUsdt);
+    if (tot === null || usdt === null) {
+      toast({ title: "参数错误", description: "TOT和USDT金额必须大于0", variant: "destructive" });
+      return;
+    }
+    await runTx("提供流动性", () => swap.addLiquidity(tot, usdt));
+  };
+
+  const onRemoveLiquidity = async () => {
+    if (!swap) return;
+    const tot = parsePositiveAmount(removeLiquidityTot);
+    const usdt = parsePositiveAmount(removeLiquidityUsdt);
+    if (tot === null || usdt === null) {
+      toast({ title: "参数错误", description: "TOT和USDT金额必须大于0", variant: "destructive" });
+      return;
+    }
+    await runTx("移除流动性", () => swap.removeLiquidity(tot, usdt));
+  };
+
+  // ===== Swap 费率配置 =====
+  const onSetBuyFeeBps = async () => {
+    if (!swap) return;
+    const fee = parseBps(buyFeeBps);
+    if (fee === null) {
+      toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置买入费率", () => swap.setBuyFeeBps(fee));
+  };
+
+  const onSetSellFeeBps = async () => {
+    if (!swap) return;
+    const fee = parseBps(sellFeeBps);
+    if (fee === null) {
+      toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置卖出费率", () => swap.setSellFeeBps(fee));
+  };
+
+  const onSetProfitTaxBps = async () => {
+    if (!swap) return;
+    const tax = parseBps(profitTaxBps);
+    if (tax === null) {
+      toast({ title: "参数错误", description: "税率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置利润税率", () => swap.setProfitTaxBps(tax));
+  };
+
+  const onSetDeflationBps = async () => {
+    if (!swap) return;
+    const def = parseBps(deflationBps);
+    if (def === null) {
+      toast({ title: "参数错误", description: "比率必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置通胀比率", () => swap.setDeflationBps(def));
+  };
+
+  // ===== Swap 分配策略 =====
+  const onSetDistributionThreshold = async () => {
+    if (!swap) return;
+    const threshold = parsePositiveAmount(distributionThreshold);
+    if (threshold === null) {
+      toast({ title: "参数错误", description: "分配阈值必须大于0", variant: "destructive" });
+      return;
+    }
+    await runTx("设置分配阈值", () => swap.setDistributionThreshold(threshold));
+  };
+
+  const onSetMaxDailyBuy = async () => {
+    if (!swap) return;
+    const max = parsePositiveAmount(maxDailyBuy);
+    if (max === null) {
+      toast({ title: "参数错误", description: "日购买上限必须大于0", variant: "destructive" });
+      return;
+    }
+    await runTx("设置日购买上限", () => swap.setMaxDailyBuy(max));
+  };
+
+  const onSetMaxSellBps = async () => {
+    if (!swap) return;
+    const maxBps = parseBps(maxSellBps);
+    if (maxBps === null) {
+      toast({ title: "参数错误", description: "卖出比例必须在0-10000之间", variant: "destructive" });
+      return;
+    }
+    await runTx("设置最大卖出比例", () => swap.setMaxSellBps(maxBps));
+  };
+
+  // ===== Swap 核心功能 =====
+  const onSetNexus = async () => {
+    if (!swap) return;
+    if (!ethers.isAddress(newNexusAddr.trim())) {
+      toast({ title: "参数错误", description: "Nexus地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置Nexus地址", () => swap.setNexus(newNexusAddr.trim()));
+  };
+
+  const onForceDistribute = async () => {
+    if (!swap) return;
+    await runTx("强制分配", () => swap.forceDistribute());
+  };
+
+  const onEmergencyWithdraw = async () => {
+    if (!swap) return;
+    if (!ethers.isAddress(emergencyTokenAddr.trim())) {
+      toast({ title: "参数错误", description: "Token地址无效", variant: "destructive" });
+      return;
+    }
+    const amount = parsePositiveAmount(emergencyAmount);
+    if (amount === null) {
+      toast({ title: "参数错误", description: "提取金额必须大于0", variant: "destructive" });
+      return;
+    }
+    await runTx("应急提取", () => swap.emergencyWithdraw(emergencyTokenAddr.trim(), amount));
   };
 
   return (
@@ -950,6 +1094,193 @@ export function AdminPage() {
             </Select>
             <div />
             <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetDistributor}>设置</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== Swap 流动性管理 ===== */}
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Swap 流动性管理</CardTitle>
+          <CardDescription>提供或移除交易对流动性</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看流动性操作说明
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>提供流动性 (addLiquidity)</strong></div>
+                  <div>• 向DEX中存入等量价值的TOT和USDT</div>
+                  <div>• 接收LP（流动性提供者）凭证，可参与手续费分红</div>
+                  <div className="mt-1"><strong>移除流动性 (removeLiquidity)</strong></div>
+                  <div>• 根据LP凭证数量提取TOT和USDT</div>
+                  <div>• 返回时已包含期间获得的手续费收益</div>
+                  <div className="text-zinc-400 mt-1">💡 金额单位为最小单位（Wei）</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
+          <div className="space-y-2">
+            <div><strong className="text-xs">提供流动性</strong></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input value={addLiquidityTot} onChange={(e) => setAddLiquidityTot(e.target.value)} placeholder="TOT数额" />
+              <Input value={addLiquidityUsdt} onChange={(e) => setAddLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
+              <Button disabled={!isOwner || loading || !swap} onClick={onAddLiquidity}>提供流动性</Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div><strong className="text-xs">移除流动性</strong></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input value={removeLiquidityTot} onChange={(e) => setRemoveLiquidityTot(e.target.value)} placeholder="TOT数额" />
+              <Input value={removeLiquidityUsdt} onChange={(e) => setRemoveLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
+              <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onRemoveLiquidity}>移除流动性</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== Swap 费率配置 ===== */}
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Swap 费率配置</CardTitle>
+          <CardDescription>设置交易费率、通胀比率等参数</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看费率配置说明
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>买入费率 (setBuyFeeBps)</strong>：用户购买TOT时的交易费</div>
+                  <div><strong>卖出费率 (setSellFeeBps)</strong>：用户出售TOT时的交易费</div>
+                  <div><strong>利润税率 (setProfitTaxBps)</strong>：对交易利润部分征税</div>
+                  <div><strong>通胀比率 (setDeflationBps)</strong>：每次交易中销毁的代币比例</div>
+                  <div className="text-zinc-400 mt-1">💡 所有参数单位为bps（基点），10000 bps = 100%</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={buyFeeBps} onChange={(e) => setBuyFeeBps(e.target.value)} placeholder="买入费率 bps" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetBuyFeeBps}>设置买入费率</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={sellFeeBps} onChange={(e) => setSellFeeBps(e.target.value)} placeholder="卖出费率 bps" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetSellFeeBps}>设置卖出费率</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={profitTaxBps} onChange={(e) => setProfitTaxBps(e.target.value)} placeholder="利润税率 bps" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetProfitTaxBps}>设置利润税率</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={deflationBps} onChange={(e) => setDeflationBps(e.target.value)} placeholder="通胀比率 bps" />
+            <div />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetDeflationBps}>设置通胀比率</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== Swap 分配策略 ===== */}
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Swap 分配策略</CardTitle>
+          <CardDescription>配置分配阈值、交易限制</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看分配策略说明
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>分配阈值 (setDistributionThreshold)</strong></div>
+                  <div>• 当合约中累积费用达到此金额时自动触发分配</div>
+                  <div className="mt-1"><strong>日购买上限 (setMaxDailyBuy)</strong></div>
+                  <div>• 单个地址单日购买TOT的最大数量</div>
+                  <div className="mt-1"><strong>最大卖出比例 (setMaxSellBps)</strong></div>
+                  <div>• 单笔交易卖出的最大百分比限制</div>
+                  <div className="text-zinc-400 mt-1">💡 用于防止恶意操纵和保护市场防线</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={distributionThreshold} onChange={(e) => setDistributionThreshold(e.target.value)} placeholder="分配阈值" />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetDistributionThreshold}>设置分配阈值</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={maxDailyBuy} onChange={(e) => setMaxDailyBuy(e.target.value)} placeholder="日购买上限" />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetMaxDailyBuy}>设置日购买上限</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={maxSellBps} onChange={(e) => setMaxSellBps(e.target.value)} placeholder="最大卖出比例 bps" />
+            <div />
+            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetMaxSellBps}>设置卖出比例</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== Swap 核心功能 ===== */}
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Swap 核心功能</CardTitle>
+          <CardDescription>设置Nexus、强制分配、应急提取</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 查看核心功能说明
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-3">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-2">
+                  <div><strong>设置Nexus (setNexus)</strong></div>
+                  <div>• 绑定DeFiNodeNexus合约地址，用于交互</div>
+                  <div className="mt-1"><strong>强制分配 (forceDistribute)</strong></div>
+                  <div>• 立即触发分配流程，不等待阈值</div>
+                  <div>• 用于紧急情况或定期维护</div>
+                  <div className="mt-1"><strong>应急提取 (emergencyWithdraw)</strong></div>
+                  <div>• Owner仅有的安全提取机制</div>
+                  <div>• 适用于任意ERC20 token和native ETH</div>
+                  <div className="text-red-400 mt-1">⚠️ 应急提取是最后防线，正常操作应避免使用</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
+          <div className="space-y-2">
+            <div><strong className="text-xs">设置Nexus地址</strong></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input value={newNexusAddr} onChange={(e) => setNewNexusAddr(e.target.value)} placeholder="Nexus合约地址 0x..." />
+              <div />
+              <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetNexus}>设置Nexus</Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div><strong className="text-xs">强制分配</strong></div>
+            <Button disabled={!isOwner || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
+          </div>
+          <div className="space-y-2">
+            <div><strong className="text-xs">应急提取</strong></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input value={emergencyTokenAddr} onChange={(e) => setEmergencyTokenAddr(e.target.value)} placeholder="Token地址 0x..." />
+              <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="提取金额" />
+              <Button variant="destructive" disabled={!isOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
