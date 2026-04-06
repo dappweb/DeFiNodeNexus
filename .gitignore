@@ -45,3 +45,15 @@ next-env.d.ts
 # hardhat
 artifacts/
 cache/
+
+# runtime / build artifacts
+seer-dist/
+runtime/
+pnpm-lock.yaml
+
+# one-off reports & logs
+referral-report-*.json
+scripts/*.log
+
+# unrelated scripts
+aaClaw.sh
