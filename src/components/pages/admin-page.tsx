@@ -10,10 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useWeb3 } from "@/lib/web3-provider";
-import { useNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
+import { useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
-import { formatAddress, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
+import { formatAddress, getNftaTierName, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
 import { ChevronDown } from "lucide-react";
+
+type NftaIssueTierOption = {
+  tierId: number;
+  maxSupply: string;
+  currentSupply: string;
+  remaining: string;
+  isActive: boolean;
+};
+
+type NftaIssuedUserRecord = {
+  user: string;
+  tierId: string;
+  nodeId: string;
+  blockNumber: string;
+  txHash: string;
+};
 
 function parseNodeId(value: string): bigint | null {
   const trimmed = value.trim();
@@ -38,6 +54,7 @@ export function AdminPage() {
   const { address, isConnected } = useWeb3();
   const { toast } = useToast();
   const nexus = useNexusContract();
+  const readonlyNexus = useReadonlyNexusContract();
   const swap = useSwapContract();
   const tof = useTofTokenContract();
 
@@ -105,6 +122,8 @@ export function AdminPage() {
   const [registerTierId, setRegisterTierId] = useState("");
   const [registerReferrerAddr, setRegisterReferrerAddr] = useState("");
   const [registerType, setRegisterType] = useState("nfta");
+  const [nftaIssueTierOptions, setNftaIssueTierOptions] = useState<NftaIssueTierOption[]>([]);
+  const [nftaIssuedUsers, setNftaIssuedUsers] = useState<NftaIssuedUserRecord[]>([]);
 
   // Swap 流动性管理
   const [addLiquidityTot, setAddLiquidityTot] = useState("");
@@ -165,21 +184,24 @@ export function AdminPage() {
   };
 
   const refresh = async () => {
-    if (!nexus) return;
+    // Use the readonly (Sepolia-only) contract for reads so they succeed
+    // regardless of which chain the user's wallet is connected to.
+    const reader = readonlyNexus || nexus;
+    if (!reader) return;
     try {
       const [owner, claimFee, burnBps, flowRate1, flowRate2, flowRate3, treasury, zLine, comm, found, inst, proj] = await Promise.all([
-        nexus.owner(),
-        nexus.tofClaimFeeBps(),
-        nexus.tofBurnBps(),
-        nexus.predictionFlowBpsByTier(1),
-        nexus.predictionFlowBpsByTier(2),
-        nexus.predictionFlowBpsByTier(3),
-        nexus.treasury(),
-        nexus.zeroLineWallet(),
-        nexus.communityWallet(),
-        nexus.foundationWallet(),
-        nexus.institutionWallet(),
-        nexus.projectWallet(),
+        reader.owner(),
+        reader.tofClaimFeeBps(),
+        reader.tofBurnBps(),
+        reader.predictionFlowBpsByTier(1),
+        reader.predictionFlowBpsByTier(2),
+        reader.predictionFlowBpsByTier(3),
+        reader.treasury(),
+        reader.zeroLineWallet(),
+        reader.communityWallet(),
+        reader.foundationWallet(),
+        reader.institutionWallet(),
+        reader.projectWallet(),
       ]);
       setOwnerAddress(owner);
       setTofClaimFeeBps(claimFee.toString());
@@ -193,8 +215,68 @@ export function AdminPage() {
       setFoundationAddr(found);
       setInstitutionAddr(inst);
       setProjectAddr(proj);
-    } catch {
-      toast({ title: "读取失败", description: "请检查合约连接状态", variant: "destructive" });
+
+      const nextNftaTierIdRaw = await reader.nextNftaTierId();
+
+      const nextNftaTierId = Number(nextNftaTierIdRaw);
+      if (Number.isFinite(nextNftaTierId) && nextNftaTierId > 1) {
+        const tierIds = Array.from({ length: nextNftaTierId - 1 }, (_, idx) => idx + 1);
+        const tierResults = await Promise.all(
+          tierIds.map(async (tierId) => {
+            const [tier, remainingRaw] = await Promise.all([
+              reader.nftaTiers(BigInt(tierId)),
+              reader.getNftaTierRemaining(BigInt(tierId)),
+            ]);
+
+            return {
+              tierId,
+              maxSupply: BigInt(tier.maxSupply).toString(),
+              currentSupply: BigInt(tier.currentSupply).toString(),
+              remaining: BigInt(remainingRaw).toString(),
+              isActive: Boolean(tier.isActive),
+            } as NftaIssueTierOption;
+          })
+        );
+
+        const validTierOptions = tierResults.filter((tier) => BigInt(tier.maxSupply) > 0n);
+        setNftaIssueTierOptions(validTierOptions);
+        if (!registerTierId && validTierOptions.length > 0) {
+          setRegisterTierId(String(validTierOptions[0].tierId));
+        }
+      } else {
+        setNftaIssueTierOptions([]);
+      }
+
+      // Event query is isolated: failure here won't block the rest of the page
+      try {
+        const readerProvider = (reader.runner as any)?.provider;
+        if (readerProvider?.getBlockNumber) {
+          const latestBlock = await readerProvider.getBlockNumber();
+          const fromBlock = Math.max(0, latestBlock - 50_000);
+          const events = await reader.queryFilter(reader.filters.NftaPurchased(), fromBlock, latestBlock);
+          const records = events
+            .slice(-100)
+            .reverse()
+            .map((event: any) => ({
+              user: String(event.args?.user || ""),
+              tierId: BigInt(event.args?.tierId ?? 0).toString(),
+              nodeId: BigInt(event.args?.nodeId ?? 0).toString(),
+              blockNumber: String(event.blockNumber ?? "-"),
+              txHash: String(event.transactionHash || ""),
+            }))
+            .filter((row) => row.user && row.user !== ethers.ZeroAddress);
+          setNftaIssuedUsers(records);
+        } else {
+          setNftaIssuedUsers([]);
+        }
+      } catch (evtErr: any) {
+        console.warn("Event query failed (non-blocking):", evtErr);
+        setNftaIssuedUsers([]);
+      }
+    } catch (err: any) {
+      const msg = err?.shortMessage || err?.message || "未知错误";
+      console.error("Admin refresh failed:", err);
+      toast({ title: "读取失败", description: msg, variant: "destructive" });
     }
   };
 
@@ -937,8 +1019,8 @@ export function AdminPage() {
 
       <Card className="glass-panel">
         <CardHeader>
-          <CardTitle>直接注册购买</CardTitle>
-          <CardDescription>为用户直接注册节点购买（无链下支付）</CardDescription>
+          <CardTitle>{registerType === "nfta" ? "管理员发放 NFTA" : "直接注册 NFTB"}</CardTitle>
+          <CardDescription>{registerType === "nfta" ? "为指定用户发放 NFTA（管理员登记）" : "为用户直接注册 NFTB 节点"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Collapsible defaultOpen={false}>
@@ -949,27 +1031,42 @@ export function AdminPage() {
               <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
                 <AlertDescription className="space-y-2">
                   <div><strong>操作流程：</strong></div>
-                  <div>1️⃣ 选择注册类型（NFTA 或 NFTB）</div>
-                  <div>2️⃣ 输入用户钱包地址（要为其开户的用户）</div>
-                  <div>3️⃣ 输入 Tier ID（等级号，如1、2、3）</div>
+                  <div>1️⃣ 选择类型（NFTA 或 NFTB）</div>
+                  <div>2️⃣ 输入接收用户地址</div>
+                  <div>3️⃣ 输入发放级别（Tier ID，如 1、2、3）</div>
                   <div>4️⃣ 可选：输入推荐人地址（若无推荐人留空）</div>
-                  <div>5️⃣ 点击"注册"按钮完成注册</div>
+                  <div>5️⃣ 点击按钮完成发放/注册</div>
                   <div className="mt-2"><strong>实际示例</strong>：</div>
                   <div className="bg-black/30 p-2 rounded">
-                    用户地址: 0x742d35Cc6634C0532925a3b844Bc87e9f88aEd39<br/>
-                    Tier ID: 1<br/>
+                    接收用户地址: 0x742d35Cc6634C0532925a3b844Bc87e9f88aEd39<br/>
+                    发放级别: 1<br/>
                     推荐人: 0x8fd379246834a3cDa7c1C2EACD957b5747539ca42<br/>
                     类型: NFTA
                   </div>
-                  <div className="text-zinc-400 mt-1">✓ 注册后该用户即可开始使用系统中的对应功能</div>
+                  <div className="text-zinc-400 mt-1">✓ 完成后该用户即可获得对应级别的节点权益</div>
                 </AlertDescription>
               </Alert>
             </CollapsibleContent>
           </Collapsible>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="用户地址" />
-              <Input value={registerTierId} onChange={(e) => setRegisterTierId(e.target.value)} placeholder="Tier ID" />
+              <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="接收用户地址" />
+              {registerType === "nfta" ? (
+                <Select value={registerTierId} onValueChange={setRegisterTierId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="NFTA级别/库存ID" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {nftaIssueTierOptions.map((tier) => (
+                      <SelectItem key={tier.tierId} value={String(tier.tierId)}>
+                        {`${getNftaTierName(tier.tierId)} ｜ 级别/库存ID:${tier.tierId} ｜ 剩余:${tier.remaining}/${tier.maxSupply}${tier.isActive ? "" : " ｜ 未启用"}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={registerTierId} onChange={(e) => setRegisterTierId(e.target.value)} placeholder="Tier ID" />
+              )}
               <Input value={registerReferrerAddr} onChange={(e) => setRegisterReferrerAddr(e.target.value)} placeholder="推荐人(可选)" />
               <Select value={registerType} onValueChange={setRegisterType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -981,10 +1078,46 @@ export function AdminPage() {
             </div>
             <div className="flex gap-2">
               <Button disabled={!isOwner || loading || !nexus} onClick={onRegisterPurchase} className="flex-1">
-                注册 {registerType === "nfta" ? "NFTA" : "NFTB"}
+                {registerType === "nfta" ? "发放 NFTA" : "注册 NFTB"}
               </Button>
             </div>
           </div>
+
+          {registerType === "nfta" && (
+            <div className="space-y-2 pt-1">
+              <div className="text-xs text-muted-foreground">已发放NFTA用户（最近100条）</div>
+              <div className="rounded-md border border-border/60 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-medium">接收用户</th>
+                      <th className="text-left px-3 py-2 font-medium">级别/库存ID</th>
+                      <th className="text-left px-3 py-2 font-medium">节点ID</th>
+                      <th className="text-left px-3 py-2 font-medium">区块</th>
+                      <th className="text-left px-3 py-2 font-medium">交易哈希</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {nftaIssuedUsers.length === 0 ? (
+                      <tr>
+                        <td className="px-3 py-3 text-muted-foreground" colSpan={5}>暂无发放记录</td>
+                      </tr>
+                    ) : (
+                      nftaIssuedUsers.map((row) => (
+                        <tr key={`${row.txHash}-${row.nodeId}`} className="border-t border-border/40">
+                          <td className="px-3 py-2">{formatAddress(row.user)}</td>
+                          <td className="px-3 py-2">{`${getNftaTierName(Number(row.tierId))} (${row.tierId})`}</td>
+                          <td className="px-3 py-2">{row.nodeId}</td>
+                          <td className="px-3 py-2">{row.blockNumber}</td>
+                          <td className="px-3 py-2 font-mono">{row.txHash ? `${row.txHash.slice(0, 10)}...${row.txHash.slice(-6)}` : "-"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
