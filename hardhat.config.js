@@ -3,6 +3,7 @@ require("@nomicfoundation/hardhat-ethers");
 require("@openzeppelin/hardhat-upgrades");
 
 const sepoliaRpcUrl = process.env.SEPOLIA_RPC_URL || "";
+const cncRpcUrl = process.env.CNC_RPC_URL || "";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY || "";
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -24,6 +25,11 @@ module.exports = {
   networks: {
     sepolia: {
       url: sepoliaRpcUrl,
+      accounts: deployerPrivateKey ? [deployerPrivateKey] : []
+    },
+    cnc: {
+      url: cncRpcUrl,
+      chainId: 50716,
       accounts: deployerPrivateKey ? [deployerPrivateKey] : []
     }
   }

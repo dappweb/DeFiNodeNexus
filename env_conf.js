@@ -31,7 +31,17 @@ const ENV_CONFIG = {
   USDT_TOKEN_ADDRESS: "",
   CONTRACT_OWNER: "",
 
+  // CNC Chain Configuration
+  CNC_RPC_URL: "",
+  CNC_CHAIN_ID: "",
+  CNC_TOT_TOKEN_ADDRESS: "",
+  CNC_TOF_TOKEN_ADDRESS: "",
+  CNC_USDT_TOKEN_ADDRESS: "",
+  CNC_NEXUS_ADDRESS: "",
+  CNC_SWAP_ADDRESS: "",
+
   DEPLOYER_PRIVATE_KEY: "",
+  OWNER_PRIVATE_KEY: "",
 };
 
 for (const [key, value] of Object.entries(ENV_CONFIG)) {

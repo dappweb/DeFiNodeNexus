@@ -38,7 +38,8 @@
     "referral:team:batch:local": "npx hardhat run scripts/team-referral-rewards-batch-local.js",
     "referral:team:batch:sepolia": "npx hardhat run scripts/team-referral-rewards-batch-sepolia.js --network sepolia",
     "mint:usdt:sepolia": "npx hardhat run scripts/mint-usdt-sepolia.js --network sepolia",
-    "regression:full:local": "npx hardhat run scripts/full-business-regression-local.js"
+    "regression:full:local": "npx hardhat run scripts/full-business-regression-local.js",
+    "deploy:cnc": "npx hardhat run scripts/deploy-cnc.js --network cnc"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.3",
