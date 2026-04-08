@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import './env_conf.js';
 
 const isDev = process.env.NODE_ENV !== 'production'
 

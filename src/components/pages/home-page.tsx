@@ -60,12 +60,18 @@ export function HomePage() {
       textarea.setAttribute("readonly", "");
       textarea.style.position = "fixed";
       textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const copied = document.execCommand("copy");
-      document.body.removeChild(textarea);
-      return copied;
+      const body = document.body;
+      body.appendChild(textarea);
+
+      try {
+        textarea.focus();
+        textarea.select();
+        return document.execCommand("copy");
+      } finally {
+        if (body.contains(textarea)) {
+          body.removeChild(textarea);
+        }
+      }
     } catch {
       return false;
     }

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/logo.png" type="image/png" />
+    <link rel="shortcut icon" href="/logo.png" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Preload critical resources -->
+    <link rel="dns-prefetch" href="//sepolia.etherscan.io" />
+    <!-- Preconnect to external APIs -->
+    <link rel="preconnect" href="https://ethereum-sepolia-rpc.publicnode.com" crossorigin />
+    
+    <!-- Open Graph / Facebook / DApp Browsers -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://seer.ac/" />
+    <meta property="og:title" content="SEER | Decentralized Mining" />
+    <meta property="og:description" content="SEER - Decentralized Prediction & Mining on Ethereum" />
+    <meta property="og:image" content="https://seer.ac/icon.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary" />
+    <meta property="twitter:title" content="SEER | Decentralized Mining" />
+    <meta property="twitter:description" content="SEER - Decentralized Prediction & Mining on Ethereum" />
+    <meta property="twitter:image" content="https://seer.ac/icon.png" />
+
+    <meta name="theme-color" content="#0F0B1E" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https: blob:; font-src 'self' data: https:; connect-src 'self' https: wss:;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SEER</title>
+    
+    <!-- Critical CSS inline -->
+    <style>body{background-color:#0f0b1e;color:#e2e8f0;font-family:Inter,sans-serif;overflow-x:hidden}.glass-panel{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(15,11,30,.95);border:1px solid rgba(99,102,241,.15);box-shadow:0 4px 20px -5px rgba(99,102,241,.08)}#root{min-height:100vh}</style>
+    
+    <!-- Load Tailwind CSS asynchronously -->
+    <script>
+      (function() {
+        var script = document.createElement('script');
+        script.src = 'https://cdn.tailwindcss.com';
+        script.async = true;
+        document.head.appendChild(script);
+      })();
+    </script>
+    <script>
+      // Tailwind config - load after script loads
+      window.addEventListener('load', function() {
+        if (window.tailwind) {
+          tailwind.config = {
+            theme: {
+              extend: {
+                colors: {
+                  seer: {
+                    50: '#EEF2FF', 100: '#E0E7FF', 200: '#C7D2FE', 300: '#A5B4FC',
+                    400: '#818CF8', 500: '#6366F1', 600: '#4F46E5', 700: '#4338CA',
+                    800: '#1A1532', 900: '#13102B', 950: '#0F0B1E',
+                  },
+                  oracle: {
+                    50: '#FFFBEB', 100: '#FEF3C7', 200: '#FDE68A', 300: '#FCD34D',
+                    400: '#FBBF24', 500: '#F59E0B', 600: '#D97706', 700: '#B45309',
+                    800: '#92400E', 900: '#78350F',
+                  },
+                },
+                fontFamily: {
+                  sans: ['Inter', 'sans-serif'],
+                  mono: ['Fira Code', 'monospace'],
+                },
+              }
+            }
+          }
+        }
+      });
+    </script>
+    <script type="module" crossorigin src="/assets/js/index-d6a3eb9e.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/js/vendor-react-407bf44e.js">
+    <link rel="modulepreload" crossorigin href="/assets/js/vendor-web3-29d0a39d.js">
+    <link rel="modulepreload" crossorigin href="/assets/js/vendor-ethers-d9b7591d.js">
+    <link rel="stylesheet" href="/assets/css/style-c046004c.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+  </body>
+</html>

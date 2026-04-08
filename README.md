@@ -38,7 +38,9 @@ git push -u origin main
 
 ## 环境变量
 
-在 GitHub Secrets 或 Cloudflare 控制面板中，请务必设置以下变量：
+配置参数统一在 [env_conf.js](env_conf.js) 中维护（`ENV_CONFIG` 对象）。
+
+在 GitHub Secrets 或 Cloudflare 控制面板中，也请务必设置以下变量（用于线上运行时注入）：
 - `GEMINI_API_KEY`: 你的 Google AI API 密钥。
 - `MYSQL_HOST`: MySQL 主机地址。
 - `MYSQL_PORT`: MySQL 端口。
