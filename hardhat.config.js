@@ -8,9 +8,9 @@ const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY || "";
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.26",
+    version: "0.8.20",
     settings: {
-      evmVersion: "cancun",
+      evmVersion: "london",
       optimizer: {
         enabled: true,
         runs: 200
