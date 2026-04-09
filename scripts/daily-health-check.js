@@ -61,13 +61,13 @@ async function sendAlert(message) {
 }
 
 async function main() {
-  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const rpcUrl = process.env.CNC_RPC_URL || process.env.SEPOLIA_RPC_URL;
   const swapAddress = process.env.SWAP_ADDRESS || process.env.NEXT_PUBLIC_SWAP_ADDRESS;
   const nexusAddress = process.env.NEXUS_ADDRESS || process.env.NEXT_PUBLIC_NEXUS_ADDRESS;
   const reportPath = resolvePath(process.env.HEALTH_REPORT_FILE, "runtime/health/latest-health-check.json");
 
   if (!rpcUrl || !swapAddress || !nexusAddress) {
-    throw new Error("Missing SEPOLIA_RPC_URL, SWAP_ADDRESS/NEXT_PUBLIC_SWAP_ADDRESS, or NEXUS_ADDRESS/NEXT_PUBLIC_NEXUS_ADDRESS");
+    throw new Error("Missing CNC_RPC_URL (or SEPOLIA_RPC_URL), SWAP_ADDRESS/NEXT_PUBLIC_SWAP_ADDRESS, or NEXUS_ADDRESS/NEXT_PUBLIC_NEXUS_ADDRESS");
   }
 
   const minTotReserve = Number(process.env.MIN_TOT_RESERVE || "10000");

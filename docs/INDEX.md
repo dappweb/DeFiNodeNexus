@@ -14,6 +14,12 @@
 ### 我想查看所有可用资源
 👉 **[RESOURCES-INDEX.md](RESOURCES-INDEX.md)** - 完整资源索引
 
+### 我需要业务功能和部署总览
+👉 **[CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md](CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md)** - CNC 业务与部署一体化手册
+
+### 我需要定时任务部署与运维
+👉 **[TIMER-DEPLOYMENT-AND-OPS.md](TIMER-DEPLOYMENT-AND-OPS.md)** - Keeper 与 Health Check 定时任务完整指南
+
 ### 我需要代码示例
 👉 **[src/lib/integration-guide.md](../src/lib/integration-guide.md)** - 集成指南与代码示例
 
@@ -28,7 +34,7 @@
 
 ---
 
-## 📚 完整文档清单
+### 📚 完整文档清单
 
 ### 🚀 快速开始类
 
@@ -43,6 +49,15 @@
 |------|------|---------|
 | [IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md) | 6阶段实施方案 | 20分钟 |
 | [UI-ALIGNMENT-CHECKLIST.md](UI-ALIGNMENT-CHECKLIST.md) | 进度追踪与检查表 | 15分钟 |
+
+### 🚢 部署与运维类
+
+| 文档 | 目的 | 阅读时长 |
+|------|------|---------|
+| [CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md](CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md) | CNC 业务与部署一体化 | 15分钟 |
+| [TIMER-DEPLOYMENT-AND-OPS.md](TIMER-DEPLOYMENT-AND-OPS.md) | 定时任务完整指南 | 20分钟 |
+| [CNC-QUICK-START.md](CNC-QUICK-START.md) | CNC 部署快速指南 | 10分钟 |
+| [CNC-DEPLOYMENT-GUIDE.md](CNC-DEPLOYMENT-GUIDE.md) | CNC 部署详细文档 | 30分钟 |
 
 ### 📖 参考与指南类
 
@@ -96,6 +111,8 @@
 | 完整方案 | [IMPLEMENTATION-ROADMAP.md](IMPLEMENTATION-ROADMAP.md) |
 | 项目总结 | [PROJECT-SUMMARY.md](PROJECT-SUMMARY.md) |
 | 资源索引 | [RESOURCES-INDEX.md](RESOURCES-INDEX.md) |
+| 部署到 CNC | [CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md](CNC-BUSINESS-FEATURES-AND-DEPLOYMENT.md) |
+| 部署定时任务 | [TIMER-DEPLOYMENT-AND-OPS.md](TIMER-DEPLOYMENT-AND-OPS.md) |
 | 查看交付物 | [DELIVERY-REPORT.md](DELIVERY-REPORT.md) |
 | 验证质量 | [VERIFICATION-CHECKLIST.md](VERIFICATION-CHECKLIST.md) |
 
@@ -139,19 +156,21 @@ integration-guide   280 行
 
 ### 文档行数
 ```
-PROJECT-SUMMARY.md       300 行
-QUICK-START.md           300 行
-IMPLEMENTATION-ROADMAP   480 行
-UI-ALIGNMENT-CHECKLIST   420 行
-RESOURCES-INDEX.md       380 行
-DELIVERY-REPORT.md       200+ 行
-VERIFICATION-CHECKLIST   400+ 行
-────────────────────────
-文档总计             2,880+ 行
+PROJECT-SUMMARY.md                    300 行
+QUICK-START.md                        300 行
+IMPLEMENTATION-ROADMAP                480 行
+UI-ALIGNMENT-CHECKLIST                420 行
+RESOURCES-INDEX.md                    380 行
+CNC-BUSINESS-FEATURES-AND-DEPLOYMENT  180 行
+TIMER-DEPLOYMENT-AND-OPS              400 行
+DELIVERY-REPORT.md                    200+ 行
+VERIFICATION-CHECKLIST                400+ 行
+──────────────────────────────────────
+文档总计                          3,460+ 行
 ```
 
 ### 总计
-**3,820+ 行高质量代码和文档**
+**4,400+ 行高质量代码和文档**
 
 ---
 
