@@ -1,0 +1,127 @@
+{
+  "version": 3,
+  "middleware": {},
+  "functions": {
+    "/api/announcements/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/announcements/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/edge-chunks/53.js",
+        "server/app/api/announcements/route.js"
+      ],
+      "name": "app/api/announcements/route",
+      "page": "/api/announcements/route",
+      "matchers": [
+        {
+          "regexp": "^/api/announcements$",
+          "originalSource": "/api/announcements"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "4yt0aHBYP2sAccAsUPX9Y",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
+        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+      }
+    },
+    "/api/admin/announcements/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/admin/announcements/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/edge-chunks/53.js",
+        "server/app/api/admin/announcements/route.js"
+      ],
+      "name": "app/api/admin/announcements/route",
+      "page": "/api/admin/announcements/route",
+      "matchers": [
+        {
+          "regexp": "^/api/admin/announcements$",
+          "originalSource": "/api/admin/announcements"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "4yt0aHBYP2sAccAsUPX9Y",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
+        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+      }
+    },
+    "/api/data-service/announcements/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/data-service/announcements/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/edge-chunks/53.js",
+        "server/app/api/data-service/announcements/route.js"
+      ],
+      "name": "app/api/data-service/announcements/route",
+      "page": "/api/data-service/announcements/route",
+      "matchers": [
+        {
+          "regexp": "^/api/data\\-service/announcements$",
+          "originalSource": "/api/data-service/announcements"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "4yt0aHBYP2sAccAsUPX9Y",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
+        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+      }
+    },
+    "/api/keeper/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/keeper/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/edge-chunks/53.js",
+        "server/app/api/keeper/route.js"
+      ],
+      "name": "app/api/keeper/route",
+      "page": "/api/keeper/route",
+      "matchers": [
+        {
+          "regexp": "^/api/keeper$",
+          "originalSource": "/api/keeper"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "4yt0aHBYP2sAccAsUPX9Y",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
+        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+      }
+    }
+  },
+  "sortedMiddleware": []
+}

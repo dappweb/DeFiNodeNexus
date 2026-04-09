@@ -1,0 +1,9 @@
+<svg width="1220" height="380" viewBox="0 0 1220 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1220" height="380" fill="transparent"/>
+  <g transform="translate(0,0)">
+    <rect x="36" y="24" width="260" height="260" rx="48" transform="rotate(-45 36 24)" fill="#050307"/>
+    <path d="M95 192C107 180 126 180 138 192L184 238C196 250 215 250 227 238L340 125C352 113 371 113 383 125C395 137 395 156 383 168L247 304C215 336 163 336 131 304L95 268C83 256 83 237 95 225C107 213 107 204 95 192Z" fill="#050307"/>
+  </g>
+  <text x="500" y="150" fill="#050307" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="4">TRUTH</text>
+  <text x="500" y="290" fill="#050307" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="4">ORACLE</text>
+</svg>

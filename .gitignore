@@ -8,10 +8,6 @@
 /playwright-report
 /test-results
 
-# next.js
-/.next/
-/.next-dev/
-/out/
 
 # production
 /build
@@ -27,7 +23,6 @@ yarn-error.log*
 
 # local env files
 .env*.local
-.env
 .env.test
 .env.production
 
@@ -57,3 +52,6 @@ scripts/*.log
 
 # unrelated scripts
 aaClaw.sh
+
+# exclude local webpack cache (too large for git)
+.next/cache/
