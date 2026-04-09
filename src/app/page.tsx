@@ -16,7 +16,6 @@ import {
     Cpu,
     Home,
     Link as LinkIcon,
-    LogOut,
     ShieldCheck,
     TrendingUp,
     UserPlus,
@@ -39,11 +38,12 @@ function sanitizeAddressInput(value: string) {
 }
 
 export default function DashboardPage() {
+  const CNC_CHAIN_ID = 50716;
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<PageTab>("home");
   const [ownerAddress, setOwnerAddress] = useState<string | null>(null);
   const { t } = useLanguage();
-  const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWeb3();
+  const { address, isConnected, isConnecting, chainId } = useWeb3();
   const nexus = useNexusContract();
   const { toast } = useToast();
 
@@ -342,7 +342,7 @@ export default function DashboardPage() {
     {
       key: "network",
       label: t("stepSwitchNetwork"),
-      done: isConnected && chainId === 11155111,
+      done: isConnected && chainId === CNC_CHAIN_ID,
       later: false,
     },
     {
@@ -401,30 +401,7 @@ export default function DashboardPage() {
             <LanguageSwitcher />
             <ThemeToggle />
 
-            {!isConnected ? (
-              <WalletConnectButton />
-            ) : (
-              <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/30 border border-accent/20 max-w-[10.5rem] sm:max-w-none">
-                <button
-                  onClick={disconnect}
-                  className="flex items-center gap-2 px-2 rounded-full transition-opacity hover:opacity-80 min-w-0"
-                  title={t("disconnect")}
-                  aria-label={t("disconnect")}
-                >
-                  <div className="h-2 w-2 rounded-full bg-accent animate-pulse shrink-0" />
-                  <span className="text-xs font-mono text-accent truncate">{displayAddress}</span>
-                </button>
-                <Button
-                  onClick={disconnect}
-                  size="sm"
-                  variant="ghost"
-                  className="hidden md:inline-flex h-7 px-2 text-xs rounded-full"
-                >
-                  <LogOut size={14} className="mr-1" />
-                  {t("disconnect")}
-                </Button>
-              </div>
-            )}
+            <WalletConnectButton />
 
           </div>
         </div>
@@ -486,8 +463,8 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <div className="flex items-center justify-between sm:justify-start gap-2">
               <span className="text-muted-foreground">{t("networkLabel")}</span>
-              <span className={chainId === 11155111 ? "text-primary font-medium" : "text-destructive font-medium"}>
-                {chainId === 11155111 ? "Sepolia" : t("notTestnet")}
+              <span className={chainId === CNC_CHAIN_ID ? "text-primary font-medium" : "text-destructive font-medium"}>
+                {chainId === CNC_CHAIN_ID ? "CNC Mainnet" : t("notTestnet")}
               </span>
             </div>
               <div className="flex items-center justify-between sm:justify-start gap-2">
@@ -601,20 +578,20 @@ export default function DashboardPage() {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed inset-x-0 bottom-0 z-[60] px-3 pb-[max(env(safe-area-inset-bottom),0.5rem)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-md h-16 px-2 rounded-2xl border border-border/50 bg-background/95 backdrop-blur-md shadow-lg overflow-x-auto no-scrollbar">
-          <div className="flex h-full items-center justify-start gap-1 min-w-max">
+        <div className="pointer-events-auto mx-auto w-full h-16 px-2 rounded-2xl border border-border/50 bg-background/95 backdrop-blur-md shadow-lg">
+          <div className="flex h-full items-center justify-between gap-1">
           {navItems.map((item) => (
             <button
               key={item.key}
               onClick={() => setActiveTab(item.key)}
-              className={`flex h-12 min-w-[4.5rem] flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${
+              className={`flex flex-1 h-12 flex-col items-center justify-center gap-0.5 px-1 py-1 rounded-lg transition-colors ${
                 activeTab === item.key
                   ? "text-primary"
                   : "text-muted-foreground"
               }`}
             >
               <item.icon size={20} />
-              <span className="text-[10px] font-medium truncate">{item.label}</span>
+              <span className="text-[10px] font-medium truncate max-w-full">{item.label}</span>
             </button>
           ))}
           </div>

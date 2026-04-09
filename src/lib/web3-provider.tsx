@@ -5,6 +5,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi';
 import { ethers } from 'ethers';
 
+type Eip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
+type WalletRequester = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
 interface Web3ContextType {
   address: `0x${string}` | undefined;
   isConnected: boolean;
@@ -31,10 +39,14 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
   // Convert viem WalletClient → ethers v6 BrowserProvider + Signer
   const [ethersSigner, setEthersSigner] = useState<ethers.Signer | null>(null);
   const [ethersProvider, setEthersProvider] = useState<ethers.Provider | null>(null);
+  const ethereumProvider =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as Window & { ethereum?: Eip1193Provider }).ethereum;
 
   useEffect(() => {
-    if (walletClient && typeof window !== 'undefined' && window.ethereum) {
-      const browserProvider = new ethers.BrowserProvider(window.ethereum as ethers.Eip1193Provider);
+    if (walletClient && ethereumProvider) {
+      const browserProvider = new ethers.BrowserProvider(ethereumProvider as ethers.Eip1193Provider);
       setEthersProvider(browserProvider);
       browserProvider.getSigner()
         .then((s) => setEthersSigner(s))
@@ -43,7 +55,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       setEthersSigner(null);
       setEthersProvider(null);
     }
-  }, [walletClient]);
+  }, [ethereumProvider, walletClient]);
 
   const handleConnect = () => {
     // RainbowKit will handle connector selection via its modal
@@ -52,6 +64,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
   const addProjectTokens = async () => {
     if (!walletClient) return;
+    const walletRequester = walletClient as unknown as WalletRequester;
 
     const totAddress = process.env.NEXT_PUBLIC_TOT_ADDRESS;
     const tofAddress = process.env.NEXT_PUBLIC_TOF_ADDRESS;
@@ -62,7 +75,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 
     for (const token of tokens) {
       try {
-        await walletClient.request({
+        await walletRequester.request({
           method: 'wallet_watchAsset',
           params: [{
             type: 'ERC20',

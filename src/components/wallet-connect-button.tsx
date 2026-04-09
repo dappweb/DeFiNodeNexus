@@ -2,18 +2,91 @@
 
 import { Link as LinkIcon, AlertCircle, Globe } from 'lucide-react';
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 /** 超过此毫秒数仍在等待时显示兜底提示 */
 const WALLET_TIMEOUT_MS = 8000;
+const CNC_CHAIN_ID = 50716;
+const CNC_CHAIN_ID_HEX = '0xc61c';
+const CNC_RPC_URL = process.env.NEXT_PUBLIC_CNC_RPC_URL || 'https://rpc.cncchainpro.com';
+const CNC_EXPLORER_URL = process.env.NEXT_PUBLIC_CNC_EXPLORER_URL || 'https://cncchainpro.com';
+
+type Eip1193Provider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
 
 export function WalletConnectButton() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
-  const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { switchChain, switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const [timedOut, setTimedOut] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSwitchAttemptedRef = useRef<string | null>(null);
+  const ethereumProvider =
+    typeof window === 'undefined'
+      ? undefined
+      : (window as Window & { ethereum?: Eip1193Provider }).ethereum;
+
+  const addAndSwitchToCnc = useCallback(async () => {
+    try {
+      if (switchChainAsync) {
+        await switchChainAsync({ chainId: CNC_CHAIN_ID });
+        return;
+      }
+      switchChain({ chainId: CNC_CHAIN_ID });
+      return;
+    } catch (err: unknown) {
+      const errorCode = (err as { code?: number })?.code;
+      const message = (err as { message?: string })?.message || '';
+      const isChainMissing = errorCode === 4902 || message.includes('4902');
+
+      if (!isChainMissing || !ethereumProvider) {
+        throw err;
+      }
+
+      await ethereumProvider.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: CNC_CHAIN_ID_HEX,
+          chainName: 'CNC Mainnet',
+          nativeCurrency: {
+            name: 'CNC',
+            symbol: 'CNC',
+            decimals: 18,
+          },
+          rpcUrls: [CNC_RPC_URL],
+          blockExplorerUrls: [CNC_EXPLORER_URL],
+        }],
+      });
+
+      if (switchChainAsync) {
+        await switchChainAsync({ chainId: CNC_CHAIN_ID });
+      } else {
+        switchChain({ chainId: CNC_CHAIN_ID });
+      }
+    }
+  }, [switchChain, switchChainAsync]);
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      autoSwitchAttemptedRef.current = null;
+      return;
+    }
+
+    if (chain?.id === CNC_CHAIN_ID) {
+      return;
+    }
+
+    if (autoSwitchAttemptedRef.current === address) {
+      return;
+    }
+
+    autoSwitchAttemptedRef.current = address;
+    void addAndSwitchToCnc().catch((err) => {
+      console.warn('Failed to auto switch to CNC Mainnet after connect', err);
+    });
+  }, [address, addAndSwitchToCnc, chain?.id, isConnected]);
 
   // 当连接挂起时启动计时；连接结束（成功或取消）时重置
   useEffect(() => {
@@ -77,15 +150,17 @@ export function WalletConnectButton() {
     );
   }
 
-  if (chain?.id !== 11155111) {
+  if (chain?.id !== CNC_CHAIN_ID) {
     return (
       <button
-        onClick={() => switchChain({ chainId: 11155111 })}
+        onClick={() => {
+          void addAndSwitchToCnc();
+        }}
         type="button"
         disabled={isSwitching}
         className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm"
       >
-        切换到 Sepolia
+        {isSwitching ? '切换中...' : '切换到 CNC 主网'}
       </button>
     );
   }
@@ -96,7 +171,7 @@ export function WalletConnectButton() {
         type="button"
         className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm flex items-center"
       >
-        Sepolia
+        CNC 主网
       </button>
 
       <button

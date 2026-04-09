@@ -2,18 +2,47 @@
 
 import { createConfig, http } from 'wagmi';
 import { injected } from '@wagmi/core';
-import { sepolia } from 'wagmi/chains';
+import { defineChain } from 'viem';
 import { QueryClient } from '@tanstack/react-query';
 
+const cncRpcUrl = process.env.NEXT_PUBLIC_CNC_RPC_URL || 'https://rpc.cncchainpro.com';
+const cncExplorerUrl = process.env.NEXT_PUBLIC_CNC_EXPLORER_URL || 'https://cncchainpro.com';
+
+const cnc = defineChain({
+  id: 50716,
+  name: 'CNC Mainnet',
+  network: 'cnc',
+  nativeCurrency: {
+    name: 'CNC',
+    symbol: 'CNC',
+    decimals: 18,
+  },
+  rpcUrls: {
+    default: {
+      http: [cncRpcUrl],
+    },
+    public: {
+      http: [cncRpcUrl],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: 'CNC Explorer',
+      url: cncExplorerUrl,
+    },
+  },
+  testnet: false,
+});
+
 export const config = createConfig({
-  chains: [sepolia],
+  chains: [cnc],
   connectors: [
     injected({
       shimDisconnect: true,
     }),
   ],
   transports: {
-    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || undefined),
+    [cnc.id]: http(cncRpcUrl),
   },
   ssr: false,
 });
