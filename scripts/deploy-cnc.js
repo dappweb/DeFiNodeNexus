@@ -58,9 +58,13 @@ async function main() {
   // Whitelist DeFiNodeNexus in TOF token
   console.log("\n--- Configuring TOF whitelist ---");
   const tofContract = await hre.ethers.getContractAt("TOFToken", tofToken);
-  const whitelistTx = await tofContract.setTransferWhitelist(deployedAddress, true);
-  await whitelistTx.wait();
-  console.log("TOF whitelist added for Nexus:", deployedAddress);
+  try {
+    const whitelistTx = await tofContract.setTransferWhitelist(deployedAddress, true);
+    await whitelistTx.wait();
+    console.log("TOF whitelist added for Nexus:", deployedAddress);
+  } catch (err) {
+    console.warn("TOF whitelist step skipped (requires TOF owner):", err?.message || err);
+  }
 
   // --- Post-deploy configuration ---
 
@@ -90,33 +94,28 @@ async function main() {
 
   const tier1Price = hre.ethers.parseUnits("500", decimals);
   const tier1Yield = tier1Price * 13n / 1000n; // 1.3% daily
-  const tx1 = await contract.configureNftaTier(0, tier1Price, tier1Yield, 10000, true);
+  const tx1 = await contract.configureNftaTier(1, tier1Price, tier1Yield, 10000, true);
   await tx1.wait();
   console.log("NFTA Tier 1 configured: 500 USDT, 1.3%/day, max 10000");
 
   const tier2Price = hre.ethers.parseUnits("1000", decimals);
   const tier2Yield = tier2Price * 20n / 1000n; // 2.0% daily
-  const tx2 = await contract.configureNftaTier(1, tier2Price, tier2Yield, 5000, true);
+  const tx2 = await contract.configureNftaTier(2, tier2Price, tier2Yield, 5000, true);
   await tx2.wait();
   console.log("NFTA Tier 2 configured: 1000 USDT, 2.0%/day, max 5000");
 
-  // Configure default NFTB tiers (USDT + TOF dual pricing)
-  // TOF pricing defaults: 100k / 200k / 400k TOF
+  // Configure default NFTB tiers
   console.log("\n--- Configuring NFTB Tiers ---");
   const nftbTier1Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER1_USDT_PRICE || "500", decimals);
   const nftbTier2Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER2_USDT_PRICE || "1000", decimals);
   const nftbTier3Usdt = hre.ethers.parseUnits(process.env.NFTB_TIER3_USDT_PRICE || "2000", decimals);
 
-  const nftbTier1Tof = hre.ethers.parseUnits(process.env.NFTB_TIER1_TOF_PRICE || "100000", decimals);
-  const nftbTier2Tof = hre.ethers.parseUnits(process.env.NFTB_TIER2_TOF_PRICE || "200000", decimals);
-  const nftbTier3Tof = hre.ethers.parseUnits(process.env.NFTB_TIER3_TOF_PRICE || "400000", decimals);
-
-  await (await contract.configureNftbTier(0, nftbTier1Usdt, nftbTier1Tof, 1, 2000, 2000, true)).wait();
-  await (await contract.configureNftbTier(1, nftbTier2Usdt, nftbTier2Tof, 2, 2000, 3000, true)).wait();
-  await (await contract.configureNftbTier(2, nftbTier3Usdt, nftbTier3Tof, 3, 2000, 4000, true)).wait();
-  console.log("NFTB Tier 1 configured: 500 USDT / 100k TOF, quotas 50/50");
-  console.log("NFTB Tier 2 configured: 1000 USDT / 200k TOF, quotas 50/50");
-  console.log("NFTB Tier 3 configured: 2000 USDT / 400k TOF, quotas 50/50");
+  await (await contract.configureNftbTier(1, nftbTier1Usdt, 1, 2000, 2000, true)).wait();
+  await (await contract.configureNftbTier(2, nftbTier2Usdt, 2, 2000, 3000, true)).wait();
+  await (await contract.configureNftbTier(3, nftbTier3Usdt, 3, 2000, 4000, true)).wait();
+  console.log("NFTB Tier 1 configured: 500 USDT, weight 1, dividend 20%");
+  console.log("NFTB Tier 2 configured: 1000 USDT, weight 2, dividend 30%");
+  console.log("NFTB Tier 3 configured: 2000 USDT, weight 3, dividend 40%");
 
   // --- Deploy TOTSwap ---
   console.log("\n--- Deploying TOTSwap ---");
@@ -144,9 +143,13 @@ async function main() {
 
   // Whitelist protocol contracts in TOF
   const tof = await hre.ethers.getContractAt("TOFToken", tofToken);
-  await (await tof.setWhitelisted(deployedAddress, true)).wait();
-  await (await tof.setWhitelisted(swapAddress, true)).wait();
-  console.log("TOF whitelist updated: Nexus + TOTSwap");
+  try {
+    await (await tof.setTransferWhitelist(deployedAddress, true)).wait();
+    await (await tof.setTransferWhitelist(swapAddress, true)).wait();
+    console.log("TOF whitelist updated: Nexus + TOTSwap");
+  } catch (err) {
+    console.warn("TOF protocol whitelist update skipped (requires TOF owner):", err?.message || err);
+  }
 
   // --- Summary ---
   console.log("\n=== DEPLOYMENT SUMMARY ===");
