@@ -20,21 +20,20 @@ function getE2EContractMock(address: string) {
 }
 
 /**
- * A read-only fallback provider for Sepolia so that public contract data
+ * A read-only fallback provider for CNC so that public contract data
  * (e.g. tier info) can be fetched even before the user connects a wallet.
  * Lazily initialised to avoid SSR issues.
  */
 let _fallbackProvider: ethers.Provider | null = null;
 function getFallbackProvider(): ethers.Provider {
   if (!_fallbackProvider) {
-    const sepoliaNetwork = ethers.Network.from("sepolia");
+    const cncNetwork = ethers.Network.from("cnc", 50716);
     const rpcUrls = Array.from(
       new Set(
         [
-          "https://ethereum-sepolia-rpc.publicnode.com",
-          "https://rpc.sepolia.org",
-          "https://1rpc.io/sepolia",
-          process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
+          "https://rpc.cncchainpro.com",
+          process.env.NEXT_PUBLIC_CNC_RPC_URL,
+          process.env.CNC_RPC_URL,
         ]
           .map((v) => v?.trim())
           .filter((value): value is string => Boolean(value))
@@ -42,7 +41,7 @@ function getFallbackProvider(): ethers.Provider {
     );
 
     const providers = rpcUrls.map(
-      (url) => new ethers.JsonRpcProvider(url, sepoliaNetwork, { staticNetwork: sepoliaNetwork })
+      (url) => new ethers.JsonRpcProvider(url, cncNetwork, { staticNetwork: cncNetwork })
     );
 
     _fallbackProvider =
@@ -55,7 +54,7 @@ function getFallbackProvider(): ethers.Provider {
               weight: 1,
               stallTimeout: 1000,
             })),
-            sepoliaNetwork,
+            cncNetwork,
             { quorum: 1 }
           );
   }

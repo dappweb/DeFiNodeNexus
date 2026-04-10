@@ -4,7 +4,6 @@
 
 适用范围：
 - 本地开发网络
-- Sepolia 测试网
 - CNC 生产网络（按本仓库现有脚本）
 
 ---
@@ -31,7 +30,6 @@
 
 核心脚本：
 - scripts/init-swap-local.js
-- scripts/deploy-swap-sepolia.js
 - scripts/upgrade-totswap-v3.js
 - scripts/seed-swap-liquidity.js
 - scripts/deploy-cnc.js
@@ -55,7 +53,7 @@
 
 最少必需（测试网/生产）：
 - DEPLOYER_PRIVATE_KEY
-- SEPOLIA_RPC_URL（或 CNC_RPC_URL，按网络）
+- CNC_RPC_URL
 - TOT_TOKEN_ADDRESS
 - USDT_TOKEN_ADDRESS
 
@@ -97,39 +95,7 @@
 
 ---
 
-## 5. Sepolia 初始化
-
-### 5.1 部署 Swap
-
-执行命令：
-
-    npx hardhat run scripts/deploy-swap-sepolia.js --network sepolia
-
-如需直接部署 TOTSwapV3：
-
-    npm run deploy:swap:sepolia:v3
-
-脚本行为：
-1. 校验 DEPLOYER_PRIVATE_KEY、SEPOLIA_RPC_URL、TOT_TOKEN_ADDRESS、USDT_TOKEN_ADDRESS。
-2. 按 SWAP_CONTRACT_NAME 部署 TOTSwap 或 TOTSwapV3 代理合约。
-3. 若提供 NEXUS_ADDRESS，自动执行 setNexus 与 setDistributor。
-4. 若为 TOTSwapV3 且提供 SWAP_DEX_* 变量，自动配置 Router / Pair / Factory 与外部 DEX 模式。
-4. 若提供 SWAP_SEED_TOT + SWAP_SEED_USDT，自动注入流动性。
-5. 输出 SWAP_ADDRESS，供回填环境变量。
-
-### 5.2 单独补充流动性
-
-执行命令：
-
-    npx hardhat run scripts/seed-swap-liquidity.js --network sepolia
-
-适用场景：
-1. 首次部署时未设置种子流动性。
-2. 运营侧需要按新策略追加流动性。
-
----
-
-## 6. CNC 初始化
+## 5. CNC 初始化
 
 如使用一体化部署脚本：
 
@@ -140,27 +106,22 @@
     npm run deploy:cnc:v3
 
 部署后建议动作：
-1. 回填 CNC_NEXUS_ADDRESS、CNC_SWAP_ADDRESS。
+1. 回填 NEXUS_ADDRESS、SWAP_ADDRESS。
 2. 使用 owner 账户执行 addLiquidity（或使用脚本补流动性）。
 3. 做一次小额买卖闭环验收。
 
 若升级现有代理到 TOTSwapV3：
-
-    npm run upgrade:totswap:v3:sepolia
-
-或：
-
     npm run upgrade:totswap:v3:cnc
 
 升级脚本会：
-1. 自动从 SWAP_ADDRESS / CNC_SWAP_ADDRESS 读取代理地址。
+1. 自动从 SWAP_ADDRESS 读取代理地址。
 2. 执行 UUPS 升级到 TOTSwapV3。
 3. 若提供 SWAP_DEX_* 变量，自动配置外部 DEX 参数。
 4. 若设置 SWAP_ENABLE_EXTERNAL_DEX=true，则自动切换到外部 DEX 模式。
 
 ---
 
-## 7. 管理员可调整参数
+## 6. 管理员可调整参数
 
 以下参数均为 onlyOwner：
 
@@ -324,6 +285,5 @@
 
 - contracts/TOTSwap.sol
 - scripts/init-swap-local.js
-- scripts/deploy-swap-sepolia.js
 - scripts/seed-swap-liquidity.js
 - docs/CNC-DEPLOYMENT-GUIDE.md

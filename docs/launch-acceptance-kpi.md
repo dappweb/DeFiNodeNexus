@@ -102,4 +102,3 @@
 
 - [docs/qa-full-test-runbook.md](docs/qa-full-test-runbook.md)
 - [docs/full-business-test-checklist.md](docs/full-business-test-checklist.md)
-- [docs/sepolia-test-plan.md](docs/sepolia-test-plan.md)

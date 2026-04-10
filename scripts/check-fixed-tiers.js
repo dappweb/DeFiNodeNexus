@@ -28,11 +28,11 @@ function ensureEqual(actual, expected, label) {
 }
 
 async function main() {
-  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const rpcUrl = process.env.CNC_RPC_URL;
   const nexusAddress = process.env.NEXUS_ADDRESS || process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "0x2cc1Ebf7185F4810C620e0A7D3300B1e381f3b44";
 
   if (!rpcUrl) {
-    throw new Error("Missing SEPOLIA_RPC_URL");
+    throw new Error("Missing CNC_RPC_URL");
   }
 
   const provider = new ethers.JsonRpcProvider(rpcUrl);

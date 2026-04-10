@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   // After `npm run build`, run: node .next/standalone/server.js
   output: 'standalone',
   env: {
-    NEXT_PUBLIC_SEPOLIA_RPC_URL:   e("NEXT_PUBLIC_SEPOLIA_RPC_URL") || e("SEPOLIA_RPC_URL"),
+    NEXT_PUBLIC_CNC_RPC_URL:       e("NEXT_PUBLIC_CNC_RPC_URL")     || e("CNC_RPC_URL"),
     NEXT_PUBLIC_NEXUS_ADDRESS:     e("NEXT_PUBLIC_NEXUS_ADDRESS")   || e("NEXUS_ADDRESS"),
     NEXT_PUBLIC_SWAP_ADDRESS:      e("NEXT_PUBLIC_SWAP_ADDRESS")    || e("SWAP_ADDRESS"),
     NEXT_PUBLIC_TOT_ADDRESS:       e("NEXT_PUBLIC_TOT_ADDRESS")     || e("TOT_TOKEN_ADDRESS"),

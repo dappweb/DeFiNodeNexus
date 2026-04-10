@@ -10,7 +10,7 @@ export const runtime = "edge";
  * Designed to be called by external cron services:
  *   - Vercel Cron, Cloudflare Workers Cron, cron-job.org, GitHub Actions, etc.
  *
- * Required env: SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY, SWAP_ADDRESS, KEEPER_SECRET
+ * Required env: CNC_RPC_URL, DEPLOYER_PRIVATE_KEY, SWAP_ADDRESS, KEEPER_SECRET
  */
 
 const SWAP_ABI = [
@@ -40,13 +40,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Validate env
-  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const rpcUrl = process.env.CNC_RPC_URL;
   const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
   const swapAddress = process.env.SWAP_ADDRESS;
 
   if (!rpcUrl || !privateKey || !swapAddress) {
     return NextResponse.json(
-      { error: "Missing SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY, or SWAP_ADDRESS" },
+      { error: "Missing CNC_RPC_URL, DEPLOYER_PRIVATE_KEY, or SWAP_ADDRESS" },
       { status: 500 }
     );
   }
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rpcUrl = process.env.SEPOLIA_RPC_URL;
+  const rpcUrl = process.env.CNC_RPC_URL;
   const swapAddress = process.env.SWAP_ADDRESS;
 
   if (!rpcUrl || !swapAddress) {

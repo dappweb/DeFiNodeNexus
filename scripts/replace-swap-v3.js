@@ -4,7 +4,7 @@ const { getSwapProxyAddress, maybeConfigureSwapV3 } = require("./lib/swap-v3");
 async function main() {
   const proxyAddress = getSwapProxyAddress(hre.network.name);
   if (!proxyAddress) {
-    throw new Error("Missing UPGRADE_PROXY_ADDRESS, SWAP_PROXY_ADDRESS, SWAP_ADDRESS, or CNC_SWAP_ADDRESS in .env");
+    throw new Error("Missing UPGRADE_PROXY_ADDRESS, SWAP_PROXY_ADDRESS, or SWAP_ADDRESS in .env");
   }
 
   const network = await hre.ethers.provider.getNetwork();
@@ -56,9 +56,6 @@ async function main() {
   }
 
   console.log("\nSuggested env sync:");
-  if (hre.network.name === "cnc") {
-    console.log(`CNC_SWAP_ADDRESS=${proxyAddress}`);
-  }
   console.log(`SWAP_ADDRESS=${proxyAddress}`);
 }
 

@@ -20,12 +20,9 @@
 - 升级回归：
   - `npx hardhat run scripts/upgrade-regression-local.js`
   - 脚本：[scripts/upgrade-regression-local.js](scripts/upgrade-regression-local.js)
-- Sepolia 发行与联调（已验证部署流程）：
-  - 部署 TOF/USDT：[scripts/deploy-tof-usdt-sepolia.js](scripts/deploy-tof-usdt-sepolia.js)
-  - 部署 TOT：[scripts/deploy-tot-sepolia.js](scripts/deploy-tot-sepolia.js)
-  - 部署 Nexus/Swap：[scripts/deploy-sepolia.js](scripts/deploy-sepolia.js)
+- CNC 发行与联调（已验证部署流程）：
+  - 一体化部署：[scripts/deploy-cnc.js](scripts/deploy-cnc.js)
   - 注入流动性：[scripts/seed-swap-liquidity.js](scripts/seed-swap-liquidity.js)
-  - USDT 分发：[scripts/mint-usdt-sepolia.js](scripts/mint-usdt-sepolia.js)
 
 ## 三、业务覆盖矩阵（必测项）
 
@@ -102,9 +99,9 @@
   - 结果：`✅ FULL business regression passed.`
 - [x] `npx hardhat run scripts/upgrade-regression-local.js`
   - 结果：`All upgrade regression checks passed.`
-- [x] Sepolia 部署与联调关键步骤
-  - 结果：TOF/USDT/TOT/Nexus/Swap 部署成功，流动性注入成功，USDT 分发链路成功
+- [x] CNC 部署与联调关键步骤
+  - 结果：Nexus/Swap 部署成功，流动性注入成功，链路验证通过
 
 ## 五、判定结论
 
-在当前代码版本下，核心业务环节、权限边界、费率与通缩分红逻辑、以及升级兼容性均已覆盖并通过本地自动化验证；Sepolia 环境完成了真实部署与关键联调步骤验证，可用于继续前端联调与验收。
+在当前代码版本下，核心业务环节、权限边界、费率与通缩分红逻辑、以及升级兼容性均已覆盖并通过本地自动化验证；CNC 环境完成了真实部署与关键联调步骤验证，可用于继续前端联调与验收。

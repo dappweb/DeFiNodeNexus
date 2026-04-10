@@ -3,7 +3,6 @@
 本文档用于指导你把现有 Swap 代理合约实现替换为 TOTSwapV3，并完成 Router/Pair/Factory 配置与上线验收。
 
 适用范围：
-- Sepolia 测试网
 - CNC 主网
 - 已存在 UUPS 代理（不新增代理地址）
 
@@ -34,12 +33,8 @@
 
 最少必需：
 - DEPLOYER_PRIVATE_KEY
-- SEPOLIA_RPC_URL 或 CNC_RPC_URL
-- 以下地址变量至少一个可用：
-- UPGRADE_PROXY_ADDRESS
-- SWAP_PROXY_ADDRESS
+- CNC_RPC_URL
 - SWAP_ADDRESS
-- CNC_SWAP_ADDRESS
 
 TOTSwapV3 可选配置：
 - SWAP_DEX_ROUTER_ADDRESS
@@ -60,10 +55,8 @@ TOTSwapV3 可选配置：
 已新增命令入口：
 
 ```bash
-npm run replace:swap:v3:sepolia
 npm run replace:swap:v3:cnc
 
-npm run configure:totswap:v3:sepolia
 npm run configure:totswap:v3:cnc
 ```
 
@@ -75,12 +68,12 @@ npm run configure:totswap:v3:cnc
 
 ```bash
 cd /home/ubuntu/DeFiNodeNexus
-rg -n "CNC_RPC_URL|CNC_SWAP_ADDRESS|SWAP_ADDRESS|SWAP_DEX_ROUTER_ADDRESS|SWAP_DEX_PAIR_ADDRESS|SWAP_DEX_FACTORY_ADDRESS|SWAP_ENABLE_EXTERNAL_DEX|SWAP_PAUSE_SWAP" .env .env.local
+rg -n "CNC_RPC_URL|SWAP_ADDRESS|SWAP_DEX_ROUTER_ADDRESS|SWAP_DEX_PAIR_ADDRESS|SWAP_DEX_FACTORY_ADDRESS|SWAP_ENABLE_EXTERNAL_DEX|SWAP_PAUSE_SWAP" .env .env.local
 ```
 
 预期结果：
 - CNC_RPC_URL 非空。
-- CNC_SWAP_ADDRESS（或 SWAP_ADDRESS）指向你当前 Swap 代理地址。
+- SWAP_ADDRESS 指向你当前 Swap 代理地址。
 
 ### 第 2 步：执行替换
 
@@ -105,7 +98,6 @@ Factory: 0x...
 External DEX enabled: true|false
 Swap paused: false
 Suggested env sync:
-CNC_SWAP_ADDRESS=0x...
 SWAP_ADDRESS=0x...
 ```
 
@@ -121,21 +113,7 @@ npm run configure:totswap:v3:cnc
 
 ---
 
-## 5. Sepolia 替换流程
-
-```bash
-npm run replace:swap:v3:sepolia
-```
-
-替换后建议再执行一次配置校验：
-
-```bash
-npm run configure:totswap:v3:sepolia
-```
-
----
-
-## 6. 替换后验收清单
+## 5. 替换后验收清单
 
 1. 代理地址未变化：
 - 仍使用原有 proxy 地址。
@@ -154,11 +132,11 @@ npm run configure:totswap:v3:sepolia
 
 6. 前端地址一致：
 - NEXT_PUBLIC_SWAP_ADDRESS 与代理地址一致。
-- SWAP_ADDRESS / CNC_SWAP_ADDRESS 与当前网络地址一致。
+- SWAP_ADDRESS 与当前网络地址一致。
 
 ---
 
-## 7. 安全发布建议
+## 6. 安全发布建议
 
 推荐顺序：
 
@@ -170,15 +148,15 @@ npm run configure:totswap:v3:sepolia
 
 ---
 
-## 8. 常见报错与处理
+## 7. 常见报错与处理
 
-### 报错：Missing UPGRADE_PROXY_ADDRESS...
+### 报错：Missing SWAP_ADDRESS...
 
 原因：
 - 未找到可用代理地址变量。
 
 处理：
-- 至少设置 CNC_SWAP_ADDRESS / SWAP_ADDRESS / SWAP_PROXY_ADDRESS 之一。
+- 设置 SWAP_ADDRESS 为当前 Swap 代理地址。
 
 ### 报错：execution reverted (Ownable)
 
@@ -207,7 +185,7 @@ npm run configure:totswap:v3:sepolia
 
 ---
 
-## 9. CNC 快速命令集
+## 8. CNC 快速命令集
 
 ```bash
 cd /home/ubuntu/DeFiNodeNexus
@@ -227,7 +205,7 @@ pm2 restart definodenexus
 
 ---
 
-## 10. 相关文件
+## 9. 相关文件
 
 - scripts/replace-swap-v3.js
 - scripts/upgrade-totswap-v3.js

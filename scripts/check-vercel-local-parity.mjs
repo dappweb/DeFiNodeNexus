@@ -8,7 +8,6 @@ const envLocalPath = path.join(root, '.env.local')
 const vercelProjectPath = path.join(root, '.vercel', 'project.json')
 
 const criticalPublicFallbackPairs = [
-  ['NEXT_PUBLIC_SEPOLIA_RPC_URL', 'SEPOLIA_RPC_URL'],
   ['NEXT_PUBLIC_NEXUS_ADDRESS', 'NEXUS_ADDRESS'],
   ['NEXT_PUBLIC_SWAP_ADDRESS', 'SWAP_ADDRESS'],
   ['NEXT_PUBLIC_TOT_ADDRESS', 'TOT_TOKEN_ADDRESS'],
@@ -23,7 +22,6 @@ const userVisibleParityKeys = [
 ]
 
 const serverFeatureKeys = [
-  'SEPOLIA_RPC_URL',
   'NEXUS_ADDRESS',
   'SWAP_ADDRESS',
   'TOT_TOKEN_ADDRESS',
@@ -95,7 +93,7 @@ for (const key of userVisibleParityKeys) {
   }
 }
 
-const addressPairs = criticalPublicFallbackPairs.filter(([publicKey]) => publicKey !== 'NEXT_PUBLIC_SEPOLIA_RPC_URL')
+const addressPairs = criticalPublicFallbackPairs
 
 for (const [publicKey, serverKey] of addressPairs) {
   const publicValue = getValue([envLocal, env, process.env], publicKey)

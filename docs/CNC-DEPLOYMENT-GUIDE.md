@@ -48,8 +48,8 @@ This will:
 After successful deployment, update `.env` with the new addresses:
 
 ```env
-CNC_NEXUS_ADDRESS=<deployed address from step 2>
-CNC_SWAP_ADDRESS=<deployed address from step 2>
+NEXUS_ADDRESS=<deployed address from step 2>
+SWAP_ADDRESS=<deployed address from step 2>
 ```
 
 ### 4. Add Liquidity (Optional)

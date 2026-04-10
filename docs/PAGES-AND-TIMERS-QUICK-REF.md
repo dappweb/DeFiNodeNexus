@@ -250,7 +250,7 @@ cat runtime/health/latest-health-check.json
 grep "NEXT_PUBLIC" .env.local
 
 # 检查 RPC
-curl https://sepolia.infura.io/...
+curl https://rpc.cncchainpro.com
 
 # 检查浏览器控制台错误
 # 清除缓存后刷新
@@ -327,7 +327,7 @@ NEXT_PUBLIC_CONTRACT_OWNER=0x...
 
 # Keeper
 DEPLOYER_PRIVATE_KEY=0x...
-SEPOLIA_RPC_URL=https://...
+CNC_RPC_URL=https://rpc.cncchainpro.com
 SWAP_ADDRESS=0x...
 KEEPER_SECRET=your_secret
 ```
@@ -336,7 +336,7 @@ KEEPER_SECRET=your_secret
 ```env
 # CNC 链（如果支持）
 NEXT_PUBLIC_CNC_RPC_URL=https://rpc.cncchainpro.com
-CNC_SWAP_ADDRESS=0x...
+SWAP_ADDRESS=0x...
 
 # 通知
 DISCORD_WEBHOOK_URL=https://...

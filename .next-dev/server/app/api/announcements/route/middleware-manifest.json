@@ -1,0 +1,42 @@
+{
+  "sorted_middleware": [
+    "/api/announcements/route"
+  ],
+  "middleware": {},
+  "instrumentation": null,
+  "functions": {
+    "/api/announcements/route": {
+      "files": [
+        "server/middleware-build-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/server-reference-manifest.js",
+        "server/app/api/announcements/route_client-reference-manifest.js",
+        "server/edge/chunks/_next-internal_server_app_api_announcements_route_actions_d1351cfb.js",
+        "server/edge/chunks/turbopack-_next-internal_server_app_api_announcements_route_actions_ccadf5fe.js",
+        "server/edge/chunks/node_modules_next_dist_esm_18ca16fa._.js",
+        "server/edge/chunks/node_modules_next_dist_compiled_a4197584._.js",
+        "server/edge/chunks/node_modules_next_dist_7bea040f._.js",
+        "server/edge/chunks/edge-wrapper_d865562c.js",
+        "server/edge/chunks/[root-of-the-server]__3822f3ee._.js",
+        "server/edge/chunks/turbopack-edge-wrapper_f433f929.js"
+      ],
+      "name": "app/api/announcements/route",
+      "page": "/api/announcements/route",
+      "matchers": [
+        {
+          "regexp": "^/api/announcements(?:/)?$",
+          "originalSource": "/api/announcements"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "development",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "YhbCKpitwXISkhteT7Ezle2shMd/vme98Avjro9bxms=",
+        "__NEXT_PREVIEW_MODE_ID": "54dc680b7d04399b0770622a93d0cfe2",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "9e6dedb992d3003aaad3dc830ec9bd8a6e29a84bb39ad6e7b86d400272292b3d",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "b5c8e2d508143ebca2ea34fb44d6669143a1d56de001bc6386da702d6ad2d657"
+      }
+    }
+  }
+}

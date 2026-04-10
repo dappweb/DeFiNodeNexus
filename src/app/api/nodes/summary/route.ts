@@ -24,21 +24,19 @@ function isUsableRpcUrl(value: string | undefined): value is string {
 
 function getReadonlyProvider(): ethers.Provider {
   if (!cachedProvider) {
-    const sepoliaNetwork = ethers.Network.from("sepolia");
+    const cncNetwork = ethers.Network.from("cnc", 50716);
     const rpcUrls = Array.from(
       new Set(
         [
-          "https://ethereum-sepolia-rpc.publicnode.com",
-          "https://rpc.sepolia.org",
-          "https://1rpc.io/sepolia",
-          process.env.SEPOLIA_RPC_URL,
-          process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL,
+          "https://rpc.cncchainpro.com",
+          process.env.CNC_RPC_URL,
+          process.env.NEXT_PUBLIC_CNC_RPC_URL,
         ].filter(isUsableRpcUrl)
       )
     );
 
     const providers = rpcUrls.map(
-      (url) => new ethers.JsonRpcProvider(url, sepoliaNetwork, { staticNetwork: sepoliaNetwork })
+      (url) => new ethers.JsonRpcProvider(url, cncNetwork, { staticNetwork: cncNetwork })
     );
 
     cachedProvider =
@@ -51,7 +49,7 @@ function getReadonlyProvider(): ethers.Provider {
               weight: 1,
               stallTimeout: 1000,
             })),
-            sepoliaNetwork,
+            cncNetwork,
             { quorum: 1 }
           );
   }

@@ -29,6 +29,9 @@
 ### 我需要 Swap 替换部署（脚本/命令/步骤/输出）教程
 👉 **[SWAP-REPLACEMENT-TUTORIAL.md](SWAP-REPLACEMENT-TUTORIAL.md)** - UUPS 代理替换到 TOTSwapV3 的操作手册
 
+### 我需要给客户的一体化执行文档（页面 + SwapV3 升级 + Timer）
+👉 **[CNC-USER-FULL-DEPLOY-SWAPV3-TIMER.md](CNC-USER-FULL-DEPLOY-SWAPV3-TIMER.md)** - 客户可直接执行的完整部署与升级手册
+
 ### 我需要代码示例
 👉 **[src/lib/integration-guide.md](../src/lib/integration-guide.md)** - 集成指南与代码示例
 

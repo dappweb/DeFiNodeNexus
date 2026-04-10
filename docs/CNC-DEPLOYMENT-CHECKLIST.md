@@ -17,8 +17,8 @@
 
 ## Post-Deployment
 - [ ] Update `.env` with deployed addresses:
-  - [ ] CNC_NEXUS_ADDRESS
-  - [ ] CNC_SWAP_ADDRESS
+  - [ ] NEXUS_ADDRESS
+  - [ ] SWAP_ADDRESS
 - [ ] Test contract interactions on CNC testnet/mainnet
 - [ ] Verify contract ownership is set correctly
 - [ ] Verify NFTA and NFTB tiers are configured

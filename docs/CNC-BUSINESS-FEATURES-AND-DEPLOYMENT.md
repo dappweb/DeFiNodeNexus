@@ -63,14 +63,14 @@
 - DEPLOYER_PRIVATE_KEY
 - OWNER_PRIVATE_KEY（可与 deployer 相同）
 - CNC_RPC_URL
-- CNC_TOT_TOKEN_ADDRESS
-- CNC_TOF_TOKEN_ADDRESS
-- CNC_USDT_TOKEN_ADDRESS
+- TOT_TOKEN_ADDRESS
+- TOF_TOKEN_ADDRESS
+- USDT_TOKEN_ADDRESS
 
 应用运行必填（Web/脚本）：
 - CNC_CHAIN_ID
-- CNC_NEXUS_ADDRESS
-- CNC_SWAP_ADDRESS
+- NEXUS_ADDRESS
+- SWAP_ADDRESS
 - NEXT_PUBLIC_NEXUS_ADDRESS
 - NEXT_PUBLIC_SWAP_ADDRESS
 - NEXT_PUBLIC_TOT_TOKEN_ADDRESS
@@ -95,8 +95,8 @@ npm run deploy:cnc
 ```
 
 3. 记录输出地址并回写环境变量：
-- CNC_NEXUS_ADDRESS
-- CNC_SWAP_ADDRESS
+- NEXUS_ADDRESS
+- SWAP_ADDRESS
 
 4. 部署后检查：
 - Nexus 与 TOTSwap 均有地址输出。
@@ -162,7 +162,7 @@ journalctl -u definode-health.service -n 80 --no-pager
 - Web 回滚：
   - 保留上一个可运行构建目录，切换后重启 definode-web.service。
 - 合约重部署：
-  - 重新执行 deploy:cnc 并更新 CNC_NEXUS_ADDRESS/CNC_SWAP_ADDRESS。
+  - 重新执行 deploy:cnc 并更新 NEXUS_ADDRESS/SWAP_ADDRESS。
   - 前端 NEXT_PUBLIC 地址必须同步。
 - UUPS 升级：
   - 仅在 ABI/存储布局确认后执行，避免直接覆盖生产合约状态。

@@ -5,9 +5,9 @@ async function main() {
   const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
   const ownerPrivateKey = process.env.OWNER_PRIVATE_KEY || deployerPrivateKey;
   const rpcUrl = process.env.CNC_RPC_URL;
-  const totToken = process.env.CNC_TOT_TOKEN_ADDRESS;
-  const tofToken = process.env.CNC_TOF_TOKEN_ADDRESS;
-  const usdtToken = process.env.CNC_USDT_TOKEN_ADDRESS;
+  const totToken = process.env.TOT_TOKEN_ADDRESS;
+  const tofToken = process.env.TOF_TOKEN_ADDRESS;
+  const usdtToken = process.env.USDT_TOKEN_ADDRESS;
   const zeroAddress = "0x0000000000000000000000000000000000000000";
 
   if (!deployerPrivateKey) {
@@ -17,10 +17,10 @@ async function main() {
     throw new Error("Missing CNC_RPC_URL in .env");
   }
   if (!totToken || !tofToken || !usdtToken) {
-    throw new Error("Missing CNC_TOT_TOKEN_ADDRESS, CNC_TOF_TOKEN_ADDRESS or CNC_USDT_TOKEN_ADDRESS in .env");
+    throw new Error("Missing TOT_TOKEN_ADDRESS, TOF_TOKEN_ADDRESS or USDT_TOKEN_ADDRESS in .env");
   }
   if (totToken === zeroAddress || tofToken === zeroAddress || usdtToken === zeroAddress) {
-    throw new Error("CNC_TOT_TOKEN_ADDRESS, CNC_TOF_TOKEN_ADDRESS and CNC_USDT_TOKEN_ADDRESS must be real deployed token addresses");
+    throw new Error("TOT_TOKEN_ADDRESS, TOF_TOKEN_ADDRESS and USDT_TOKEN_ADDRESS must be real deployed token addresses");
   }
 
   // Get signer accounts
@@ -179,8 +179,8 @@ async function main() {
 
   // Update .env with deployed addresses
   console.log("\n--- Update .env with deployed addresses ---");
-  console.log("CNC_NEXUS_ADDRESS=" + deployedAddress);
-  console.log("CNC_SWAP_ADDRESS=" + swapAddress);
+  console.log("NEXUS_ADDRESS=" + deployedAddress);
+  console.log("SWAP_ADDRESS=" + swapAddress);
 }
 
 main().catch((error) => {

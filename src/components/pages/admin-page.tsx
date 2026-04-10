@@ -161,6 +161,9 @@ export function AdminPage() {
   const [externalDexEnabled, setExternalDexEnabled] = useState(false);
   const [swapPaused, setSwapPaused] = useState(false);
 
+  // Swap Owner 转移
+  const [newSwapOwnerAddr, setNewSwapOwnerAddr] = useState("");
+
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
     return address.toLowerCase() === ownerAddress.toLowerCase();
@@ -857,6 +860,37 @@ export function AdminPage() {
       return;
     }
     await runTx("应急提取", () => swap.emergencyWithdraw(emergencyTokenAddr.trim(), amount));
+  };
+
+  const onTransferSwapOwner = async () => {
+    if (!isSwapOwner) {
+      toast({ title: "权限不足", description: "只有Swap Owner才能转移所有权", variant: "destructive" });
+      return;
+    }
+
+    if (!swap) {
+      toast({ title: "错误", description: "Swap合约未加载", variant: "destructive" });
+      return;
+    }
+
+    if (!ethers.isAddress(newSwapOwnerAddr.trim())) {
+      toast({ title: "参数错误", description: "新Owner地址无效", variant: "destructive" });
+      return;
+    }
+
+    if (newSwapOwnerAddr.trim().toLowerCase() === swapOwnerAddress.toLowerCase()) {
+      toast({ title: "参数错误", description: "新Owner与当前Owner相同", variant: "destructive" });
+      return;
+    }
+
+    // Confirm with user
+    const confirmed = window.confirm(
+      `确认转移Swap Owner权限吗？\n当前Owner: ${swapOwnerAddress}\n新Owner: ${newSwapOwnerAddr}\n\n此操作不可逆！`
+    );
+    if (!confirmed) return;
+
+    await runTx("转移Swap Owner", () => swap.transferOwnership(newSwapOwnerAddr.trim()));
+    setNewSwapOwnerAddr("");
   };
 
   return (
@@ -1562,6 +1596,25 @@ export function AdminPage() {
               <Input value={emergencyTokenAddr} onChange={(e) => setEmergencyTokenAddr(e.target.value)} placeholder="Token地址 0x..." />
               <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="提取金额" />
               <Button variant="destructive" disabled={!isOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 border-t pt-3 mt-3">
+            <div><strong className="text-xs">Swap Owner 转移</strong></div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <Input 
+                value={newSwapOwnerAddr} 
+                onChange={(e) => setNewSwapOwnerAddr(e.target.value)} 
+                placeholder="新Owner地址 0x..."
+                disabled={!isSwapOwner || loading}
+              />
+              <Button 
+                variant="destructive" 
+                disabled={!isSwapOwner || loading || !newSwapOwnerAddr.trim() || !swap}
+                onClick={onTransferSwapOwner}
+              >
+                {loading ? "处理中..." : "转移Owner"}
+              </Button>
             </div>
           </div>
         </CardContent>

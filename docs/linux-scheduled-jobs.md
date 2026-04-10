@@ -23,7 +23,7 @@
 ## 3. keeper.env 示例
 
 ```env
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your-key
+CNC_RPC_URL=https://rpc.cncchainpro.com
 DEPLOYER_PRIVATE_KEY=0xyourprivatekey
 SWAP_ADDRESS=0xYourSwapAddress
 NEXUS_ADDRESS=0xYourNexusAddress

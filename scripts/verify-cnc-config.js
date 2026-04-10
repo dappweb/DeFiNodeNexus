@@ -6,9 +6,9 @@ require("../env_conf");
 
 const cncRpcUrl = process.env.CNC_RPC_URL;
 const cncChainId = process.env.CNC_CHAIN_ID;
-const cncTotToken = process.env.CNC_TOT_TOKEN_ADDRESS;
-const cncTofToken = process.env.CNC_TOF_TOKEN_ADDRESS;
-const cncUsdtToken = process.env.CNC_USDT_TOKEN_ADDRESS;
+const cncTotToken = process.env.TOT_TOKEN_ADDRESS;
+const cncTofToken = process.env.TOF_TOKEN_ADDRESS;
+const cncUsdtToken = process.env.USDT_TOKEN_ADDRESS;
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
 const ownerPrivateKey = process.env.OWNER_PRIVATE_KEY;
 const zeroAddress = "0x0000000000000000000000000000000000000000";
@@ -38,24 +38,24 @@ if (!cncChainId) {
 
 // Check Token Addresses
 if (!cncTotToken || cncTotToken === zeroAddress) {
-  console.error("❌ CNC_TOT_TOKEN_ADDRESS is not set or is zero address");
+  console.error("❌ TOT_TOKEN_ADDRESS is not set or is zero address");
   hasErrors = true;
 } else {
-  console.log("✓ CNC_TOT_TOKEN_ADDRESS:", cncTotToken);
+  console.log("✓ TOT_TOKEN_ADDRESS:", cncTotToken);
 }
 
 if (!cncTofToken || cncTofToken === zeroAddress) {
-  console.error("❌ CNC_TOF_TOKEN_ADDRESS is not set or is zero address");
+  console.error("❌ TOF_TOKEN_ADDRESS is not set or is zero address");
   hasErrors = true;
 } else {
-  console.log("✓ CNC_TOF_TOKEN_ADDRESS:", cncTofToken);
+  console.log("✓ TOF_TOKEN_ADDRESS:", cncTofToken);
 }
 
 if (!cncUsdtToken || cncUsdtToken === zeroAddress) {
-  console.error("❌ CNC_USDT_TOKEN_ADDRESS is not set or is zero address");
+  console.error("❌ USDT_TOKEN_ADDRESS is not set or is zero address");
   hasErrors = true;
 } else {
-  console.log("✓ CNC_USDT_TOKEN_ADDRESS:", cncUsdtToken);
+  console.log("✓ USDT_TOKEN_ADDRESS:", cncUsdtToken);
 }
 
 // Check Deployer Private Key

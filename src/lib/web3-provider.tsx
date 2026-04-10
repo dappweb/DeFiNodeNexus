@@ -27,9 +27,6 @@ interface Web3ContextType {
 
 const Web3Context = createContext<Web3ContextType | undefined>(undefined);
 
-const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111
-const SEPOLIA_CHAIN_ID_DECIMAL = 11155111;
-
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const { address, isConnected, isConnecting, chainId } = useAccount();
   const { connect } = useConnect();

@@ -15,7 +15,7 @@ const path = require("path");
  *   C) Next.js API route:    POST /api/keeper?token=KEEPER_SECRET
  *
  * Required .env:
- *   CNC_RPC_URL (or SEPOLIA_RPC_URL), DEPLOYER_PRIVATE_KEY, SWAP_ADDRESS
+ *   CNC_RPC_URL, DEPLOYER_PRIVATE_KEY, SWAP_ADDRESS
  *
  * Optional .env:
  *   KEEPER_INTERVAL_MS  — loop interval in ms (default: 600000 = 10 min)
@@ -40,13 +40,13 @@ const SWAP_ABI = [
 ];
 
 function getConfig() {
-  const rpcUrl = process.env.CNC_RPC_URL || process.env.SEPOLIA_RPC_URL;
+  const rpcUrl = process.env.CNC_RPC_URL;
   const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
   const swapAddress = process.env.SWAP_ADDRESS;
   const lockFile = resolveRuntimePath(process.env.KEEPER_LOCK_FILE || "runtime/keeper/keeper.lock");
   const statusFile = resolveRuntimePath(process.env.KEEPER_STATUS_FILE || "runtime/keeper/latest-run.json");
 
-  if (!rpcUrl) throw new Error("Missing CNC_RPC_URL (or SEPOLIA_RPC_URL)");
+  if (!rpcUrl) throw new Error("Missing CNC_RPC_URL");
   if (!privateKey) throw new Error("Missing DEPLOYER_PRIVATE_KEY");
   if (!swapAddress || swapAddress === "0x0000000000000000000000000000000000000000") {
     throw new Error("Missing or zero SWAP_ADDRESS");

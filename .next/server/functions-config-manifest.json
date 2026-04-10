@@ -2,9 +2,9 @@
   "version": 1,
   "functions": {
     "/api/announcements": {},
+    "/api/admin/announcements": {},
     "/api/keeper": {},
     "/api/data-service/announcements": {},
-    "/api/admin/announcements": {},
     "/api/nodes/summary": {}
   }
 }

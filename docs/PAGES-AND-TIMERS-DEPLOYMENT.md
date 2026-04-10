@@ -163,7 +163,7 @@ TOT_DISTRIBUTION_THRESHOLD=1000000000000000000
 USDT_DISTRIBUTION_THRESHOLD=1000000
 
 # RPC 和合约
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+CNC_RPC_URL=https://rpc.cncchainpro.com
 SWAP_ADDRESS=0x...
 TOT_TOKEN_ADDRESS=0x...
 USDT_TOKEN_ADDRESS=0x...
@@ -383,13 +383,13 @@ POST /api/keeper?token=KEEPER_SECRET
 KEEPER_SECRET=your_secret_key
 
 # RPC 和网络
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+CNC_RPC_URL=https://rpc.cncchainpro.com
 DEPLOYER_PRIVATE_KEY=0x...
 SWAP_ADDRESS=0x...
 
 # CNC 链配置
 CNC_RPC_URL=https://rpc.cncchainpro.com
-CNC_SWAP_ADDRESS=0x...
+SWAP_ADDRESS=0x...
 ```
 
 #### 使用示例
