@@ -24,7 +24,7 @@ function isUsableRpcUrl(value: string | undefined): value is string {
 
 function getReadonlyProvider(): ethers.Provider {
   if (!cachedProvider) {
-    const cncNetwork = ethers.Network.from("cnc", 50716);
+    const cncNetwork = ethers.Network.from(50716);
     const rpcUrls = Array.from(
       new Set(
         [

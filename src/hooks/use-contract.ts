@@ -27,7 +27,7 @@ function getE2EContractMock(address: string) {
 let _fallbackProvider: ethers.Provider | null = null;
 function getFallbackProvider(): ethers.Provider {
   if (!_fallbackProvider) {
-    const cncNetwork = ethers.Network.from("cnc", 50716);
+    const cncNetwork = ethers.Network.from(50716);
     const rpcUrls = Array.from(
       new Set(
         [

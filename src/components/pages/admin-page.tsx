@@ -907,6 +907,13 @@ export function AdminPage() {
         </CardContent>
       </Card>
 
+      <Card className="glass-panel border-blue-500/30">
+        <CardHeader>
+          <CardTitle>主合约（Nexus）配置区</CardTitle>
+          <CardDescription>以下卡片均为主合约治理与业务参数配置</CardDescription>
+        </CardHeader>
+      </Card>
+
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>NFTA 单笔操作</CardTitle>
@@ -993,7 +1000,7 @@ export function AdminPage() {
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>参数与运营</CardTitle>
-          <CardDescription>TOF 领取费率、奖励池注资、Swap通缩</CardDescription>
+          <CardDescription>TOF 领取费率、奖励池注资</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Collapsible defaultOpen={false}>
@@ -1027,11 +1034,6 @@ export function AdminPage() {
             <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="奖励池注资 TOT 数量" />
             <div />
             <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onFundRewardPool}>注资奖励池</Button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="text-xs text-muted-foreground flex items-center">触发一次 4h 通缩逻辑</div>
-            <div />
-            <Button variant="secondary" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>
@@ -1378,6 +1380,13 @@ export function AdminPage() {
         </CardContent>
       </Card>
 
+      <Card className="glass-panel border-amber-500/30">
+        <CardHeader>
+          <CardTitle>Swap 合约配置区</CardTitle>
+          <CardDescription>以下卡片均为 Swap 合约参数与交易引擎配置</CardDescription>
+        </CardHeader>
+      </Card>
+
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>Swap 外部 DEX 配置</CardTitle>
@@ -1504,6 +1513,12 @@ export function AdminPage() {
             <div />
             <div />
             <Button variant="outline" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onSetDeflationBps}>设置通胀比率</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <div className="text-xs text-muted-foreground flex items-center">触发一次 4h 通缩逻辑</div>
+            <div />
+            <div />
+            <Button variant="secondary" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>

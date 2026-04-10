@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
 # DeFiNodeNexus — 一键部署 / 更新脚本
-# 适用环境: Ubuntu 24.04 · Node.js 20 · PM2 · OpenResty / Nginx
+# 适用环境: Ubuntu 24.04 · Node.js 20 · PM2 · Caddy / OpenResty / Nginx
 # 应用目录: /home/ubuntu/DeFiNodeNexus
-# 应用端口: 9002  (OpenResty / Nginx 反代 80 → 9002)
+# 应用端口: 9002  (Caddy/OpenResty/Nginx 反代 80/443 → 9002)
 #
 # 用法:
 #   bash deploy.sh              # 拉取最新代码 + 构建 + 重载
@@ -17,11 +17,13 @@ set -euo pipefail
 APP_DIR="/home/ubuntu/DeFiNodeNexus"
 APP_NAME="definodenexus"
 APP_PORT="9002"
-PROXY_CONF_SRC="$APP_DIR/deploy/linux/nginx-definode.conf"
+PROXY_CADDY_TEMPLATE="$APP_DIR/deploy/linux/Caddyfile"
+CADDY_CONF_DST="/etc/caddy/Caddyfile"
 OPENRESTY_CONF_DST="/etc/openresty/conf.d/definodexus.conf"
 OPENRESTY_1PANEL_CONF_DST="/opt/1panel/docker/compose/openresty/conf.d/definodexus.conf"
 NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
 NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
+APP_DOMAIN="${APP_DOMAIN:-t1.test2dapp.xyz}"
 
 # ── 参数解析 ──────────────────────────────────────────────────────────────────
 SKIP_PULL=false
@@ -120,40 +122,57 @@ fi
 pm2 save
 
 # ── Nginx 更新 ────────────────────────────────────────────────────────────────
-step "[5/6] 检查反向代理配置 (OpenResty 优先)"
+step "[5/6] 检查反向代理配置 (Caddy 优先)"
 # 保证目录有反向代理可读权限
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
 # 每次部署都同步模板，确保缓存/代理策略及时生效
-if [[ -d "/opt/1panel/docker/compose/openresty/conf.d" ]]; then
-  sudo install -m 644 "$PROXY_CONF_SRC" "$OPENRESTY_1PANEL_CONF_DST"
-  echo "  已同步 1Panel OpenResty 配置: $OPENRESTY_1PANEL_CONF_DST"
-elif [[ -d "/etc/openresty/conf.d" ]]; then
-  sudo install -m 644 "$PROXY_CONF_SRC" "$OPENRESTY_CONF_DST"
-  echo "  已同步 OpenResty 配置: $OPENRESTY_CONF_DST"
-else
-  sudo install -m 644 "$PROXY_CONF_SRC" "$NGINX_CONF_DST"
-  [[ ! -L "$NGINX_LINK" ]] && sudo ln -s "$NGINX_CONF_DST" "$NGINX_LINK"
-  [[ -L "/etc/nginx/sites-enabled/default" ]] && sudo rm -f "/etc/nginx/sites-enabled/default" || true
-  echo "  已同步 Nginx 配置: $NGINX_CONF_DST"
-fi
+if command -v caddy &>/dev/null && [[ -f "$PROXY_CADDY_TEMPLATE" ]] && [[ -d "/etc/caddy" ]]; then
+  TMP_CADDY="$(mktemp)"
+  sed \
+    -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
+    -e "s|__UPSTREAM__|127.0.0.1:$APP_PORT|g" \
+    "$PROXY_CADDY_TEMPLATE" > "$TMP_CADDY"
 
-sudo nginx -t
+  sudo install -m 644 "$TMP_CADDY" "$CADDY_CONF_DST"
+  rm -f "$TMP_CADDY"
 
-OPENRESTY_MASTER_PID="$(pgrep -o -f '/usr/local/openresty|openresty -g daemon off' || true)"
-if [[ -n "$OPENRESTY_MASTER_PID" ]]; then
-  if sudo docker ps --format '{{.Names}}' | grep -q '^openresty-1panel$'; then
-    sudo docker exec openresty-1panel openresty -s reload >/dev/null
-    echo "  1Panel OpenResty 容器已重载"
+  sudo caddy validate --config "$CADDY_CONF_DST"
+  if systemctl is-active --quiet caddy; then
+    sudo systemctl reload caddy
   else
-    sudo kill -HUP "$OPENRESTY_MASTER_PID"
-    echo "  OpenResty 已重载 (PID: $OPENRESTY_MASTER_PID)"
+    sudo systemctl enable --now caddy
   fi
-elif systemctl is-active --quiet nginx; then
-  sudo systemctl reload nginx
-  echo "  Nginx 已重载"
+  echo "  Caddy 配置已同步并重载: $CADDY_CONF_DST"
+elif [[ -d "/opt/1panel/docker/compose/openresty/conf.d" ]]; then
+  if [[ -f "$APP_DIR/deploy/linux/nginx-definode.conf" ]]; then
+    sudo install -m 644 "$APP_DIR/deploy/linux/nginx-definode.conf" "$OPENRESTY_1PANEL_CONF_DST"
+    echo "  已同步 1Panel OpenResty 配置: $OPENRESTY_1PANEL_CONF_DST"
+  else
+    warn "未找到 nginx-definode.conf，跳过 OpenResty 配置同步"
+  fi
+elif [[ -d "/etc/openresty/conf.d" ]]; then
+  if [[ -f "$APP_DIR/deploy/linux/nginx-definode.conf" ]]; then
+    sudo install -m 644 "$APP_DIR/deploy/linux/nginx-definode.conf" "$OPENRESTY_CONF_DST"
+    echo "  已同步 OpenResty 配置: $OPENRESTY_CONF_DST"
+  else
+    warn "未找到 nginx-definode.conf，跳过 OpenResty 配置同步"
+  fi
+elif [[ -d "/etc/nginx" ]]; then
+  if [[ -f "$APP_DIR/deploy/linux/nginx-definode.conf" ]]; then
+    sudo install -m 644 "$APP_DIR/deploy/linux/nginx-definode.conf" "$NGINX_CONF_DST"
+    [[ ! -L "$NGINX_LINK" ]] && sudo ln -s "$NGINX_CONF_DST" "$NGINX_LINK"
+    [[ -L "/etc/nginx/sites-enabled/default" ]] && sudo rm -f "/etc/nginx/sites-enabled/default" || true
+    sudo nginx -t
+    if systemctl is-active --quiet nginx; then
+      sudo systemctl reload nginx
+      echo "  Nginx 已重载"
+    fi
+  else
+    warn "未找到 nginx-definode.conf，跳过 Nginx 配置同步"
+  fi
 else
-  warn "未检测到 OpenResty 进程，且 nginx.service 未运行；仅完成配置校验"
+  warn "未检测到 Caddy/OpenResty/Nginx，可执行 deploy/linux/setup-caddy.sh 安装 Caddy"
 fi
 
 # ── 健康检查 ──────────────────────────────────────────────────────────────────
@@ -187,5 +206,5 @@ echo -e "  ${GREEN}部署完成${NC}"
 echo "  访问地址 : http://t1.test2dapp.xyz"
 echo "  应用日志 : pm2 logs $APP_NAME"
 echo "  进程状态 : pm2 list"
-echo "  代理日志 : sudo tail -f /var/log/nginx/access.log"
+echo "  代理日志 : sudo journalctl -u caddy -f"
 echo "============================================================"

@@ -37,6 +37,54 @@ sudo systemctl logs -u definode-health.service -f
 
 ---
 
+## 🌐 Web 反向代理（Caddy）
+
+本项目 Web 服务默认监听 9002 端口，推荐使用 Caddy 反向代理到 80/443。
+
+### 一键安装并启用 Caddy
+
+```bash
+sudo APP_DOMAIN=t1.test2dapp.xyz bash deploy/linux/setup-caddy.sh
+```
+
+可选自定义上游端口：
+
+```bash
+sudo APP_DOMAIN=t1.test2dapp.xyz APP_PORT=9002 bash deploy/linux/setup-caddy.sh
+```
+
+### 使用 deploy.sh 自动同步 Caddy
+
+deploy.sh 已更新为 Caddy 优先：
+
+```bash
+bash deploy.sh
+```
+
+可通过环境变量指定域名：
+
+```bash
+APP_DOMAIN=t1.test2dapp.xyz bash deploy.sh
+```
+
+### 验证 Caddy 状态
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl status caddy --no-pager
+sudo journalctl -u caddy -n 100 --no-pager
+```
+
+### Caddy 配置模板位置
+
+- `deploy/linux/Caddyfile`
+
+模板中的占位符由脚本自动替换：
+- `__APP_DOMAIN__`
+- `__UPSTREAM__`
+
+---
+
 ## 🎯 Keeper 定时任务说明
 
 ### 执行的业务

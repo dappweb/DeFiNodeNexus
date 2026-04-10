@@ -32,6 +32,9 @@
 ### 我需要给客户的一体化执行文档（页面 + SwapV3 升级 + Timer）
 👉 **[CNC-USER-FULL-DEPLOY-SWAPV3-TIMER.md](CNC-USER-FULL-DEPLOY-SWAPV3-TIMER.md)** - 客户可直接执行的完整部署与升级手册
 
+### 我需要一页完成：启动项目 + 启动 Timer + 更换 SwapV3 Owner
+👉 **[PROJECT-START-TIMER-SWAPV3-OWNER.md](PROJECT-START-TIMER-SWAPV3-OWNER.md)** - 生产可执行的三项核心操作手册
+
 ### 我需要代码示例
 👉 **[src/lib/integration-guide.md](../src/lib/integration-guide.md)** - 集成指南与代码示例
 
@@ -71,6 +74,7 @@
 | [ENV-SERVICE-PAGE-TIMER-DEPLOYMENT.md](ENV-SERVICE-PAGE-TIMER-DEPLOYMENT.md) | 环境要求+服务/页面/Timer一体化部署 | 15分钟 |
 | [SWAP-INIT-AND-ADJUSTMENT.md](SWAP-INIT-AND-ADJUSTMENT.md) | Swap 初始化与参数调整操作手册 | 15分钟 |
 | [SWAP-REPLACEMENT-TUTORIAL.md](SWAP-REPLACEMENT-TUTORIAL.md) | Swap 替换部署（脚本/命令/步骤/输出）教程 | 12分钟 |
+| [PROJECT-START-TIMER-SWAPV3-OWNER.md](PROJECT-START-TIMER-SWAPV3-OWNER.md) | 启动项目 + 启动 Timer + 更换 SwapV3 Owner 一页手册 | 8分钟 |
 | [CNC-QUICK-START.md](CNC-QUICK-START.md) | CNC 部署快速指南 | 10分钟 |
 | [CNC-DEPLOYMENT-GUIDE.md](CNC-DEPLOYMENT-GUIDE.md) | CNC 部署详细文档 | 30分钟 |
 
