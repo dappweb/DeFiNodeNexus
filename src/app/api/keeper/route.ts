@@ -16,11 +16,11 @@ export const runtime = "edge";
 const SWAP_ABI = [
   "function deflate() external",
   "function forceDistribute() external",
+  "function externalDexEnabled() view returns (bool)",
   "function timeUntilNextDeflation() view returns (uint256)",
   "function nftbDividendPool() view returns (uint256)",
   "function distributionThreshold() view returns (uint256)",
-  "function totReserve() view returns (uint256)",
-  "function usdtReserve() view returns (uint256)",
+  "function getDexReserves() view returns (uint256 totR, uint256 usdtR)",
 ];
 
 export async function POST(request: NextRequest) {
@@ -57,10 +57,13 @@ export async function POST(request: NextRequest) {
     const swap = new ethers.Contract(swapAddress, SWAP_ABI, wallet);
 
     const results: Record<string, unknown> = {};
+    const isExternalDex = Boolean(await swap.externalDexEnabled());
 
     // 1. Deflation
     const countdown = Number(await swap.timeUntilNextDeflation());
-    if (countdown <= 0) {
+    if (isExternalDex) {
+      results.deflation = { executed: false, skipped: true, reason: "external-dex-mode" };
+    } else if (countdown <= 0) {
       const tx = await swap.deflate();
       const receipt = await tx.wait();
       results.deflation = { executed: true, hash: receipt.hash };
@@ -88,8 +91,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Pool state
-    const totR = await swap.totReserve();
-    const usdtR = await swap.usdtReserve();
+    const [totR, usdtR] = await swap.getDexReserves();
     results.pool = {
       totReserve: ethers.formatUnits(totR, 18),
       usdtReserve: ethers.formatUnits(usdtR, 18),
@@ -125,18 +127,20 @@ export async function GET(request: NextRequest) {
     const provider = new ethers.JsonRpcProvider(rpcUrl);
     const swap = new ethers.Contract(swapAddress, SWAP_ABI, provider);
 
-    const [countdown, pool, threshold, totR, usdtR] = await Promise.all([
+    const [isExternalDex, countdown, pool, threshold, reserves] = await Promise.all([
+      swap.externalDexEnabled(),
       swap.timeUntilNextDeflation(),
       swap.nftbDividendPool(),
       swap.distributionThreshold(),
-      swap.totReserve(),
-      swap.usdtReserve(),
+      swap.getDexReserves(),
     ]);
+    const [totR, usdtR] = reserves;
 
     return NextResponse.json({
       deflation: {
-        readyToDeflate: Number(countdown) <= 0,
+        readyToDeflate: !isExternalDex && Number(countdown) <= 0,
         remainingSeconds: Number(countdown),
+        mode: isExternalDex ? "external-dex" : "internal-pool",
       },
       distribution: {
         readyToDistribute: pool >= threshold && pool > BigInt(0),

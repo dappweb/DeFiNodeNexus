@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { getSwapContractName, maybeConfigureSwapV3 } = require("./lib/swap-v3");
 
 async function main() {
   const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
@@ -118,9 +119,10 @@ async function main() {
   console.log("NFTB Tier 3 configured: 2000 USDT, weight 3, dividend 40%");
 
   // --- Deploy TOTSwap ---
-  console.log("\n--- Deploying TOTSwap ---");
+  const swapContractName = getSwapContractName();
+  console.log(`\n--- Deploying ${swapContractName} ---`);
 
-  const TOTSwap = await hre.ethers.getContractFactory("TOTSwap", deployer);
+  const TOTSwap = await hre.ethers.getContractFactory(swapContractName, deployer);
   const swap = await hre.upgrades.deployProxy(
     TOTSwap,
     [totToken, usdtToken, owner.address],
@@ -129,7 +131,7 @@ async function main() {
   await swap.waitForDeployment();
 
   const swapAddress = await swap.getAddress();
-  console.log("TOTSwap deployed to:", swapAddress);
+  console.log(`${swapContractName} deployed to:`, swapAddress);
 
   // Link TOTSwap to DeFiNodeNexus
   const txNexus = await swap.setNexus(deployedAddress);
@@ -151,15 +153,29 @@ async function main() {
     console.warn("TOF protocol whitelist update skipped (requires TOF owner):", err?.message || err);
   }
 
+  const swapV3Config = await maybeConfigureSwapV3(hre, swap, {
+    contractName: swapContractName,
+    networkName: hre.network.name,
+  });
+  if (swapContractName === "TOTSwapV3") {
+    console.log("\n--- TOTSwapV3 configuration ---");
+    console.log("External DEX enabled:", Boolean(swapV3Config.externalDexEnabled));
+    console.log("Swap paused:         ", Boolean(swapV3Config.swapPaused));
+  }
+
   // --- Summary ---
   console.log("\n=== DEPLOYMENT SUMMARY ===");
   console.log("Network:       CNC Chain (50716)");
   console.log("DeFiNodeNexus: ", deployedAddress);
-  console.log("TOTSwap:       ", swapAddress);
+  console.log(`${swapContractName}:`, swapAddress);
   console.log("TOT token:     ", totToken);
   console.log("TOF token:     ", tofToken);
   console.log("USDT token:    ", usdtToken);
-  console.log("\nNOTE: Owner must call swap.addLiquidity() to seed 6% TOT + USDT into pool.");
+  if (swapV3Config.externalDexEnabled) {
+    console.log("\nNOTE: External DEX mode is enabled, so internal pool seeding is skipped.");
+  } else {
+    console.log("\nNOTE: Owner must call swap.addLiquidity() to seed 6% TOT + USDT into pool.");
+  }
 
   // Update .env with deployed addresses
   console.log("\n--- Update .env with deployed addresses ---");

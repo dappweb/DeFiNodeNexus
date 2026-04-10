@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { getSwapContractName, maybeConfigureSwapV3 } = require("./lib/swap-v3");
 
 async function main() {
   const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
@@ -99,9 +100,10 @@ async function main() {
 
   // --- Deploy TOTSwap ---
 
-  console.log("\n--- Deploying TOTSwap ---");
+  const swapContractName = getSwapContractName();
+  console.log(`\n--- Deploying ${swapContractName} ---`);
 
-  const TOTSwap = await hre.ethers.getContractFactory("TOTSwap");
+  const TOTSwap = await hre.ethers.getContractFactory(swapContractName);
   const swap = await hre.upgrades.deployProxy(
     TOTSwap,
     [totToken, usdtToken, deployer.address],
@@ -110,7 +112,7 @@ async function main() {
   await swap.waitForDeployment();
 
   const swapAddress = await swap.getAddress();
-  console.log("TOTSwap deployed to:", swapAddress);
+  console.log(`${swapContractName} deployed to:`, swapAddress);
 
   // Link TOTSwap to DeFiNodeNexus
   const txNexus = await swap.setNexus(deployedAddress);
@@ -128,14 +130,28 @@ async function main() {
   await (await tof.setWhitelisted(swapAddress, true)).wait();
   console.log("TOF whitelist updated: Nexus + TOTSwap");
 
+  const swapV3Config = await maybeConfigureSwapV3(hre, swap, {
+    contractName: swapContractName,
+    networkName: hre.network.name,
+  });
+  if (swapContractName === "TOTSwapV3") {
+    console.log("\n--- TOTSwapV3 configuration ---");
+    console.log("External DEX enabled:", Boolean(swapV3Config.externalDexEnabled));
+    console.log("Swap paused:         ", Boolean(swapV3Config.swapPaused));
+  }
+
   // Summary
   console.log("\n=== DEPLOYMENT SUMMARY ===");
   console.log("DeFiNodeNexus:", deployedAddress);
-  console.log("TOTSwap:      ", swapAddress);
+  console.log(`${swapContractName}:`, swapAddress);
   console.log("TOT token:    ", totToken);
   console.log("TOF token:    ", tofToken);
   console.log("USDT token:   ", usdtToken);
-  console.log("\nNOTE: Owner must call swap.addLiquidity() to seed 6% TOT + USDT into pool.");
+  if (swapV3Config.externalDexEnabled) {
+    console.log("\nNOTE: External DEX mode is enabled, so internal pool seeding is skipped.");
+  } else {
+    console.log("\nNOTE: Owner must call swap.addLiquidity() to seed 6% TOT + USDT into pool.");
+  }
 }
 
 main().catch((error) => {

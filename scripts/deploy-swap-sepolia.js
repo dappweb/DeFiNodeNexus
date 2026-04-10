@@ -1,4 +1,5 @@
 const hre = require("hardhat");
+const { getSwapContractName, maybeConfigureSwapV3 } = require("./lib/swap-v3");
 
 /**
  * Deploy & initialise TOTSwap on Sepolia.
@@ -35,9 +36,10 @@ async function main() {
   console.log("USDT token:", usdtToken);
 
   // ── 1. Deploy TOTSwap proxy ───────────────────────────────────
-  console.log("\n--- Deploying TOTSwap ---");
+  const swapContractName = getSwapContractName();
+  console.log(`\n--- Deploying ${swapContractName} ---`);
 
-  const TOTSwap = await hre.ethers.getContractFactory("TOTSwap");
+  const TOTSwap = await hre.ethers.getContractFactory(swapContractName);
   const swap = await hre.upgrades.deployProxy(
     TOTSwap,
     [totToken, usdtToken, deployer.address],
@@ -46,7 +48,7 @@ async function main() {
   await swap.waitForDeployment();
 
   const swapAddress = await swap.getAddress();
-  console.log("TOTSwap deployed to:", swapAddress);
+  console.log(`${swapContractName} deployed to:`, swapAddress);
 
   // ── 2. Link to DeFiNodeNexus (optional) ───────────────────────
   if (nexusAddress && nexusAddress !== zeroAddress) {
@@ -68,11 +70,21 @@ async function main() {
     console.log("  nexus.setDistributor(<swap>, true)");
   }
 
+  const swapV3Config = await maybeConfigureSwapV3(hre, swap, {
+    contractName: swapContractName,
+    networkName: hre.network.name,
+  });
+  if (swapContractName === "TOTSwapV3") {
+    console.log("\n--- TOTSwapV3 configuration ---");
+    console.log("External DEX enabled:", Boolean(swapV3Config.externalDexEnabled));
+    console.log("Swap paused:         ", Boolean(swapV3Config.swapPaused));
+  }
+
   // ── 3. Seed initial liquidity (optional) ──────────────────────
   const seedTotRaw = process.env.SWAP_SEED_TOT || "";
   const seedUsdtRaw = process.env.SWAP_SEED_USDT || "";
 
-  if (seedTotRaw && seedUsdtRaw) {
+  if (seedTotRaw && seedUsdtRaw && !swapV3Config.externalDexEnabled) {
     const seedTot = hre.ethers.parseUnits(seedTotRaw, 18);
     const seedUsdt = hre.ethers.parseUnits(seedUsdtRaw, 18);
 
@@ -96,6 +108,8 @@ async function main() {
     const txLiq = await swap.addLiquidity(seedTot, seedUsdt);
     await txLiq.wait();
     console.log("Liquidity added ✓");
+  } else if (swapV3Config.externalDexEnabled) {
+    console.log("\nExternal DEX mode enabled – skipping internal liquidity seeding.");
   } else {
     console.log("\nSWAP_SEED_TOT / SWAP_SEED_USDT not set – skipping liquidity seeding.");
     console.log("Seed manually later:");
@@ -106,7 +120,7 @@ async function main() {
 
   // ── Summary ───────────────────────────────────────────────────
   console.log("\n=== DEPLOYMENT SUMMARY ===");
-  console.log("TOTSwap:      ", swapAddress);
+  console.log(`${swapContractName}:`, swapAddress);
   console.log("TOT token:    ", totToken);
   console.log("USDT token:   ", usdtToken);
   if (nexusAddress && nexusAddress !== zeroAddress) {

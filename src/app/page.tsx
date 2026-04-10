@@ -5,9 +5,10 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { execTx, useNexusContract } from "@/hooks/use-contract";
+import { execTx, useNexusContract, useSwapContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
 import {
@@ -33,6 +34,15 @@ import { AdminPage } from "@/components/pages/admin-page";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
+let _cncReadonlyProvider: ethers.JsonRpcProvider | null = null;
+function getCncReadonlyProvider() {
+  if (!_cncReadonlyProvider) {
+    const rpc = process.env.NEXT_PUBLIC_CNC_RPC_URL || "https://rpc.cncchainpro.com";
+    _cncReadonlyProvider = new ethers.JsonRpcProvider(rpc);
+  }
+  return _cncReadonlyProvider;
+}
+
 function sanitizeAddressInput(value: string) {
   return value.replace(/[\s\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, "");
 }
@@ -45,11 +55,13 @@ export default function DashboardPage() {
   const { t } = useLanguage();
   const { address, isConnected, isConnecting, chainId } = useWeb3();
   const nexus = useNexusContract();
+  const swap = useSwapContract();
   const { toast } = useToast();
 
   // Env-var override: deployer can set NEXT_PUBLIC_CONTRACT_OWNER to their address.
   // This allows instant admin detection without waiting for an on-chain RPC call.
   const envOwnerAddress = process.env.NEXT_PUBLIC_CONTRACT_OWNER?.trim() || null;
+  const envSwapOwnerAddress = process.env.NEXT_PUBLIC_SWAP_OWNER?.trim() || null;
 
   // Referral binding state
   const [referrerBound, setReferrerBound] = useState(false);
@@ -60,6 +72,8 @@ export default function DashboardPage() {
   const [referrerError, setReferrerError] = useState("");
   const [referralPromptDismissed, setReferralPromptDismissed] = useState(false);
   const [ownerStatusLoaded, setOwnerStatusLoaded] = useState(false);
+  const [swapOwnerAddress, setSwapOwnerAddress] = useState<string | null>(null);
+  const [swapOwnerStatusLoaded, setSwapOwnerStatusLoaded] = useState(false);
   const [isOperatorManager, setIsOperatorManager] = useState(false);
 
   useEffect(() => {
@@ -165,6 +179,56 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const loadSwapOwner = async () => {
+      if (!cancelled) setSwapOwnerStatusLoaded(false);
+
+      if (envSwapOwnerAddress) {
+        if (!cancelled) {
+          setSwapOwnerAddress(envSwapOwnerAddress);
+          setSwapOwnerStatusLoaded(true);
+        }
+        return;
+      }
+
+      if (!swap) {
+        if (!cancelled) {
+          setSwapOwnerAddress(null);
+          setSwapOwnerStatusLoaded(true);
+        }
+        return;
+      }
+
+      try {
+        const owner = await swap.owner();
+        if (!cancelled) {
+          setSwapOwnerAddress(owner);
+          setSwapOwnerStatusLoaded(true);
+        }
+      } catch {
+        try {
+          const readonlySwap = new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider());
+          const owner = await readonlySwap.owner();
+          if (!cancelled) {
+            setSwapOwnerAddress(owner);
+            setSwapOwnerStatusLoaded(true);
+          }
+        } catch {
+          if (!cancelled) {
+            setSwapOwnerAddress(null);
+            setSwapOwnerStatusLoaded(true);
+          }
+        }
+      }
+    };
+
+    loadSwapOwner();
+    return () => {
+      cancelled = true;
+    };
+  }, [swap, envSwapOwnerAddress]);
+
+  useEffect(() => {
+    let cancelled = false;
     const checkOperator = async () => {
       if (!nexus || !address) {
         if (!cancelled) setIsOperatorManager(false);
@@ -185,9 +249,7 @@ export default function DashboardPage() {
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
     : MOCK_USER_DATA.walletAddress;
 
-  // Owner detection — auto-show admin panel for on-chain contract owner.
-  // Checks both env-var override and on-chain ownerAddress.
-  const isOwner = isConnected && address
+  const isNexusOwner = isConnected && address
     ? [
         ownerAddress,
         envOwnerAddress,
@@ -196,11 +258,22 @@ export default function DashboardPage() {
         .some((o) => o!.toLowerCase() === address.toLowerCase())
     : false;
 
+  const isSwapOwner = isConnected && address
+    ? [
+        swapOwnerAddress,
+        envSwapOwnerAddress,
+      ]
+        .filter(Boolean)
+        .some((o) => o!.toLowerCase() === address.toLowerCase())
+    : false;
+
+  const isOwner = isNexusOwner || isSwapOwner;
+
   const shouldShowAdmin = isOwner || isOperatorManager;
 
   // Referral binding required: connected + not owner + not yet bound
   // Root node (owner) never needs referral binding
-  const needsReferralBinding = isConnected && ownerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
+  const needsReferralBinding = isConnected && ownerStatusLoaded && swapOwnerStatusLoaded && referrerStatusLoaded && !isOwner && !referrerBound;
   const shouldBlockForReferral = needsReferralBinding && !referralPromptDismissed;
 
   useEffect(() => {

@@ -137,7 +137,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      *   4. Update user cost basis for profit tax tracking.
      *   5. Auto-trigger distribution & deflation if due.
      */
-    function buyTot(uint256 usdtAmount, uint256 minTotOut) external {
+    function buyTot(uint256 usdtAmount, uint256 minTotOut) public virtual {
         require(usdtAmount > 0, "Zero amount");
         require(totReserve > 0 && usdtReserve > 0, "Pool empty");
 
@@ -197,7 +197,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      *   5. Update user cost basis.
      *   6. Auto-trigger distribution & deflation if due.
      */
-    function sellTot(uint256 totAmount, uint256 minUsdtOut) external {
+    function sellTot(uint256 totAmount, uint256 minUsdtOut) public virtual {
         require(totAmount > 0, "Zero amount");
         require(totReserve > 0 && usdtReserve > 0, "Pool empty");
 
@@ -261,7 +261,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      *
      * Catches up for missed intervals (max 6 = 24 hours).
      */
-    function deflate() external {
+    function deflate() public virtual {
         _tryDeflate();
     }
 
@@ -466,7 +466,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // ================================================================
 
     /// @notice Current TOT price in USDT (scaled by 1e18).
-    function getCurrentPrice() external view returns (uint256) {
+    function getCurrentPrice() public view virtual returns (uint256) {
         if (totReserve == 0) return 0;
         return (usdtReserve * PRICE_PRECISION) / totReserve;
     }
@@ -490,21 +490,21 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Seconds until next deflation is possible.
-    function timeUntilNextDeflation() external view returns (uint256) {
+    function timeUntilNextDeflation() public view virtual returns (uint256) {
         uint256 nextTime = lastDeflationTime + DEFLATION_INTERVAL;
         if (block.timestamp >= nextTime) return 0;
         return nextTime - block.timestamp;
     }
 
     /// @notice Simulated buy output (before fees).
-    function quoteBuy(uint256 usdtAmount) external view returns (uint256 totOut, uint256 fee) {
+    function quoteBuy(uint256 usdtAmount) public view virtual returns (uint256 totOut, uint256 fee) {
         totOut = _getAmountOut(usdtAmount, usdtReserve, totReserve);
         fee = (totOut * buyFeeBps) / BASIS_POINTS;
         totOut -= fee;
     }
 
     /// @notice Simulated sell output (before profit tax).
-    function quoteSell(uint256 totAmount) external view returns (uint256 usdtOut, uint256 sellFee) {
+    function quoteSell(uint256 totAmount) public view virtual returns (uint256 usdtOut, uint256 sellFee) {
         sellFee = (totAmount * sellFeeBps) / BASIS_POINTS;
         uint256 totAfterFee = totAmount - sellFee;
         usdtOut = _getAmountOut(totAfterFee, totReserve, usdtReserve);
@@ -515,7 +515,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // ================================================================
 
     /// @notice Add liquidity to the pool (owner seeds 6% TOT + matching USDT).
-    function addLiquidity(uint256 totAmount, uint256 usdtAmount) external onlyOwner {
+    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwner {
         require(totAmount > 0 && usdtAmount > 0, "Zero");
 
         totToken.safeTransferFrom(msg.sender, address(this), totAmount);
@@ -528,7 +528,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Remove liquidity (emergency, owner only).
-    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) external onlyOwner {
+    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwner {
         require(totAmount <= totReserve && usdtAmount <= usdtReserve, "Exceeds reserve");
 
         totReserve -= totAmount;

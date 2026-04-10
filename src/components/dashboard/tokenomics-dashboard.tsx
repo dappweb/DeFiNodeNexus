@@ -22,12 +22,12 @@ export function TokenomicsDashboard() {
   const refreshPoolData = useCallback(async () => {
     if (!swap) return;
     try {
-      const [totR, usdtR, price, pool] = await Promise.all([
-        swap.totReserve(),
-        swap.usdtReserve(),
+      const [reserves, price, pool] = await Promise.all([
+        swap.getDexReserves(),
         swap.getCurrentPrice(),
         swap.nftbDividendPool(),
       ]);
+      const [totR, usdtR] = reserves;
       setTotReserve(Number(ethers.formatUnits(totR, 18)));
       setUsdtReserve(Number(ethers.formatUnits(usdtR, 18)));
       setCurrentPrice(Number(ethers.formatUnits(price, 18)).toFixed(6));

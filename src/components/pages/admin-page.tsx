@@ -13,7 +13,17 @@ import { useWeb3 } from "@/lib/web3-provider";
 import { useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { formatAddress, getNftaTierName, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
+import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
 import { ChevronDown } from "lucide-react";
+
+let _cncReadonlyProvider: ethers.JsonRpcProvider | null = null;
+function getCncReadonlyProvider() {
+  if (!_cncReadonlyProvider) {
+    const rpc = process.env.NEXT_PUBLIC_CNC_RPC_URL || "https://rpc.cncchainpro.com";
+    _cncReadonlyProvider = new ethers.JsonRpcProvider(rpc);
+  }
+  return _cncReadonlyProvider;
+}
 
 type NftaIssueTierOption = {
   tierId: number;
@@ -60,6 +70,7 @@ export function AdminPage() {
 
   const [loading, setLoading] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState("");
+  const [swapOwnerAddress, setSwapOwnerAddress] = useState("");
   
   // NFTA 单笔/批量
   const [transferNodeId, setTransferNodeId] = useState("");
@@ -144,11 +155,23 @@ export function AdminPage() {
   const [emergencyTokenAddr, setEmergencyTokenAddr] = useState("");
   const [emergencyAmount, setEmergencyAmount] = useState("");
   const [newNexusAddr, setNewNexusAddr] = useState("");
+  const [dexRouterAddr, setDexRouterAddr] = useState("");
+  const [dexPairAddr, setDexPairAddr] = useState("");
+  const [dexFactoryAddr, setDexFactoryAddr] = useState("");
+  const [externalDexEnabled, setExternalDexEnabled] = useState(false);
+  const [swapPaused, setSwapPaused] = useState(false);
 
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
     return address.toLowerCase() === ownerAddress.toLowerCase();
   }, [address, ownerAddress]);
+
+  const isSwapOwner = useMemo(() => {
+    if (!address || !swapOwnerAddress) return false;
+    return address.toLowerCase() === swapOwnerAddress.toLowerCase();
+  }, [address, swapOwnerAddress]);
+
+  const isAdmin = isOwner || isSwapOwner;
 
   const NEXUS_ADDR = process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "";
   const SWAP_ADDR  = process.env.NEXT_PUBLIC_SWAP_ADDRESS  || "";
@@ -216,6 +239,35 @@ export function AdminPage() {
       setInstitutionAddr(inst);
       setProjectAddr(proj);
 
+      if (swap) {
+        try {
+          const swapOwner = await swap.owner();
+          const [router, pair, factory, enabled, paused] = await swap.getRouterConfig();
+          setSwapOwnerAddress(String(swapOwner || ""));
+          setDexRouterAddr(String(router || ""));
+          setDexPairAddr(String(pair || ""));
+          setDexFactoryAddr(String(factory || ""));
+          setExternalDexEnabled(Boolean(enabled));
+          setSwapPaused(Boolean(paused));
+        } catch {
+          try {
+            const readonlySwap = new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider());
+            const swapOwner = await readonlySwap.owner();
+            const [router, pair, factory, enabled, paused] = await readonlySwap.getRouterConfig();
+            setSwapOwnerAddress(String(swapOwner || ""));
+            setDexRouterAddr(String(router || ""));
+            setDexPairAddr(String(pair || ""));
+            setDexFactoryAddr(String(factory || ""));
+            setExternalDexEnabled(Boolean(enabled));
+            setSwapPaused(Boolean(paused));
+          } catch {
+            setSwapOwnerAddress("");
+            setExternalDexEnabled(false);
+            setSwapPaused(false);
+          }
+        }
+      }
+
       const nextNftaTierIdRaw = await reader.nextNftaTierId();
 
       const nextNftaTierId = Number(nextNftaTierIdRaw);
@@ -282,7 +334,7 @@ export function AdminPage() {
 
   useEffect(() => {
     refresh();
-  }, [nexus, address]);
+  }, [nexus, address, swap]);
 
   const runTx = async (action: string, txRequest: () => Promise<any>) => {
     setLoading(true);
@@ -411,6 +463,10 @@ export function AdminPage() {
 
   const onDeflate = async () => {
     if (!swap) return;
+    if (externalDexEnabled) {
+      toast({ title: "外部DEX模式已启用", description: "当前模式下已禁用内部池通缩", variant: "destructive" });
+      return;
+    }
     await runTx("执行通缩", () => swap.deflate());
   };
 
@@ -625,6 +681,10 @@ export function AdminPage() {
   // ===== Swap 流动性管理 =====
   const onAddLiquidity = async () => {
     if (!swap) return;
+    if (externalDexEnabled) {
+      toast({ title: "外部DEX模式已启用", description: "当前模式下已禁用内部池流动性管理", variant: "destructive" });
+      return;
+    }
     const tot = parsePositiveAmount(addLiquidityTot);
     const usdt = parsePositiveAmount(addLiquidityUsdt);
     if (tot === null || usdt === null) {
@@ -636,6 +696,10 @@ export function AdminPage() {
 
   const onRemoveLiquidity = async () => {
     if (!swap) return;
+    if (externalDexEnabled) {
+      toast({ title: "外部DEX模式已启用", description: "当前模式下已禁用内部池流动性管理", variant: "destructive" });
+      return;
+    }
     const tot = parsePositiveAmount(removeLiquidityTot);
     const usdt = parsePositiveAmount(removeLiquidityUsdt);
     if (tot === null || usdt === null) {
@@ -678,6 +742,10 @@ export function AdminPage() {
 
   const onSetDeflationBps = async () => {
     if (!swap) return;
+    if (externalDexEnabled) {
+      toast({ title: "外部DEX模式已启用", description: "当前模式下不再使用内部池通缩参数", variant: "destructive" });
+      return;
+    }
     const def = parseBps(deflationBps);
     if (def === null) {
       toast({ title: "参数错误", description: "比率必须在0-10000之间", variant: "destructive" });
@@ -727,6 +795,51 @@ export function AdminPage() {
     await runTx("设置Nexus地址", () => swap.setNexus(newNexusAddr.trim()));
   };
 
+  const onSetDexRouter = async () => {
+    if (!swap) return;
+    const addr = dexRouterAddr.trim();
+    if (!ethers.isAddress(addr)) {
+      toast({ title: "参数错误", description: "Router地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置DEX Router", () => swap.setDexRouter(addr));
+    setDexRouterAddr(addr);
+  };
+
+  const onSetDexPair = async () => {
+    if (!swap) return;
+    const addr = dexPairAddr.trim();
+    if (!ethers.isAddress(addr)) {
+      toast({ title: "参数错误", description: "Pair地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置DEX Pair", () => swap.setDexPair(addr));
+    setDexPairAddr(addr);
+  };
+
+  const onSetDexFactory = async () => {
+    if (!swap) return;
+    const addr = dexFactoryAddr.trim();
+    if (!ethers.isAddress(addr)) {
+      toast({ title: "参数错误", description: "Factory地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置DEX Factory", () => swap.setDexFactory(addr));
+    setDexFactoryAddr(addr);
+  };
+
+  const onToggleExternalDex = async (enabled: boolean) => {
+    if (!swap) return;
+    await runTx(enabled ? "启用外部DEX模式" : "关闭外部DEX模式", () => swap.setExternalDexEnabled(enabled));
+    setExternalDexEnabled(enabled);
+  };
+
+  const onToggleSwapPaused = async (paused: boolean) => {
+    if (!swap) return;
+    await runTx(paused ? "暂停外部兑换" : "恢复外部兑换", () => swap.setSwapPaused(paused));
+    setSwapPaused(paused);
+  };
+
   const onForceDistribute = async () => {
     if (!swap) return;
     await runTx("强制分配", () => swap.forceDistribute());
@@ -752,11 +865,11 @@ export function AdminPage() {
         <CardHeader>
           <CardTitle>管理员面板</CardTitle>
           <CardDescription>
-            Owner: {formatAddress(ownerAddress)} ｜ 当前钱包: {isOwner ? "✅ 管理员" : "👁️ 只读"}
+            Nexus Owner: {formatAddress(ownerAddress)} ｜ Swap Owner: {formatAddress(swapOwnerAddress)} ｜ 当前钱包: {isAdmin ? "✅ 管理员" : "👁️ 只读"}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-xs text-muted-foreground">
-          {!isConnected ? "请先连接钱包。" : "完整功能覆盖 - 所有 onlyOwner 操作已支持"}
+          {!isConnected ? "请先连接钱包。" : "Nexus治理按Nexus Owner鉴权，DEX配置按Swap Owner鉴权。"}
         </CardContent>
       </Card>
 
@@ -884,7 +997,7 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="text-xs text-muted-foreground flex items-center">触发一次 4h 通缩逻辑</div>
             <div />
-            <Button variant="secondary" disabled={!isOwner || loading || !swap} onClick={onDeflate}>执行通缩</Button>
+            <Button variant="secondary" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>
@@ -1231,6 +1344,42 @@ export function AdminPage() {
         </CardContent>
       </Card>
 
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Swap 外部 DEX 配置</CardTitle>
+          <CardDescription>保留 TOTSwap 业务规则，核心成交切到外部 Router 与 Pair</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-lg border border-border/40 bg-muted/20 p-3 text-xs text-muted-foreground space-y-1">
+            <div>当前模式: <strong className="text-foreground">{externalDexEnabled ? "External DEX" : "Internal Pool"}</strong></div>
+            <div>兑换状态: <strong className="text-foreground">{swapPaused ? "Paused" : "Active"}</strong></div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={dexRouterAddr} onChange={(e) => setDexRouterAddr(e.target.value)} placeholder="Router 地址 0x..." />
+            <div />
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexRouter}>设置 Router</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={dexPairAddr} onChange={(e) => setDexPairAddr(e.target.value)} placeholder="Pair 地址 0x..." />
+            <div />
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexPair}>设置 Pair</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input value={dexFactoryAddr} onChange={(e) => setDexFactoryAddr(e.target.value)} placeholder="Factory 地址 0x..." />
+            <div />
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexFactory}>设置 Factory</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={() => onToggleExternalDex(true)}>启用外部 DEX 模式</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !externalDexEnabled} onClick={() => onToggleExternalDex(false)}>关闭外部 DEX 模式</Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <Button variant="secondary" disabled={!isSwapOwner || loading || !swap || swapPaused} onClick={() => onToggleSwapPaused(true)}>暂停外部兑换</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !swapPaused} onClick={() => onToggleSwapPaused(false)}>恢复外部兑换</Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ===== Swap 流动性管理 ===== */}
       <Card className="glass-panel">
         <CardHeader>
@@ -1261,7 +1410,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={addLiquidityTot} onChange={(e) => setAddLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={addLiquidityUsdt} onChange={(e) => setAddLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button disabled={!isOwner || loading || !swap} onClick={onAddLiquidity}>提供流动性</Button>
+              <Button disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
             </div>
           </div>
           <div className="space-y-2">
@@ -1269,7 +1418,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={removeLiquidityTot} onChange={(e) => setRemoveLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={removeLiquidityUsdt} onChange={(e) => setRemoveLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onRemoveLiquidity}>移除流动性</Button>
+              <Button variant="outline" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
             </div>
           </div>
         </CardContent>
@@ -1320,7 +1469,7 @@ export function AdminPage() {
             <Input value={deflationBps} onChange={(e) => setDeflationBps(e.target.value)} placeholder="通胀比率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetDeflationBps}>设置通胀比率</Button>
+            <Button variant="outline" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onSetDeflationBps}>设置通胀比率</Button>
           </div>
         </CardContent>
       </Card>
