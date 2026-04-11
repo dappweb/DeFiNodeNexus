@@ -19,8 +19,6 @@ function isAllowedCncRpcUrl(url: string): boolean {
 
     const host = parsed.hostname.toLowerCase();
 
-    // Prevent accidental fallback to Ethereum/Sepolia endpoints in CNC UI.
-    if (host.includes("sepolia")) return false;
     if (host.includes("ethereum")) return false;
 
     return host.includes("cnc") || isPrivateOrLocalHost(host);

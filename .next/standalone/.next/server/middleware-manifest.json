@@ -2,36 +2,6 @@
   "version": 3,
   "middleware": {},
   "functions": {
-    "/api/announcements/route": {
-      "files": [
-        "server/server-reference-manifest.js",
-        "server/app/api/announcements/route_client-reference-manifest.js",
-        "server/middleware-build-manifest.js",
-        "server/middleware-react-loadable-manifest.js",
-        "server/next-font-manifest.js",
-        "server/interception-route-rewrite-manifest.js",
-        "server/edge-runtime-webpack.js",
-        "server/edge-chunks/53.js",
-        "server/app/api/announcements/route.js"
-      ],
-      "name": "app/api/announcements/route",
-      "page": "/api/announcements/route",
-      "matchers": [
-        {
-          "regexp": "^/api/announcements$",
-          "originalSource": "/api/announcements"
-        }
-      ],
-      "wasm": [],
-      "assets": [],
-      "env": {
-        "__NEXT_BUILD_ID": "LGZvM3EZyPaG8OgYa8faJ",
-        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
-        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
-      }
-    },
     "/api/admin/announcements/route": {
       "files": [
         "server/server-reference-manifest.js",
@@ -55,41 +25,41 @@
       "wasm": [],
       "assets": [],
       "env": {
-        "__NEXT_BUILD_ID": "LGZvM3EZyPaG8OgYa8faJ",
-        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
-        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+        "__NEXT_BUILD_ID": "HbWkfOZRN_rnqbFCeCKja",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "6Yh14okaB2x28miKabfQoXAU8nzw70AmES4HLKvIsdI=",
+        "__NEXT_PREVIEW_MODE_ID": "4b3e00ff42521eb5075da7dabb8cdc97",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3c00737bb9f2ee19a89b7ac1f130271f71a48d793f9875a6039c63d7f16146dc",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "4fbba9f89067c6830e3e2b713e6706d75281c7e6233a379fe933b5fb5171078d"
       }
     },
-    "/api/data-service/announcements/route": {
+    "/api/announcements/route": {
       "files": [
         "server/server-reference-manifest.js",
-        "server/app/api/data-service/announcements/route_client-reference-manifest.js",
+        "server/app/api/announcements/route_client-reference-manifest.js",
         "server/middleware-build-manifest.js",
         "server/middleware-react-loadable-manifest.js",
         "server/next-font-manifest.js",
         "server/interception-route-rewrite-manifest.js",
         "server/edge-runtime-webpack.js",
         "server/edge-chunks/53.js",
-        "server/app/api/data-service/announcements/route.js"
+        "server/app/api/announcements/route.js"
       ],
-      "name": "app/api/data-service/announcements/route",
-      "page": "/api/data-service/announcements/route",
+      "name": "app/api/announcements/route",
+      "page": "/api/announcements/route",
       "matchers": [
         {
-          "regexp": "^/api/data\\-service/announcements$",
-          "originalSource": "/api/data-service/announcements"
+          "regexp": "^/api/announcements$",
+          "originalSource": "/api/announcements"
         }
       ],
       "wasm": [],
       "assets": [],
       "env": {
-        "__NEXT_BUILD_ID": "LGZvM3EZyPaG8OgYa8faJ",
-        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
-        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+        "__NEXT_BUILD_ID": "HbWkfOZRN_rnqbFCeCKja",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "6Yh14okaB2x28miKabfQoXAU8nzw70AmES4HLKvIsdI=",
+        "__NEXT_PREVIEW_MODE_ID": "4b3e00ff42521eb5075da7dabb8cdc97",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3c00737bb9f2ee19a89b7ac1f130271f71a48d793f9875a6039c63d7f16146dc",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "4fbba9f89067c6830e3e2b713e6706d75281c7e6233a379fe933b5fb5171078d"
       }
     },
     "/api/keeper/route": {
@@ -115,11 +85,41 @@
       "wasm": [],
       "assets": [],
       "env": {
-        "__NEXT_BUILD_ID": "LGZvM3EZyPaG8OgYa8faJ",
-        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "uG7MUCLaKzj2qh/NKLP8OlbmkgZ5TfG78RodsLJ+4Ko=",
-        "__NEXT_PREVIEW_MODE_ID": "0d759a9d4927b6ca6501bdcea7e1b0ab",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "7f66a1fc599bf8e09bb4b4a5390e6e7438f55e0da757879a7e6587d439402c17",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "e6768275e27a511c033150e55225c5a3f54dcc4dc746e0153596100a8923ce28"
+        "__NEXT_BUILD_ID": "HbWkfOZRN_rnqbFCeCKja",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "6Yh14okaB2x28miKabfQoXAU8nzw70AmES4HLKvIsdI=",
+        "__NEXT_PREVIEW_MODE_ID": "4b3e00ff42521eb5075da7dabb8cdc97",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3c00737bb9f2ee19a89b7ac1f130271f71a48d793f9875a6039c63d7f16146dc",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "4fbba9f89067c6830e3e2b713e6706d75281c7e6233a379fe933b5fb5171078d"
+      }
+    },
+    "/api/data-service/announcements/route": {
+      "files": [
+        "server/server-reference-manifest.js",
+        "server/app/api/data-service/announcements/route_client-reference-manifest.js",
+        "server/middleware-build-manifest.js",
+        "server/middleware-react-loadable-manifest.js",
+        "server/next-font-manifest.js",
+        "server/interception-route-rewrite-manifest.js",
+        "server/edge-runtime-webpack.js",
+        "server/edge-chunks/53.js",
+        "server/app/api/data-service/announcements/route.js"
+      ],
+      "name": "app/api/data-service/announcements/route",
+      "page": "/api/data-service/announcements/route",
+      "matchers": [
+        {
+          "regexp": "^/api/data\\-service/announcements$",
+          "originalSource": "/api/data-service/announcements"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "HbWkfOZRN_rnqbFCeCKja",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "6Yh14okaB2x28miKabfQoXAU8nzw70AmES4HLKvIsdI=",
+        "__NEXT_PREVIEW_MODE_ID": "4b3e00ff42521eb5075da7dabb8cdc97",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3c00737bb9f2ee19a89b7ac1f130271f71a48d793f9875a6039c63d7f16146dc",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "4fbba9f89067c6830e3e2b713e6706d75281c7e6233a379fe933b5fb5171078d"
       }
     }
   },

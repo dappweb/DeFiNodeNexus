@@ -1,3 +1,7 @@
 {
-  "workbench.startupEditor": "readme"
+  "workbench.startupEditor": "readme",
+  "search.exclude": {
+    "**/.next/**": true,
+    "**/.next-dev/**": true
+  }
 }

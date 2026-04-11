@@ -18,7 +18,7 @@
   const zeroAddress = "0x0000000000000000000000000000000000000000"
 
   const state = {
-    chainId: "0xaa36a7",
+    chainId: "0xc61c",
     blockNumber: 1n,
     txNonce: 0n,
     failNextTx: false,
@@ -441,7 +441,7 @@
         case "eth_chainId":
           return state.chainId
         case "net_version":
-          return "11155111"
+          return "50716"
         case "eth_accounts":
           return [...state.accounts]
         case "eth_requestAccounts": {

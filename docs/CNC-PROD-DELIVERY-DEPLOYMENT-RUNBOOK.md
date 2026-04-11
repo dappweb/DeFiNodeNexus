@@ -1,6 +1,7 @@
 # DeFiNodeNexus CNC 生产交付部署手册（一步一步可粘贴）
 
 本手册覆盖 4 个交付模块：
+
 1. 环境准备
 2. 合约部署（CNC）
 3. 页面部署（Next.js 生产）
@@ -95,7 +96,7 @@ NEXT_PUBLIC_TOT_ADDRESS=0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA
 NEXT_PUBLIC_TOF_ADDRESS=0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D
 NEXT_PUBLIC_USDT_ADDRESS=0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
 NEXT_PUBLIC_CONTRACT_OWNER=0xREPLACE_OWNER_ADDRESS
-NEXT_PUBLIC_APP_URL=https://t1.test2dapp.xyz
+NEXT_PUBLIC_APP_URL=https://your-domain.com
 
 # ===== Optional wallets =====
 ZERO_LINE_WALLET=0xREPLACE_ZERO_LINE_WALLET
@@ -163,6 +164,7 @@ npm run deploy:cnc | tee deploy-cnc.log
 ```
 
 部署完成后，终端会输出：
+
 - NEXUS_ADDRESS=0x...
 - SWAP_ADDRESS=0x...
 
@@ -307,7 +309,7 @@ sudo apt install -y caddy
 
 ```bash
 sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
-t1.test2dapp.xyz {
+your-domain.com {
   reverse_proxy 127.0.0.1:9002
 }
 EOF
@@ -370,7 +372,7 @@ node scripts/verify-cnc-config.js
 ### 7.5 浏览器访问
 
 ```bash
-curl -I --max-time 15 https://t1.test2dapp.xyz/
+curl -I --max-time 15 https://your-domain.com/
 ```
 
 ---
@@ -445,6 +447,7 @@ curl -sS https://rpc.cncchainpro.com | head
 ---
 
 本手册对应当前仓库脚本：
+
 - 合约部署: scripts/deploy-cnc.js
 - 页面构建: npm run build
 - 页面启动: node .next/standalone/server.js

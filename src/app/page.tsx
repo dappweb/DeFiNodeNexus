@@ -572,32 +572,32 @@ export default function DashboardPage() {
 
         {shouldBlockForReferral ? (
           /* ===== Referral Binding Overlay ===== */
-          <div className="flex items-center justify-center min-h-[calc(100dvh-12rem)] md:min-h-[calc(100vh-10rem)]">
+          <div className="flex items-center justify-center min-h-[calc(100dvh-12rem)] md:min-h-[calc(100vh-10rem)] px-3 sm:px-4">
             <div className="w-full max-w-md mx-auto">
-              <div className="rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl p-5 sm:p-8 shadow-xl space-y-6">
+              <div className="rounded-2xl border border-border/50 bg-background/80 backdrop-blur-xl p-4 sm:p-6 md:p-8 shadow-xl space-y-5 sm:space-y-6">
                 {/* Icon & Title */}
-                <div className="text-center space-y-3">
-                  <div className="mx-auto w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <UserPlus className="h-8 w-8 text-primary" />
+                <div className="text-center space-y-2 sm:space-y-3">
+                  <div className="mx-auto w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <UserPlus className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                   </div>
-                  <h2 className="text-xl font-headline font-bold">{t('referralBindingTitle')}</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{t('referralBindingDesc')}</p>
+                  <h2 className="text-lg sm:text-xl font-headline font-bold leading-tight">{t('referralBindingTitle')}</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed px-2">{t('referralBindingDesc')}</p>
                 </div>
 
                 {/* Your Address */}
-                <div className="rounded-lg bg-muted/30 border border-border/30 p-3">
-                  <p className="text-[10px] uppercase text-muted-foreground font-medium mb-1">{t('connectWallet')}</p>
-                  <p className="font-mono text-xs text-accent">{displayAddress}</p>
+                <div className="rounded-lg bg-muted/30 border border-border/30 p-2.5 sm:p-3">
+                  <p className="text-[9px] sm:text-[10px] uppercase text-muted-foreground font-medium mb-1.5">{t('connectWallet')}</p>
+                  <p className="font-mono text-[11px] sm:text-xs text-accent break-all">{displayAddress}</p>
                 </div>
 
                 {/* Referrer Input */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">{t('referralAddressLabel')}</label>
+                  <label className="text-xs sm:text-sm font-medium">{t('referralAddressLabel')}</label>
                   <Input
                     value={referrerAddress}
                     onChange={(e) => { setReferrerAddress(sanitizeAddressInput(e.target.value)); setReferrerError(""); }}
                     placeholder={t('referralAddressPlaceholder')}
-                    className="font-mono text-sm"
+                    className="font-mono text-xs sm:text-sm"
                     autoCapitalize="off"
                     autoCorrect="off"
                     spellCheck={false}
@@ -611,7 +611,7 @@ export default function DashboardPage() {
                 <Button
                   onClick={handleBindReferrer}
                   disabled={isBindingReferrer || (!sanitizeAddressInput(referrerAddress) && !sanitizeAddressInput(ownerAddress ?? ""))}
-                  className="w-full bg-primary hover:bg-primary/90 h-11 font-semibold"
+                  className="w-full bg-primary hover:bg-primary/90 h-10 sm:h-11 font-semibold text-sm sm:text-base"
                 >
                   {isBindingReferrer ? (
                     <>{t('referralBinding')}</>
@@ -624,13 +624,13 @@ export default function DashboardPage() {
                 </Button>
 
                 {/* Skip link */}
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   <p className="text-center text-xs text-muted-foreground">{t('referralSkip')}</p>
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={handleSkipReferralForNow}
-                    className="w-full text-xs"
+                    className="w-full text-xs sm:text-sm h-9"
                   >
                     {t("referralSkipForNow")}
                   </Button>

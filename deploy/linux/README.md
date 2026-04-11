@@ -3,11 +3,13 @@
 ## 📋 快速开始（3 步）
 
 ### 1️⃣ 配置环境变量
+
 ```bash
 vim deploy/linux/.env.production
 ```
 
 **必填项：**
+
 ```bash
 DEPLOYER_PRIVATE_KEY=0x...        # Keeper 执行链上操作的私钥
 CNC_RPC_URL=https://...           # CNC 链 RPC 地址（已预设）
@@ -16,16 +18,19 @@ NEXUS_ADDRESS=0x...               # DeFiNodeNexus 合约地址（已预设）
 ```
 
 ### 2️⃣ 启动定时任务
+
 ```bash
 sudo bash deploy/linux/start-timers.sh
 ```
 
 启动脚本会自动：
+
 - ✅ 生成 systemd timer 配置（自动检测项目路径）
 - ✅ 安装到系统 `/etc/systemd/system/`
 - ✅ 启用并启动所有定时器
 
 ### 3️⃣ 验证运行
+
 ```bash
 # 查看定时器状态
 sudo systemctl list-timers definode-*
@@ -44,13 +49,13 @@ sudo systemctl logs -u definode-health.service -f
 ### 一键安装并启用 Caddy
 
 ```bash
-sudo APP_DOMAIN=t1.test2dapp.xyz bash deploy/linux/setup-caddy.sh
+sudo APP_DOMAIN=your-domain.com bash deploy/linux/setup-caddy.sh
 ```
 
 可选自定义上游端口：
 
 ```bash
-sudo APP_DOMAIN=t1.test2dapp.xyz APP_PORT=9002 bash deploy/linux/setup-caddy.sh
+sudo APP_DOMAIN=your-domain.com APP_PORT=9002 bash deploy/linux/setup-caddy.sh
 ```
 
 ### 使用 deploy.sh 自动同步 Caddy
@@ -64,7 +69,7 @@ bash deploy.sh
 可通过环境变量指定域名：
 
 ```bash
-APP_DOMAIN=t1.test2dapp.xyz bash deploy.sh
+APP_DOMAIN=your-domain.com bash deploy.sh
 ```
 
 ### 验证 Caddy 状态
@@ -80,6 +85,7 @@ sudo journalctl -u caddy -n 100 --no-pager
 - `deploy/linux/Caddyfile`
 
 模板中的占位符由脚本自动替换：
+
 - `__APP_DOMAIN__`
 - `__UPSTREAM__`
 
@@ -89,11 +95,11 @@ sudo journalctl -u caddy -n 100 --no-pager
 
 ### 执行的业务
 
-| 任务 | 触发条件 | 频率 | 说明 |
-|------|--------|------|------|
-| **Deflation（通缩）** | 计时器到期 | 每 4 小时 | TOT 铸币销毁机制 |
-| **TOT 分红分发** | 分红池 ≥ 阈值 | 每 1-3 天 | 分给 NFTB 持有者 |
-| **USDT 分红分发** | USDT 分红池 ≥ 阈值 | 每 1-3 天 | 利润分红分发 |
+| 任务                  | 触发条件           | 频率      | 说明             |
+| --------------------- | ------------------ | --------- | ---------------- |
+| **Deflation（通缩）** | 计时器到期         | 每 4 小时 | TOT 铸币销毁机制 |
+| **TOT 分红分发**      | 分红池 ≥ 阈值      | 每 1-3 天 | 分给 NFTB 持有者 |
+| **USDT 分红分发**     | USDT 分红池 ≥ 阈值 | 每 1-3 天 | 利润分红分发     |
 
 ### 定时安排
 
@@ -101,7 +107,7 @@ sudo journalctl -u caddy -n 100 --no-pager
 Keeper 任务：
   启动后 2 分钟首次执行
   之后每 10 分钟执行一次
-  
+
 Health Check 任务：
   每天上午 08:00 执行一次
   检查系统监控指标，异常时告警
@@ -112,12 +118,14 @@ Health Check 任务：
 ## 💰 Gas 费用预算
 
 ### 单次操作 Gas 消耗
+
 ```
 deflate()           ≈ 200k - 400k gas
 forceDistribute()   ≈ 300k - 500k gas
 ```
 
 ### 月度预算估算（CNC 链）
+
 ```
 执行次数/月：
   deflate:      6-7 次
@@ -137,6 +145,7 @@ forceDistribute()   ≈ 300k - 500k gas
 ## 🔧 常用命令
 
 ### 查看运行状态
+
 ```bash
 # 查看所有 definode 定时器
 sudo systemctl list-timers definode-*
@@ -149,6 +158,7 @@ cat /opt/definode/DeFiNodeNexus/runtime/keeper/latest-run.json
 ```
 
 ### 管理定时任务
+
 ```bash
 # 手动触发一次 Keeper
 sudo systemctl start definode-keeper.service
@@ -167,6 +177,7 @@ sudo journalctl -u definode-keeper.service -f
 ```
 
 ### 调试与测试
+
 ```bash
 # 立即执行一次 Keeper（不等待定时器）
 npm run keeper:once
@@ -261,6 +272,7 @@ npm run keeper:once
 ## ❌ 故障排除
 
 ### 问题 1：Keeper 不执行
+
 ```bash
 # 检查定时器是否启用
 sudo systemctl is-enabled definode-keeper.timer
@@ -273,6 +285,7 @@ sudo journalctl -u definode-keeper.service -n 50
 ```
 
 ### 问题 2：环境变量未加载
+
 ```bash
 # 检查 .env.production 是否存在
 ls -la deploy/linux/.env.production
@@ -284,6 +297,7 @@ echo $SWAP_ADDRESS
 ```
 
 ### 问题 3：Gas 不足
+
 ```bash
 # 检查钱包余额
 node -r ./env_conf.js -e "
@@ -301,6 +315,7 @@ provider.getBalance(w.address).then(bal => {
 ```
 
 ### 问题 4：权限错误
+
 ```bash
 # 确保脚本有执行权限
 chmod +x deploy/linux/start-timers.sh
@@ -315,11 +330,13 @@ sudo chown $USER:$USER /var/log/definode
 ## 📞 更多帮助
 
 ### 查看详细文档
+
 ```bash
 cat TIMER-DEPLOYMENT-AND-OPS.md
 ```
 
 ### 测试 Keeper
+
 ```bash
 # 模式 1：一次性执行
 npm run keeper:once
@@ -332,6 +349,7 @@ curl -X POST http://localhost:9002/api/keeper?token=YOUR_SECRET
 ```
 
 ### 查看链上数据
+
 访问 [CNC 区块浏览器](https://cncscan.com)，输入 `SWAP_ADDRESS` 查询交易历史。
 
 ---
@@ -352,4 +370,3 @@ curl -X POST http://localhost:9002/api/keeper?token=YOUR_SECRET
 
 **最后更新：2026-04-09**  
 **版本：1.0**
-

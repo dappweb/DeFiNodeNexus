@@ -52,7 +52,7 @@ test.beforeEach(async ({ page }) => {
 
 test("钱包连接流程可执行", async ({ page }) => {
   await connectWallet(page)
-  await expect(page.getByText("Sepolia", { exact: true })).toBeVisible()
+  await expect(page.getByText("CNC Mainnet", { exact: true })).toBeVisible()
 })
 
 test("交易提交流程可执行", async ({ page }) => {

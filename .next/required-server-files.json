@@ -2,7 +2,7 @@
   "version": 1,
   "config": {
     "env": {
-      "NEXT_PUBLIC_SEPOLIA_RPC_URL": "https://sepolia.infura.io/v3/1a10a13df2cc454ead9480743d1c09e1",
+      "NEXT_PUBLIC_CNC_RPC_URL": "https://rpc.cncchainpro.com",
       "NEXT_PUBLIC_NEXUS_ADDRESS": "0x6D862Bc5E9486C89c959905D18760204851f6203",
       "NEXT_PUBLIC_SWAP_ADDRESS": "0xfE20139dCFA053b819A3745E9ed801b9C6cc84aC",
       "NEXT_PUBLIC_TOT_ADDRESS": "0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA",

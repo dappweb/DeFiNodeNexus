@@ -1,7 +1,9 @@
 # CNC 链部署完整步骤
 
 ## 概述
+
 该部署配置支持 **Deployer 和 Owner 分离**：
+
 - **Deployer**：部署合约并支付 gas 费用
 - **Owner**：拥有合约所有权和管理权限
 
@@ -28,8 +30,9 @@
 ### 2. 检查 CNC 链代币地址
 
 验证以下代币地址在 CNC 链上已正确部署：
+
 - **TOT Token**: 0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA
-- **TOF Token**: 0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D  
+- **TOF Token**: 0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D
 - **USDT Token**: 0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
 
 可以在 CNC 链浏览器上验证这些地址。
@@ -64,12 +67,14 @@ USDART_TOKEN_ADDRESS=0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
 ```
 
 **示例（使用同一个账户作为 Deployer 和 Owner）：**
+
 ```env
 DEPLOYER_PRIVATE_KEY=0x4f3b2b7388daa9fbafede197e8c629cb7882a3af942a87aa0988dde7d73d03d2
 # 不设置 OWNER_PRIVATE_KEY，将默认使用 DEPLOYER_PRIVATE_KEY
 ```
 
 **示例（使用不同账户）：**
+
 ```env
 DEPLOYER_PRIVATE_KEY=0x4f3b2b7388daa9fbafede197e8c629cb7882a3af942a87aa0988dde7d73d03d2
 OWNER_PRIVATE_KEY=0x<another_account_private_key>
@@ -85,6 +90,7 @@ node scripts/verify-cnc-config.js
 ```
 
 **预期输出：**
+
 ```
 === CNC Deployment Configuration Verification ===
 
@@ -112,6 +118,7 @@ npm run deploy:cnc
 ```
 
 或显式指定网络：
+
 ```bash
 npx hardhat run scripts/deploy-cnc.js --network cnc
 ```
@@ -196,7 +203,7 @@ npx hardhat run scripts/seed-swap-liquidity.js --network cnc
 # 检查 Nexus 的 Owner
 cast call 0x<nexus_address> "owner()" --rpc-url https://rpc.cncchainpro.com
 
-# 检查 TOTSwap 的 Owner  
+# 检查 TOTSwap 的 Owner
 cast call 0x<swap_address> "owner()" --rpc-url https://rpc.cncchainpro.com
 ```
 
@@ -205,12 +212,14 @@ cast call 0x<swap_address> "owner()" --rpc-url https://rpc.cncchainpro.com
 ## 账户角色说明
 
 ### Deployer 账户职责
+
 - 上传合约代码到 CNC 链
 - 支付部署的 gas 费用
 - 初始化合约（仅在部署阶段）
 - **任何链上操作都需要 CNC 原生代币用于 gas**
 
 ### Owner 账户职责
+
 - 拥有合约所有权（owner）
 - 管理合约配置：
   - 添加/修改 NFTA 和 NFTB Tiers
@@ -234,6 +243,7 @@ cast call 0x<swap_address> "owner()" --rpc-url https://rpc.cncchainpro.com
 ### Q: Owner 和 Deployer 地址不同，Owner 无法执行管理操作
 
 **A:** 确保：
+
 1. Owner 账户有足够 CNC 代币用于 gas
 2. `OWNER_PRIVATE_KEY` 的值与 Owner 账户匹配
 
@@ -274,6 +284,7 @@ grep "^CNC_" .env
 ## 安全建议
 
 1. **不要提交私钥到 Git**
+
    ```bash
    # .gitignore 中应该包含
    .env
@@ -282,7 +293,7 @@ grep "^CNC_" .env
    ```
 
 2. **使用测试网络先行验证**
-   - 部署到 Sepolia 测试网络进行验证
+   - 部署到 CNC 主网络进行验证
    - 确认部署流程无误后再部署到主网
 
 3. **备份 Owner 私钥**

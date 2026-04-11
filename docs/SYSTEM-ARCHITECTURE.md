@@ -36,7 +36,7 @@
 └─────────────────────────────────────────────────────────────────┘
          │                                            │
          └────────────────── RPC ──────────────────┘
-                      (Sepolia 或 CNC)
+                      (CNC Mainnet)
 ```
 
 ---
@@ -451,7 +451,7 @@
 │                ▼                       ▼                ▼
 │        ┌──────────────────┐  ┌──────────────────┐  ┌─────┐
 │        │   RPC Provider   │  │   Keeper Timer   │  │其他  │
-│        │   (Sepolia/CNC)  │  │(Systemd/Crons)  │  │服务  │
+│        │   (CNC Mainnet)  │  │(Systemd/Crons)  │  │服务  │
 │        │                  │  │                  │  │      │
 │        │ ethers.js调用    │  │定期触发处理      │  │      │
 │        └──────────────────┘  └────────┬─────────┘  └─────┘
@@ -514,6 +514,7 @@
 ---
 
 相关文档：
+
 - [PAGES-AND-TIMERS-DEPLOYMENT.md](PAGES-AND-TIMERS-DEPLOYMENT.md) - 详细部署指南
 - [PAGES-AND-TIMERS-QUICK-REF.md](PAGES-AND-TIMERS-QUICK-REF.md) - 快速参考
 - [linux-scheduled-jobs.md](linux-scheduled-jobs.md) - Linux 定时任务

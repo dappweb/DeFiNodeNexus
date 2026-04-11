@@ -23,7 +23,7 @@ OPENRESTY_CONF_DST="/etc/openresty/conf.d/definodexus.conf"
 OPENRESTY_1PANEL_CONF_DST="/opt/1panel/docker/compose/openresty/conf.d/definodexus.conf"
 NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
 NGINX_LINK="/etc/nginx/sites-enabled/definodexus"
-APP_DOMAIN="${APP_DOMAIN:-t1.test2dapp.xyz}"
+APP_DOMAIN="${APP_DOMAIN:-localhost}"
 
 # ── 参数解析 ──────────────────────────────────────────────────────────────────
 SKIP_PULL=false
@@ -203,7 +203,7 @@ fi
 echo ""
 echo "============================================================"
 echo -e "  ${GREEN}部署完成${NC}"
-echo "  访问地址 : http://t1.test2dapp.xyz"
+echo "  访问地址 : http://${APP_DOMAIN}"
 echo "  应用日志 : pm2 logs $APP_NAME"
 echo "  进程状态 : pm2 list"
 echo "  代理日志 : sudo journalctl -u caddy -f"
