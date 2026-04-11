@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { ethers } from "ethers";
+import { getCncRpcUrls } from "@/lib/cnc-rpc";
+import { CONTRACTS, ERC20_ABI, NEXUS_ABI, SWAP_ABI, TOF_ABI } from "@/lib/contracts";
 import { useWeb3 } from "@/lib/web3-provider";
-import { CONTRACTS, NEXUS_ABI, SWAP_ABI, ERC20_ABI, TOF_ABI } from "@/lib/contracts";
+import { ethers } from "ethers";
+import { useMemo } from "react";
 export { execTx } from "@/lib/tx";
 
 declare global {
@@ -28,16 +29,10 @@ let _fallbackProvider: ethers.Provider | null = null;
 function getFallbackProvider(): ethers.Provider {
   if (!_fallbackProvider) {
     const cncNetwork = ethers.Network.from(50716);
-    const rpcUrls = Array.from(
-      new Set(
-        [
-          "https://rpc.cncchainpro.com",
-          process.env.NEXT_PUBLIC_CNC_RPC_URL,
-          process.env.CNC_RPC_URL,
-        ]
-          .map((v) => v?.trim())
-          .filter((value): value is string => Boolean(value))
-      )
+    const rpcUrls = getCncRpcUrls(
+      "https://rpc.cncchainpro.com",
+      process.env.NEXT_PUBLIC_CNC_RPC_URL,
+      process.env.CNC_RPC_URL
     );
 
     const providers = rpcUrls.map(

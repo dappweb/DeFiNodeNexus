@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { execTx, useNexusContract, useSwapContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
-import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { getPrimaryCncRpcUrl } from "@/lib/cnc-rpc";
 import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
+import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
 import {
@@ -16,7 +17,6 @@ import {
     CheckCircle2,
     Cpu,
     Home,
-    Link as LinkIcon,
     ShieldCheck,
     TrendingUp,
     UserPlus,
@@ -24,20 +24,20 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { WalletConnectButton } from "@/components/wallet-connect-button";
+import { AdminPage } from "@/components/pages/admin-page";
+import { EarningsPage } from "@/components/pages/earnings-page";
 import { HomePage } from "@/components/pages/home-page";
 import { NodesPage } from "@/components/pages/nodes-page";
 import { SwapPage } from "@/components/pages/swap-page";
-import { EarningsPage } from "@/components/pages/earnings-page";
 import { TeamPage } from "@/components/pages/team-page";
-import { AdminPage } from "@/components/pages/admin-page";
+import { WalletConnectButton } from "@/components/wallet-connect-button";
 
 type PageTab = "home" | "nodes" | "swap" | "earnings" | "team" | "admin";
 
 let _cncReadonlyProvider: ethers.JsonRpcProvider | null = null;
 function getCncReadonlyProvider() {
   if (!_cncReadonlyProvider) {
-    const rpc = process.env.NEXT_PUBLIC_CNC_RPC_URL || "https://rpc.cncchainpro.com";
+    const rpc = getPrimaryCncRpcUrl(process.env.NEXT_PUBLIC_CNC_RPC_URL);
     _cncReadonlyProvider = new ethers.JsonRpcProvider(rpc);
   }
   return _cncReadonlyProvider;

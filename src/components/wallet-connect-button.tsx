@@ -1,14 +1,15 @@
 "use client";
 
-import { Link as LinkIcon, AlertCircle, Globe } from 'lucide-react';
+import { getPrimaryCncRpcUrl } from '@/lib/cnc-rpc';
+import { AlertCircle, Globe, Link as LinkIcon } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from 'wagmi';
-import { useState, useEffect, useRef, useCallback } from 'react';
 
 /** 超过此毫秒数仍在等待时显示兜底提示 */
 const WALLET_TIMEOUT_MS = 8000;
 const CNC_CHAIN_ID = 50716;
 const CNC_CHAIN_ID_HEX = '0xc61c';
-const CNC_RPC_URL = process.env.NEXT_PUBLIC_CNC_RPC_URL || 'https://rpc.cncchainpro.com';
+const CNC_RPC_URL = getPrimaryCncRpcUrl(process.env.NEXT_PUBLIC_CNC_RPC_URL);
 const CNC_EXPLORER_URL = process.env.NEXT_PUBLIC_CNC_EXPLORER_URL || 'https://cncchainpro.com';
 
 type Eip1193Provider = {

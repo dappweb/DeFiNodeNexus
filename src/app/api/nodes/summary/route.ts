@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
-import { ethers } from "ethers";
+import { getCncRpcUrls } from "@/lib/cnc-rpc";
 import { CONTRACTS, NEXUS_ABI } from "@/lib/contracts";
 import {
-  createDefaultSerializedNftaTiers,
-  createDefaultSerializedNftbTiers,
+    createDefaultSerializedNftaTiers,
+    createDefaultSerializedNftbTiers,
 } from "@/lib/node-tier-config";
+import { ethers } from "ethers";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -17,22 +18,13 @@ const DEFAULT_NFTB_TIERS = createDefaultSerializedNftbTiers();
 let cachedProvider: ethers.Provider | null = null;
 const summaryCache = new Map<string, { expiresAt: number; payload: unknown }>();
 
-function isUsableRpcUrl(value: string | undefined): value is string {
-  if (!value?.trim()) return false;
-  return !/infura\.io/i.test(value);
-}
-
 function getReadonlyProvider(): ethers.Provider {
   if (!cachedProvider) {
     const cncNetwork = ethers.Network.from(50716);
-    const rpcUrls = Array.from(
-      new Set(
-        [
-          "https://rpc.cncchainpro.com",
-          process.env.CNC_RPC_URL,
-          process.env.NEXT_PUBLIC_CNC_RPC_URL,
-        ].filter(isUsableRpcUrl)
-      )
+    const rpcUrls = getCncRpcUrls(
+      "https://rpc.cncchainpro.com",
+      process.env.CNC_RPC_URL,
+      process.env.NEXT_PUBLIC_CNC_RPC_URL
     );
 
     const providers = rpcUrls.map(

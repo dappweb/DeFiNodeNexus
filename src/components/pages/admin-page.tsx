@@ -1,25 +1,26 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ethers } from "ethers";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useWeb3 } from "@/lib/web3-provider";
-import { useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract, execTx } from "@/hooks/use-contract";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { execTx, useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
-import { formatAddress, getNftaTierName, STAGE_LABELS, UI_PARAMS } from "@/lib/ui-config";
+import { getPrimaryCncRpcUrl } from "@/lib/cnc-rpc";
 import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
+import { formatAddress, getNftaTierName } from "@/lib/ui-config";
+import { useWeb3 } from "@/lib/web3-provider";
+import { ethers } from "ethers";
 import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 let _cncReadonlyProvider: ethers.JsonRpcProvider | null = null;
 function getCncReadonlyProvider() {
   if (!_cncReadonlyProvider) {
-    const rpc = process.env.NEXT_PUBLIC_CNC_RPC_URL || "https://rpc.cncchainpro.com";
+    const rpc = getPrimaryCncRpcUrl(process.env.NEXT_PUBLIC_CNC_RPC_URL);
     _cncReadonlyProvider = new ethers.JsonRpcProvider(rpc);
   }
   return _cncReadonlyProvider;
@@ -210,8 +211,8 @@ export function AdminPage() {
   };
 
   const refresh = async () => {
-    // Use the readonly (Sepolia-only) contract for reads so they succeed
-    // regardless of which chain the user's wallet is connected to.
+    // Use readonly contract for reads so they succeed regardless of
+    // which chain the user's wallet is connected to.
     const reader = readonlyNexus || nexus;
     if (!reader) return;
     try {

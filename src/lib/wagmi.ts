@@ -1,11 +1,12 @@
 "use client";
 
-import { createConfig, http } from 'wagmi';
+import { getPrimaryCncRpcUrl } from '@/lib/cnc-rpc';
+import { QueryClient } from '@tanstack/react-query';
 import { injected } from '@wagmi/core';
 import { defineChain } from 'viem';
-import { QueryClient } from '@tanstack/react-query';
+import { createConfig, http } from 'wagmi';
 
-const cncRpcUrl = process.env.NEXT_PUBLIC_CNC_RPC_URL || 'https://rpc.cncchainpro.com';
+const cncRpcUrl = getPrimaryCncRpcUrl(process.env.NEXT_PUBLIC_CNC_RPC_URL);
 const cncExplorerUrl = process.env.NEXT_PUBLIC_CNC_EXPLORER_URL || 'https://cncchainpro.com';
 
 const cnc = defineChain({
