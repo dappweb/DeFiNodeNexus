@@ -126,24 +126,31 @@ step "[5/6] 检查反向代理配置 (Caddy 优先)"
 # 保证目录有反向代理可读权限
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
-# 每次部署都同步模板，确保缓存/代理策略及时生效
+# 同步 Caddy 模板。如果 Caddyfile 已含多站点配置（非模板生成），跳过覆盖避免破坏。
 if command -v caddy &>/dev/null && [[ -f "$PROXY_CADDY_TEMPLATE" ]] && [[ -d "/etc/caddy" ]]; then
-  TMP_CADDY="$(mktemp)"
-  sed \
-    -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
-    -e "s|__UPSTREAM__|127.0.0.1:$APP_PORT|g" \
-    "$PROXY_CADDY_TEMPLATE" > "$TMP_CADDY"
+  if grep -q "__APP_DOMAIN__\|__UPSTREAM__" "$CADDY_CONF_DST" 2>/dev/null || [[ ! -f "$CADDY_CONF_DST" ]]; then
+    TMP_CADDY="$(mktemp)"
+    sed \
+      -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
+      -e "s|__UPSTREAM__|127.0.0.1:$APP_PORT|g" \
+      "$PROXY_CADDY_TEMPLATE" > "$TMP_CADDY"
 
-  sudo install -m 644 "$TMP_CADDY" "$CADDY_CONF_DST"
-  rm -f "$TMP_CADDY"
+    sudo install -m 644 "$TMP_CADDY" "$CADDY_CONF_DST"
+    rm -f "$TMP_CADDY"
 
-  sudo caddy validate --config "$CADDY_CONF_DST"
-  if systemctl is-active --quiet caddy; then
-    sudo systemctl reload caddy
+    sudo caddy validate --config "$CADDY_CONF_DST"
+    if systemctl is-active --quiet caddy; then
+      sudo systemctl reload caddy
+    else
+      sudo systemctl enable --now caddy
+    fi
+    echo "  Caddy 配置已同步并重载: $CADDY_CONF_DST"
   else
-    sudo systemctl enable --now caddy
+    warn "检测到自定义多站点 Caddyfile，跳过模板覆盖（如需更新请手动编辑 $CADDY_CONF_DST）"
+    if systemctl is-active --quiet caddy; then
+      echo "  Caddy 当前运行中，无需重载"
+    fi
   fi
-  echo "  Caddy 配置已同步并重载: $CADDY_CONF_DST"
 elif [[ -d "/opt/1panel/docker/compose/openresty/conf.d" ]]; then
   if [[ -f "$APP_DIR/deploy/linux/nginx-definode.conf" ]]; then
     sudo install -m 644 "$APP_DIR/deploy/linux/nginx-definode.conf" "$OPENRESTY_1PANEL_CONF_DST"

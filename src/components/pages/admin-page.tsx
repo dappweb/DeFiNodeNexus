@@ -1,5 +1,6 @@
 "use client";
 
+import { TierManagementPanel } from "@/components/admin/tier-management-panel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,20 +98,6 @@ export function AdminPage() {
   // 提现费率按等级
   const [withdrawLevel, setWithdrawLevel] = useState("0");
   const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
-
-  // Tier 配置
-  const [nftaTierId, setNftaTierId] = useState("0");
-  const [nftaPrice, setNftaPrice] = useState("");
-  const [nftaDailyYield, setNftaDailyYield] = useState("");
-  const [nftaMaxSupply, setNftaMaxSupply] = useState("");
-  const [nftaActive, setNftaActive] = useState("true");
-
-  const [nftbTierId, setNftbTierId] = useState("0");
-  const [nftbPrice, setNftbPrice] = useState("");
-  const [nftbWeight, setNftbWeight] = useState("");
-  const [nftbMaxSupply, setNftbMaxSupply] = useState("");
-  const [nftbDividendBps, setNftbDividendBps] = useState("");
-  const [nftbActive, setNftbActive] = useState("true");
 
   // 钱包管理
   const [treasuryAddr, setTreasuryAddr] = useState("");
@@ -545,41 +532,6 @@ export function AdminPage() {
     }
   };
 
-  // ===== NFTA Tier 配置 =====
-  const onConfigureNftaTier = async () => {
-    if (!nexus) return;
-    const tierId = parsePositiveInteger(nftaTierId);
-    const price = parsePositiveAmount(nftaPrice);
-    const yield_ = parsePositiveAmount(nftaDailyYield);
-    const maxSup = parsePositiveInteger(nftaMaxSupply);
-    if (tierId === null || price === null || yield_ === null || maxSup === null) {
-      toast({ title: "参数错误", description: "所有字段必须有效", variant: "destructive" });
-      return;
-    }
-    await runTx(
-      "配置NFTA Tier",
-      () => nexus.configureNftaTier(BigInt(tierId), price, yield_, BigInt(maxSup), nftaActive === "true")
-    );
-  };
-
-  // ===== NFTB Tier 配置 =====
-  const onConfigureNftbTier = async () => {
-    if (!nexus) return;
-    const tierId = parsePositiveInteger(nftbTierId);
-    const price = parsePositiveAmount(nftbPrice);
-    const weight = parsePositiveInteger(nftbWeight);
-    const maxSup = parsePositiveInteger(nftbMaxSupply);
-    const divBps = parseBps(nftbDividendBps);
-    if (tierId === null || price === null || weight === null || maxSup === null || divBps === null) {
-      toast({ title: "参数错误", description: "所有字段必须有效", variant: "destructive" });
-      return;
-    }
-    await runTx(
-      "配置NFTB Tier",
-      () => nexus.configureNftbTier(BigInt(tierId), price, BigInt(weight), BigInt(maxSup), divBps, nftbActive === "true")
-    );
-  };
-
   // ===== 注册购买 =====
   const onRegisterPurchase = async () => {
     if (!nexus) return;
@@ -915,6 +867,15 @@ export function AdminPage() {
         </CardHeader>
       </Card>
 
+      <TierManagementPanel
+        nexus={nexus}
+        readonlyNexus={readonlyNexus}
+        isOwner={isOwner}
+        loading={loading}
+        setLoading={setLoading}
+        onRefreshParent={refresh}
+      />
+
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>NFTA 单笔操作</CardTitle>
@@ -1093,76 +1054,6 @@ export function AdminPage() {
             <Input value={predictionRateTier2} onChange={(e) => setPredictionRateTier2(e.target.value)} placeholder="中级费率 bps" />
             <Input value={predictionRateTier3} onChange={(e) => setPredictionRateTier3(e.target.value)} placeholder="高级费率 bps" />
             <Button disabled={!isOwner || loading || !nexus} onClick={onSetPredictionFlowRates}>更新预测流水费率</Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="glass-panel">
-        <CardHeader>
-          <CardTitle>Tier 配置</CardTitle>
-          <CardDescription>配置NFTA/NFTB等级参数</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-3">
-              <ChevronDown className="h-4 w-4" /> 查看 Tier 配置说明与举例
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mb-3 space-y-2">
-              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
-                <AlertDescription className="space-y-2">
-                  <div><strong>NFTA Tier 配置参数说明：</strong></div>
-                  <div>• Tier ID：等级编号（0表示新建），如1、2、3等</div>
-                  <div>• 价格：购买价格（USDT，如100、500、1000）</div>
-                  <div>• 日收益：每天获得的TOT收益</div>
-                  <div>• 最大供应：该等级最多可发行多少个NFT</div>
-                  <div>• 激活状态：是否启用该等级</div>
-                  <div className="mt-2"><strong>举例</strong>：创建一个高级NFTA</div>
-                  <div className="bg-black/30 p-2 rounded text-xs">
-                    Tier ID: 3 | 价格: 1000 | 日收益: 10 | 最大供应: 100 | 激活: ✓
-                  </div>
-                  <div className="mt-2"><strong>NFTB Tier 配置参数说明：</strong></div>
-                  <div>• 权重：在分红中的权重系数</div>
-                  <div>• 分红bps：该等级的分红比率（0-10000，1 bps = 0.01%）</div>
-                  <div className="text-zinc-400 mt-1">💡 建议：分红bps对应Tier级别提升而增加，如Tier1:1000, Tier2:1500, Tier3:2000</div>
-                </AlertDescription>
-              </Alert>
-            </CollapsibleContent>
-          </Collapsible>
-          <div>
-            <div className="text-sm font-semibold mb-2">NFTA Tier 配置</div>
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
-              <Input value={nftaTierId} onChange={(e) => setNftaTierId(e.target.value)} placeholder="Tier ID (0=新建)" />
-              <Input value={nftaPrice} onChange={(e) => setNftaPrice(e.target.value)} placeholder="价格 (USDT)" />
-              <Input value={nftaDailyYield} onChange={(e) => setNftaDailyYield(e.target.value)} placeholder="日收益 (TOT)" />
-              <Input value={nftaMaxSupply} onChange={(e) => setNftaMaxSupply(e.target.value)} placeholder="最大供应" />
-              <Select value={nftaActive} onValueChange={setNftaActive}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">激活</SelectItem>
-                  <SelectItem value="false">禁用</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button disabled={!isOwner || loading || !nexus} onClick={onConfigureNftaTier} variant="outline">保存</Button>
-            </div>
-          </div>
-
-          <div>
-            <div className="text-sm font-semibold mb-2">NFTB Tier 配置</div>
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
-              <Input value={nftbTierId} onChange={(e) => setNftbTierId(e.target.value)} placeholder="Tier ID (0=新建)" />
-              <Input value={nftbPrice} onChange={(e) => setNftbPrice(e.target.value)} placeholder="价格 (USDT)" />
-              <Input value={nftbWeight} onChange={(e) => setNftbWeight(e.target.value)} placeholder="权重" />
-              <Input value={nftbMaxSupply} onChange={(e) => setNftbMaxSupply(e.target.value)} placeholder="最大供应" />
-              <Input value={nftbDividendBps} onChange={(e) => setNftbDividendBps(e.target.value)} placeholder="分红 bps" />
-              <Select value={nftbActive} onValueChange={setNftbActive}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">激活</SelectItem>
-                  <SelectItem value="false">禁用</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button disabled={!isOwner || loading || !nexus} onClick={onConfigureNftbTier} variant="outline">保存</Button>
-            </div>
           </div>
         </CardContent>
       </Card>
