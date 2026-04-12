@@ -84,6 +84,44 @@ sudo journalctl -u caddy -n 100 --no-pager
 
 - `deploy/linux/Caddyfile`
 
+## 🤖 提交后自动部署（GitHub -> 服务器 -> Caddy）
+
+已新增自动部署工作流：
+
+- `.github/workflows/auto-deploy-server.yml`
+- `deploy/linux/auto-update-from-github.sh`
+
+触发条件：
+
+- push 到 `main`
+- push 到 `feat/**`
+- 手动触发工作流（workflow_dispatch）
+
+服务器执行内容：
+
+1. 拉取对应分支最新代码
+2. 执行 `bash deploy.sh --skip-pull`
+3. `deploy.sh` 内自动同步并重载 Caddy（如检测到 Caddy）
+
+### 需要在 GitHub 仓库配置的 Secrets
+
+- `DEPLOY_HOST`: 服务器 IP 或域名
+- `DEPLOY_USER`: SSH 用户名（例如 `ubuntu`）
+- `DEPLOY_SSH_KEY`: 私钥内容（建议专用 deploy key）
+
+可选：
+
+- `DEPLOY_PORT`: SSH 端口，默认 `22`
+- `DEPLOY_APP_DOMAIN`: 注入到 `APP_DOMAIN`，用于 Caddy 模板替换
+- `DEPLOY_APP_DIR`: 服务器项目目录，默认 `/home/ubuntu/DeFiNodeNexus`
+
+### 服务器前置条件
+
+- 服务器已可通过 SSH 登录
+- 项目目录存在并已初始化为 git 仓库
+- `deploy.sh` 可执行，且服务器具备 `node`、`npm`、`pm2`
+- 若使用 Caddy，已安装 `caddy` 且有 `/etc/caddy/Caddyfile` 写权限
+
 模板中的占位符由脚本自动替换：
 
 - `__APP_DOMAIN__`

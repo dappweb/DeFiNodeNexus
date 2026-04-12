@@ -1,0 +1,34 @@
+name: Auto Deploy And Caddy Sync
+
+on:
+  push:
+    branches:
+      - main
+      - feat/**
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'dappweb/DeFiNodeNexus'
+    steps:
+      - name: Deploy to server via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: ${{ secrets.DEPLOY_PORT || 22 }}
+          script_stop: true
+          command_timeout: 30m
+          envs: DEPLOY_BRANCH,APP_DOMAIN
+          script: |
+            export DEPLOY_BRANCH="${{ github.ref_name }}"
+            export APP_DOMAIN="${{ secrets.DEPLOY_APP_DOMAIN }}"
+            export APP_DIR="${{ secrets.DEPLOY_APP_DIR || '/home/ubuntu/DeFiNodeNexus' }}"
+            chmod +x "$APP_DIR/deploy/linux/auto-update-from-github.sh"
+            "$APP_DIR/deploy/linux/auto-update-from-github.sh"
