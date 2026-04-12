@@ -124,6 +124,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     uint256 public tofPerUsdt;          // TOF amount per 1 USDT (scaled by 1e18)
     mapping(uint256 => uint256) public predictionFlowBpsByTier;
     mapping(address => uint256) public nftaLastClaimDayByUser;
+    mapping(address => bool) public admins;
 
     // ======================== Events ========================
 
@@ -150,6 +151,9 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event TofClaimFeeUpdated(uint256 newBps);
     event TofPerUsdtUpdated(uint256 newRate);
     event DistributorUpdated(address indexed addr, bool status);
+    event AdminUpdated(address indexed account, bool enabled);
+    event AdminBatchUpdated(uint256 count);
+    event UsdtTokenUpdated(address indexed oldToken, address indexed newToken);
 
     // ======================== Constructor ========================
 
@@ -193,6 +197,11 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         withdrawFeeBpsByLevel[3] = 500;   // Lv3  5%
         withdrawFeeBpsByLevel[4] = 400;   // Lv4  4%
         withdrawFeeBpsByLevel[5] = 300;   // Lv5  3%
+    }
+
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        _;
     }
 
     // ================================================================
@@ -552,7 +561,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         uint256 dailyYield,
         uint256 maxSupply,
         bool isActive
-    ) external onlyOwner returns (uint256 configuredTierId) {
+    ) external onlyOwnerOrAdmin returns (uint256 configuredTierId) {
         require(dailyYield > 0, "Yield is zero");
         require(maxSupply > 0, "MaxSupply is zero");
 
@@ -582,7 +591,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         uint256 maxSupply,
         uint256 dividendBps,
         bool isActive
-    ) external onlyOwner returns (uint256 configuredTierId) {
+    ) external onlyOwnerOrAdmin returns (uint256 configuredTierId) {
         require(weight > 0, "Weight is zero");
         require(maxSupply > 0, "MaxSupply is zero");
 
@@ -609,7 +618,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Admin registers an NFTA purchase (off-chain payment).
-    function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {
+    function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyOwnerOrAdmin returns (uint256 nodeId) {
         require(user != address(0), "User is zero");
         NftaTier storage tier = nftaTiers[tierId];
         require(tier.isActive, "Tier inactive");
@@ -623,7 +632,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit NftaPurchased(user, nodeId, tierId, tier.price);
     }
 
-    function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {
+    function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyOwnerOrAdmin returns (uint256 nodeId) {
         require(user != address(0), "User is zero");
         NftbTier storage tier = nftbTiers[tierId];
         require(tier.isActive, "Tier inactive");
@@ -637,7 +646,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit NftbPurchased(user, nodeId, tierId, tier.price);
     }
 
-    function fundRewardPool(uint256 amount) external onlyOwner {
+    function fundRewardPool(uint256 amount) external onlyOwnerOrAdmin {
         require(amount > 0, "Zero");
         totToken.safeTransferFrom(msg.sender, address(this), amount);
         emit RewardPoolFunded(msg.sender, amount);
@@ -743,13 +752,13 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit PredictionFlowDistributed(flowAmount, distributed, treasuryAmount);
     }
 
-    function setDistributor(address addr, bool status) external onlyOwner {
+    function setDistributor(address addr, bool status) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         isDistributor[addr] = status;
         emit DistributorUpdated(addr, status);
     }
 
-    function setTreasury(address addr) external onlyOwner {
+    function setTreasury(address addr) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         treasury = addr;
         emit TreasuryUpdated(addr);
@@ -760,7 +769,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         address _community,
         address _foundation,
         address _institution
-    ) external onlyOwner {
+    ) external onlyOwnerOrAdmin {
         require(
             _zeroLine != address(0) && _community != address(0)
             && _foundation != address(0) && _institution != address(0),
@@ -773,41 +782,66 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit WalletsUpdated(_zeroLine, _community, _foundation, _institution);
     }
 
-    function setProjectWallet(address addr) external onlyOwner {
+    function setProjectWallet(address addr) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         projectWallet = addr;
         emit ProjectWalletUpdated(addr);
     }
 
-    function setTofBurnBps(uint256 bps) external onlyOwner {
+    function setTofBurnBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= BASIS_POINTS, "Too high");
         tofBurnBps = bps;
         emit TofBurnRateUpdated(bps);
     }
 
-    function setTofClaimFeeBps(uint256 bps) external onlyOwner {
+    function setTofClaimFeeBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= BASIS_POINTS, "Too high");
         tofClaimFeeBps = bps;
         emit TofClaimFeeUpdated(bps);
     }
 
-    function setTofPerUsdt(uint256 rate) external onlyOwner {
+    function setTofPerUsdt(uint256 rate) external onlyOwnerOrAdmin {
         require(rate > 0, "Zero");
         tofPerUsdt = rate;
         emit TofPerUsdtUpdated(rate);
     }
 
-    function setPredictionFlowRateBps(uint256 tierId, uint256 bps) external onlyOwner {
+    function setPredictionFlowRateBps(uint256 tierId, uint256 bps) external onlyOwnerOrAdmin {
         require(tierId > 0 && tierId < nextNftbTierId, "Invalid tier");
         require(bps <= BASIS_POINTS, "Too high");
         predictionFlowBpsByTier[tierId] = bps;
         emit PredictionFlowRateUpdated(tierId, bps);
     }
 
-    function setWithdrawFeeBps(uint8 level, uint256 feeBps) external onlyOwner {
+    function setWithdrawFeeBps(uint8 level, uint256 feeBps) external onlyOwnerOrAdmin {
         require(level <= 5, "Invalid level");
         require(feeBps <= BASIS_POINTS, "Too high");
         withdrawFeeBpsByLevel[level] = feeBps;
+    }
+
+    function setAdmin(address account, bool enabled) external onlyOwner {
+        require(account != address(0), "Zero");
+        admins[account] = enabled;
+        emit AdminUpdated(account, enabled);
+    }
+
+    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwner {
+        uint256 len = accounts_.length;
+        require(len == enabled_.length, "Length mismatch");
+        for (uint256 i = 0; i < len; i++) {
+            address account = accounts_[i];
+            require(account != address(0), "Zero");
+            admins[account] = enabled_[i];
+            emit AdminUpdated(account, enabled_[i]);
+        }
+        emit AdminBatchUpdated(len);
+    }
+
+    function setUsdtToken(address newUsdt) external onlyOwnerOrAdmin {
+        require(newUsdt != address(0), "Zero");
+        address oldToken = address(usdtToken);
+        usdtToken = IERC20(newUsdt);
+        emit UsdtTokenUpdated(oldToken, newUsdt);
     }
 
     // ================================================================

@@ -361,14 +361,38 @@ export function NodesPage() {
     setLoading(true);
     setNftaStage("checking");
     try {
-      const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
-      if (allowance < tier.price) {
+      const ensureAllowance = async (token: ethers.Contract, required: bigint, failTitle: string) => {
+        const allowance = await token.allowance(address, CONTRACTS.NEXUS);
+        if (allowance >= required) return true;
+
         setNftaStage("approving");
-        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price, { gasLimit: 120_000n }));
-        if (!approveRes.success) {
-          toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
-          return;
+        // First try: let the wallet/RPC estimate gas naturally (avoids CNC chain coalesce errors)
+        let approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
+        if (approveRes.success) return true;
+
+        // Second try: explicit gasLimit in case estimation itself fails
+        if (/could not coalesce error|missing revert data|network error/i.test(approveRes.error || "")) {
+          approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
+          if (approveRes.success) return true;
         }
+
+        // Compatibility fallback for USDT-like tokens that require resetting allowance to 0 first.
+        if (allowance > 0n) {
+          const clearRes = await execTx(() => token.approve(CONTRACTS.NEXUS, 0n));
+          if (clearRes.success) {
+            const setRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
+            if (setRes.success) return true;
+            toast({ title: failTitle, description: toFriendlyTxError(setRes.error), variant: "destructive" });
+            return false;
+          }
+        }
+
+        toast({ title: failTitle, description: toFriendlyTxError(approveRes.error), variant: "destructive" });
+        return false;
+      };
+
+      if (!(await ensureAllowance(usdt, tier.price, t("toastUsdtApproveFailed")))) {
+        return;
       }
 
       setNftaStage("purchasing");
@@ -416,6 +440,35 @@ export function NodesPage() {
     setLoading(true);
     setNftbStage("checking");
     try {
+      const ensureAllowance = async (token: ethers.Contract, required: bigint, failTitle: string) => {
+        const allowance = await token.allowance(address, CONTRACTS.NEXUS);
+        if (allowance >= required) return true;
+
+        setNftbStage("approving");
+        // First try: let the wallet/RPC estimate gas naturally (avoids CNC chain coalesce errors)
+        let approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
+        if (approveRes.success) return true;
+
+        // Second try: explicit gasLimit in case estimation itself fails
+        if (/could not coalesce error|missing revert data|network error/i.test(approveRes.error || "")) {
+          approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
+          if (approveRes.success) return true;
+        }
+
+        if (allowance > 0n) {
+          const clearRes = await execTx(() => token.approve(CONTRACTS.NEXUS, 0n));
+          if (clearRes.success) {
+            const setRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
+            if (setRes.success) return true;
+            toast({ title: failTitle, description: toFriendlyTxError(setRes.error), variant: "destructive" });
+            return false;
+          }
+        }
+
+        toast({ title: failTitle, description: toFriendlyTxError(approveRes.error), variant: "destructive" });
+        return false;
+      };
+
       const parsedReferrer = referrer.trim();
       const finalReferrer = ethers.isAddress(parsedReferrer) ? parsedReferrer : ethers.ZeroAddress;
       if (nftbPayToken === "USDT") {
@@ -424,14 +477,8 @@ export function NodesPage() {
           return;
         }
         if (!usdt) return;
-        const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
-        if (allowance < tier.price) {
-          setNftbStage("approving");
-          const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price, { gasLimit: 120_000n }));
-          if (!approveRes.success) {
-            toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
-            return;
-          }
+        if (!(await ensureAllowance(usdt, tier.price, t("toastUsdtApproveFailed")))) {
+          return;
         }
         setNftbStage("purchasing");
         const res = await execTx(() => nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer, { gasLimit: 900_000n }));
@@ -464,14 +511,8 @@ export function NodesPage() {
           return;
         }
 
-        const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
-        if (allowance < tofCost) {
-          setNftbStage("approving");
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tofCost, { gasLimit: 120_000n }));
-          if (!approveRes.success) {
-            toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
-            return;
-          }
+        if (!(await ensureAllowance(tof, tofCost, t("toastTofApproveFailed")))) {
+          return;
         }
         setNftbStage("purchasing");
         const res = await execTx(() => nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer, { gasLimit: 900_000n }));

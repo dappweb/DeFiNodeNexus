@@ -83,6 +83,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     uint256 public maxSellBps; // §2.4: 50%
     uint256 public nftbUsdtDividendPool;
     uint256 public usdtDistributionThreshold; // 10,000 USDT triggers distribution
+    mapping(address => bool) public admins;
 
     // ======================== Events ========================
 
@@ -94,6 +95,9 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event LiquidityAdded(uint256 totAmount, uint256 usdtAmount);
     event LiquidityRemoved(uint256 totAmount, uint256 usdtAmount);
     event NexusUpdated(address indexed newNexus);
+    event AdminUpdated(address indexed account, bool enabled);
+    event AdminBatchUpdated(uint256 count);
+    event UsdtTokenUpdated(address indexed oldToken, address indexed newToken);
 
     // ======================== Constructor ========================
 
@@ -119,6 +123,11 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         maxDailyBuy = 100_000e18;
         maxSellBps = 5000;
         lastDeflationTime = block.timestamp;
+    }
+
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        _;
     }
 
     // ================================================================
@@ -515,7 +524,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // ================================================================
 
     /// @notice Add liquidity to the pool (owner seeds 6% TOT + matching USDT).
-    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwner {
+    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwnerOrAdmin {
         require(totAmount > 0 && usdtAmount > 0, "Zero");
 
         totToken.safeTransferFrom(msg.sender, address(this), totAmount);
@@ -528,7 +537,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Remove liquidity (emergency, owner only).
-    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwner {
+    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwnerOrAdmin {
         require(totAmount <= totReserve && usdtAmount <= usdtReserve, "Exceeds reserve");
 
         totReserve -= totAmount;
@@ -540,49 +549,74 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit LiquidityRemoved(totAmount, usdtAmount);
     }
 
-    function setNexus(address _nexus) external onlyOwner {
+    function setNexus(address _nexus) external onlyOwnerOrAdmin {
         require(_nexus != address(0), "Zero");
         nexus = _nexus;
         emit NexusUpdated(_nexus);
     }
 
-    function setBuyFeeBps(uint256 bps) external onlyOwner {
+    function setBuyFeeBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= 1000, "Max 10%");
         buyFeeBps = bps;
     }
 
-    function setSellFeeBps(uint256 bps) external onlyOwner {
+    function setSellFeeBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= 2000, "Max 20%");
         sellFeeBps = bps;
     }
 
-    function setProfitTaxBps(uint256 bps) external onlyOwner {
+    function setProfitTaxBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= 5000, "Max 50%");
         profitTaxBps = bps;
     }
 
-    function setDistributionThreshold(uint256 threshold) external onlyOwner {
+    function setDistributionThreshold(uint256 threshold) external onlyOwnerOrAdmin {
         require(threshold > 0, "Zero");
         distributionThreshold = threshold;
     }
 
-    function setUsdtDistributionThreshold(uint256 threshold) external onlyOwner {
+    function setUsdtDistributionThreshold(uint256 threshold) external onlyOwnerOrAdmin {
         require(threshold > 0, "Zero");
         usdtDistributionThreshold = threshold;
     }
 
-    function setMaxDailyBuy(uint256 amount) external onlyOwner {
+    function setMaxDailyBuy(uint256 amount) external onlyOwnerOrAdmin {
         maxDailyBuy = amount;
     }
 
-    function setMaxSellBps(uint256 bps) external onlyOwner {
+    function setMaxSellBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= BASIS_POINTS, "Too high");
         maxSellBps = bps;
     }
 
-    function setDeflationBps(uint256 bps) external onlyOwner {
+    function setDeflationBps(uint256 bps) external onlyOwnerOrAdmin {
         require(bps <= 1000, "Max 10%");
         deflationBps = bps;
+    }
+
+    function setAdmin(address account, bool enabled) external onlyOwner {
+        require(account != address(0), "Zero");
+        admins[account] = enabled;
+        emit AdminUpdated(account, enabled);
+    }
+
+    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwner {
+        uint256 len = accounts_.length;
+        require(len == enabled_.length, "Length mismatch");
+        for (uint256 i = 0; i < len; i++) {
+            address account = accounts_[i];
+            require(account != address(0), "Zero");
+            admins[account] = enabled_[i];
+            emit AdminUpdated(account, enabled_[i]);
+        }
+        emit AdminBatchUpdated(len);
+    }
+
+    function setUsdtToken(address newUsdt) external onlyOwnerOrAdmin {
+        require(newUsdt != address(0), "Zero");
+        address oldToken = address(usdtToken);
+        usdtToken = IERC20(newUsdt);
+        emit UsdtTokenUpdated(oldToken, newUsdt);
     }
 
     /// @notice Emergency withdraw tokens stuck in the contract.

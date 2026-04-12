@@ -6,11 +6,11 @@ import { ethers } from "ethers";
 // env vars are not configured - these are public on-chain addresses, not secrets.
 // Update DEPLOYED values here after each new deployment.
 const DEPLOYED = {
-  NEXUS: "0x2cc1Ebf7185F4810C620e0A7D3300B1e381f3b44",
-  SWAP:  "0x018F73b493a0F8D0B8f7F85480Ec8E9c9d852ad6",
-  TOT:   "0x46f7729e2158Dd005DC6bdD28FaD457d6f036219",
-  TOF:   "0x2d764DF04FE2A086780ab3F1Edfb4b39E44C0c1B",
-  USDT:  "0x02ED3072eB83e4E0654d30250102aA58cE977789",
+  NEXUS: "0x5427c5E2c9f6aD20eaA06b49844D2F7008F1Ef04",
+  SWAP:  "0xbb90415bb460E11Bf64014a7f333A3733ab5b06b",
+  TOT:   "0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA",
+  TOF:   "0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D",
+  USDT:  "0xf54cC0F6CE272125c39C45A8141b84989A8765f4",
 } as const;
 
 // Vercel (and some CI systems) sometimes injects \r\n into env var values
@@ -29,6 +29,9 @@ export const CONTRACTS = {
 
 export const NEXUS_ABI = [
   "function transferOwnership(address newOwner) external",
+  "function setAdmin(address account, bool enabled) external",
+  "function setAdmins(address[] accounts_, bool[] enabled_) external",
+  "function setUsdtToken(address newUsdt) external",
   "function configureNftaTier(uint256 tierId, uint256 price, uint256 dailyYield, uint256 maxSupply, bool isActive) external returns (uint256)",
   "function configureNftbTier(uint256 tierId, uint256 price, uint256 weight, uint256 maxSupply, uint256 dividendBps, bool isActive) external returns (uint256)",
   "function registerNftaPurchase(address user, uint256 tierId, address referrer) external returns (uint256)",
@@ -90,6 +93,8 @@ export const NEXUS_ABI = [
   "function withdrawFeeBpsByLevel(uint8) view returns (uint256)",
   "function nftaLastClaimDayByUser(address) view returns (uint256)",
   "function isDistributor(address) view returns (bool)",
+  "function admins(address) view returns (bool)",
+  "function usdtToken() view returns (address)",
   "function owner() view returns (address)",
   "event NftbTierConfigured(uint256 indexed tierId, uint256 price, uint256 weight, uint256 maxSupply, uint256 dividendBps, bool isActive)",
   "event ReferrerBound(address indexed user, address indexed referrer)",
@@ -115,6 +120,9 @@ export const NEXUS_ABI = [
 
 export const SWAP_ABI = [
   "function transferOwnership(address newOwner) external",
+  "function setAdmin(address account, bool enabled) external",
+  "function setAdmins(address[] accounts_, bool[] enabled_) external",
+  "function setUsdtToken(address newUsdt) external",
   "function addLiquidity(uint256 totAmount, uint256 usdtAmount) external",
   "function removeLiquidity(uint256 totAmount, uint256 usdtAmount) external",
   "function setNexus(address _nexus) external",
@@ -163,6 +171,7 @@ export const SWAP_ABI = [
   "function getUserAvgPrice(address user) view returns (uint256)",
   "function getDailyBoughtAmount(address user) view returns (uint256)",
   "function getMaxSellAmount(address user) view returns (uint256)",
+  "function admins(address) view returns (bool)",
   "function quoteBuy(uint256 usdtAmount) view returns (uint256 totOut, uint256 fee)",
   "function quoteSell(uint256 totAmount) view returns (uint256 usdtOut, uint256 sellFee)",
   "function timeUntilNextDeflation() view returns (uint256)",

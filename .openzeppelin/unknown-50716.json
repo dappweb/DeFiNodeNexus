@@ -30,6 +30,21 @@
       "address": "0xfE20139dCFA053b819A3745E9ed801b9C6cc84aC",
       "txHash": "0xe9b07333bfefd3812d6604ee5e0a547450275159fe8adb78addac18659361657",
       "kind": "uups"
+    },
+    {
+      "address": "0xE4536231F8aA8589dc83a53797c8d412B9a0957B",
+      "txHash": "0x7d55d4c5d76ddf0d1dafb019df3eca38adf294770625706665d8ef7ee0449e79",
+      "kind": "uups"
+    },
+    {
+      "address": "0xbb90415bb460E11Bf64014a7f333A3733ab5b06b",
+      "txHash": "0x1e42a31b07f4a9290a0dba56790505400ed15bc505ee4cc418f3fa9adce63702",
+      "kind": "uups"
+    },
+    {
+      "address": "0x5427c5E2c9f6aD20eaA06b49844D2F7008F1Ef04",
+      "txHash": "0xcca191045d6b61e627b8551bbc6ba22dd6526380aaad07b2174e9a42572d13da",
+      "kind": "uups"
     }
   ],
   "impls": {
@@ -1138,6 +1153,603 @@
           "t_uint256": {
             "label": "uint256",
             "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "7e5322dc5f518d37dc027769d9b56f34e9ae19638cf0a8fa5fef04441837923a": {
+      "address": "0x1d41f2805EB2126324584f00265d639f1Fd9144A",
+      "txHash": "0x3d59339ee1bcdc6716ce4a0a940261ded82b463595a15f8c1460072c9b25ae37",
+      "layout": {
+        "solcVersion": "0.8.20",
+        "storage": [
+          {
+            "label": "totToken",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(IERC20)1077",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:89"
+          },
+          {
+            "label": "tofToken",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IERC20)1077",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:90"
+          },
+          {
+            "label": "usdtToken",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IERC20)1077",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:92"
+          },
+          {
+            "label": "treasury",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:94"
+          },
+          {
+            "label": "zeroLineWallet",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:95"
+          },
+          {
+            "label": "communityWallet",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:96"
+          },
+          {
+            "label": "foundationWallet",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:97"
+          },
+          {
+            "label": "institutionWallet",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:99"
+          },
+          {
+            "label": "projectWallet",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_address",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:99"
+          },
+          {
+            "label": "nextNftaTierId",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:105"
+          },
+          {
+            "label": "nextNftbTierId",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:106"
+          },
+          {
+            "label": "nextNodeId",
+            "offset": 0,
+            "slot": "11",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:106"
+          },
+          {
+            "label": "totalWeightByTier",
+            "offset": 0,
+            "slot": "12",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:107"
+          },
+          {
+            "label": "accDividendPerWeightByTier",
+            "offset": 0,
+            "slot": "13",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:108"
+          },
+          {
+            "label": "tofBurnBps",
+            "offset": 0,
+            "slot": "14",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:109"
+          },
+          {
+            "label": "tofClaimFeeBps",
+            "offset": 0,
+            "slot": "15",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:109"
+          },
+          {
+            "label": "nftaTiers",
+            "offset": 0,
+            "slot": "16",
+            "type": "t_mapping(t_uint256,t_struct(NftaTier)1807_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:114"
+          },
+          {
+            "label": "nftbTiers",
+            "offset": 0,
+            "slot": "17",
+            "type": "t_mapping(t_uint256,t_struct(NftbTier)1822_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:115"
+          },
+          {
+            "label": "nftaNodes",
+            "offset": 0,
+            "slot": "18",
+            "type": "t_mapping(t_uint256,t_struct(NodeA)1833_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:116"
+          },
+          {
+            "label": "nftbNodes",
+            "offset": 0,
+            "slot": "19",
+            "type": "t_mapping(t_uint256,t_struct(NodeB)1844_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:117"
+          },
+          {
+            "label": "userNftaNodes",
+            "offset": 0,
+            "slot": "20",
+            "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:118"
+          },
+          {
+            "label": "userNftbNodes",
+            "offset": 0,
+            "slot": "21",
+            "type": "t_mapping(t_address,t_array(t_uint256)dyn_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:119"
+          },
+          {
+            "label": "accounts",
+            "offset": 0,
+            "slot": "22",
+            "type": "t_mapping(t_address,t_struct(Account)1861_storage)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:120"
+          },
+          {
+            "label": "withdrawFeeBpsByLevel",
+            "offset": 0,
+            "slot": "23",
+            "type": "t_mapping(t_uint8,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:121"
+          },
+          {
+            "label": "isDistributor",
+            "offset": 0,
+            "slot": "24",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:121"
+          },
+          {
+            "label": "accUsdtDividendPerWeightByTier",
+            "offset": 0,
+            "slot": "25",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:122"
+          },
+          {
+            "label": "usdtRewardDebtByNode",
+            "offset": 0,
+            "slot": "26",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:124"
+          },
+          {
+            "label": "tofPerUsdt",
+            "offset": 0,
+            "slot": "27",
+            "type": "t_uint256",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:124"
+          },
+          {
+            "label": "predictionFlowBpsByTier",
+            "offset": 0,
+            "slot": "28",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:126"
+          },
+          {
+            "label": "nftaLastClaimDayByUser",
+            "offset": 0,
+            "slot": "29",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:127"
+          },
+          {
+            "label": "admins",
+            "offset": 0,
+            "slot": "30",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "DeFiNodeNexus",
+            "src": "contracts/DeFiNodeNexus.sol:129"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_uint256)dyn_storage": {
+            "label": "uint256[]",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)1077": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_array(t_uint256)dyn_storage)": {
+            "label": "mapping(address => uint256[])",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(Account)1861_storage)": {
+            "label": "mapping(address => struct DeFiNodeNexus.Account)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(NftaTier)1807_storage)": {
+            "label": "mapping(uint256 => struct DeFiNodeNexus.NftaTier)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(NftbTier)1822_storage)": {
+            "label": "mapping(uint256 => struct DeFiNodeNexus.NftbTier)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(NodeA)1833_storage)": {
+            "label": "mapping(uint256 => struct DeFiNodeNexus.NodeA)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(NodeB)1844_storage)": {
+            "label": "mapping(uint256 => struct DeFiNodeNexus.NodeB)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_uint256)": {
+            "label": "mapping(uint8 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Account)1861_storage": {
+            "label": "struct DeFiNodeNexus.Account",
+            "members": [
+              {
+                "label": "referrer",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "pendingTot",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "claimedTot",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "withdrawnTot",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "totalNodes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "directReferrals",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "teamNodes",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "teamCommissionEarned",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              }
+            ],
+            "numberOfBytes": "256"
+          },
+          "t_struct(NftaTier)1807_storage": {
+            "label": "struct DeFiNodeNexus.NftaTier",
+            "members": [
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "dailyYield",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "maxSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "currentSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(NftbTier)1822_storage": {
+            "label": "struct DeFiNodeNexus.NftbTier",
+            "members": [
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "weight",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "maxSupply",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "usdtMinted",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "tofMinted",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "dividendBps",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_struct(NodeA)1833_storage": {
+            "label": "struct DeFiNodeNexus.NodeA",
+            "members": [
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "tierId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "dailyYield",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "lastClaimDay",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_struct(NodeB)1844_storage": {
+            "label": "struct DeFiNodeNexus.NodeB",
+            "members": [
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "tierId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "weight",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "rewardDebt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "4"
+              }
+            ],
+            "numberOfBytes": "160"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
           }
         },
         "namespaces": {
