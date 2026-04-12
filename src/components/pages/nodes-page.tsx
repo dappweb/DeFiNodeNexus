@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ethers } from "ethers";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/components/language-provider";
-import { useWeb3 } from "@/lib/web3-provider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
-import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
 import { createDefaultSerializedNftaTiers, createDefaultSerializedNftbTiers } from "@/lib/node-tier-config";
-import { getNftaTierName, getNftbTierName, formatAddress, formatBalance } from "@/lib/ui-config";
+import { getNftaTierName, getNftbTierName } from "@/lib/ui-config";
+import { useWeb3 } from "@/lib/web3-provider";
+import { ethers } from "ethers";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type NftaTier = {
   id: number;
@@ -338,6 +338,19 @@ export function NodesPage() {
   const buyNfta = async () => {
     if (!isConnected || !address || !nexus || selectedNftaTier === null) return;
 
+    const runnerProvider = (nexus.runner as { provider?: ethers.Provider } | undefined)?.provider;
+    if (runnerProvider) {
+      try {
+        const nativeBalance = await runnerProvider.getBalance(address);
+        if (nativeBalance <= 0n) {
+          toast({ title: t("toastBuyNftaFailed"), description: "Gas不足：请先充值主网币后再购买", variant: "destructive" });
+          return;
+        }
+      } catch {
+        // Ignore balance precheck failures and let the tx flow handle errors.
+      }
+    }
+
     const tier = nftaTiers.find((t) => t.id === selectedNftaTier);
     if (!tier || !usdt) return;
     if (!tier.isActive || tier.remaining <= 0n) {
@@ -351,7 +364,7 @@ export function NodesPage() {
       const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
       if (allowance < tier.price) {
         setNftaStage("approving");
-        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price));
+        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price, { gasLimit: 120_000n }));
         if (!approveRes.success) {
           toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
           return;
@@ -361,7 +374,7 @@ export function NodesPage() {
       setNftaStage("purchasing");
       const parsedReferrer = referrer.trim();
       const finalReferrer = ethers.isAddress(parsedReferrer) ? parsedReferrer : ethers.ZeroAddress;
-      const res = await execTx(() => nexus.buyNfta(BigInt(tier.id), finalReferrer));
+      const res = await execTx(() => nexus.buyNfta(BigInt(tier.id), finalReferrer, { gasLimit: 900_000n }));
       if (!res.success) {
         toast({ title: t("toastBuyNftaFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
         return;
@@ -379,6 +392,19 @@ export function NodesPage() {
 
   const buyNftb = async () => {
     if (!isConnected || !address || !nexus || selectedNftbTier === null) return;
+
+    const runnerProvider = (nexus.runner as { provider?: ethers.Provider } | undefined)?.provider;
+    if (runnerProvider) {
+      try {
+        const nativeBalance = await runnerProvider.getBalance(address);
+        if (nativeBalance <= 0n) {
+          toast({ title: t("toastBuyNftbFailed"), description: "Gas不足：请先充值主网币后再购买", variant: "destructive" });
+          return;
+        }
+      } catch {
+        // Ignore balance precheck failures and let the tx flow handle errors.
+      }
+    }
 
     const tier = nftbTiers.find((t) => t.id === selectedNftbTier);
     if (!tier) return;
@@ -401,14 +427,14 @@ export function NodesPage() {
         const allowance = await usdt.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tier.price) {
           setNftbStage("approving");
-          const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price));
+          const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, tier.price, { gasLimit: 120_000n }));
           if (!approveRes.success) {
             toast({ title: t("toastUsdtApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(() => nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer));
+        const res = await execTx(() => nexus.buyNftbWithUsdt(BigInt(tier.id), finalReferrer, { gasLimit: 900_000n }));
         if (!res.success) {
           toast({ title: t("toastBuyNftbFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
           return;
@@ -441,14 +467,14 @@ export function NodesPage() {
         const allowance = await tof.allowance(address, CONTRACTS.NEXUS);
         if (allowance < tofCost) {
           setNftbStage("approving");
-          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tofCost));
+          const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, tofCost, { gasLimit: 120_000n }));
           if (!approveRes.success) {
             toast({ title: t("toastTofApproveFailed"), description: toFriendlyTxError(approveRes.error), variant: "destructive" });
             return;
           }
         }
         setNftbStage("purchasing");
-        const res = await execTx(() => nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer));
+        const res = await execTx(() => nexus.buyNftbWithTof(BigInt(tier.id), finalReferrer, { gasLimit: 900_000n }));
         if (!res.success) {
           toast({ title: t("toastBuyNftbFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
           return;
@@ -663,6 +689,8 @@ export function NodesPage() {
     if (/Not owner/i.test(raw)) return t("toastNotNodeOwner");
     if (/Already claimed today/i.test(raw)) return t("toastAlreadyClaimedToday");
     if (/Transaction rejected by user/i.test(raw)) return t("toastTxRejectedByUser");
+    if (/could not coalesce error/i.test(raw)) return "RPC返回异常，请重试或切换网络后再试";
+    if (/insufficient funds/i.test(raw)) return "主网Gas不足，请先充值后再试";
     if (/unknown custom error/i.test(raw)) return t("toastTofAllowanceOrBalanceHint");
     if (/ERC20InsufficientAllowance/i.test(raw)) return t("toastTofApproveRequired");
     if (/ERC20InsufficientBalance/i.test(raw)) return t("toastTofBalanceInsufficient");
