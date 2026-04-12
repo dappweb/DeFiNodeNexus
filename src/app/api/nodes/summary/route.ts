@@ -132,6 +132,9 @@ export async function GET(request: Request) {
           const remaining = await withRpcRetry(() => nexus.getNftaTierRemaining(id));
           return {
             id,
+            price: toStringValue(tier.price),
+            dailyYield: toStringValue(tier.dailyYield),
+            maxSupply: toStringValue(tier.maxSupply),
             currentSupply: toStringValue(tier.currentSupply),
             isActive: tier.isActive,
             remaining: toStringValue(remaining),
@@ -145,8 +148,12 @@ export async function GET(request: Request) {
           const remaining = await withRpcRetry(() => nexus.getNftbTierRemaining(id));
           return {
             id,
+            price: toStringValue(tier.price),
+            weight: toStringValue(tier.weight),
+            maxSupply: toStringValue(tier.maxSupply),
             usdtMinted: toStringValue(tier.usdtMinted),
             tofMinted: toStringValue(tier.tofMinted),
+            dividendBps: toStringValue(tier.dividendBps),
             isActive: tier.isActive,
             usdtRemaining: toStringValue(remaining[0]),
             tofRemaining: toStringValue(remaining[1]),

@@ -28,6 +28,7 @@ export const CONTRACTS = {
 };
 
 export const NEXUS_ABI = [
+  "function transferOwnership(address newOwner) external",
   "function configureNftaTier(uint256 tierId, uint256 price, uint256 dailyYield, uint256 maxSupply, bool isActive) external returns (uint256)",
   "function configureNftbTier(uint256 tierId, uint256 price, uint256 weight, uint256 maxSupply, uint256 dividendBps, bool isActive) external returns (uint256)",
   "function registerNftaPurchase(address user, uint256 tierId, address referrer) external returns (uint256)",
@@ -113,6 +114,7 @@ export const NEXUS_ABI = [
 ];
 
 export const SWAP_ABI = [
+  "function transferOwnership(address newOwner) external",
   "function addLiquidity(uint256 totAmount, uint256 usdtAmount) external",
   "function removeLiquidity(uint256 totAmount, uint256 usdtAmount) external",
   "function setNexus(address _nexus) external",
