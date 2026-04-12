@@ -365,6 +365,33 @@ export function NodesPage() {
         const allowance = await token.allowance(address, CONTRACTS.NEXUS);
         if (allowance >= required) return true;
 
+        const manualApprove = async (amount: bigint) => {
+          try {
+            const runner = token.runner as ethers.Signer;
+            const provider = (runner as { provider?: ethers.Provider } | undefined)?.provider;
+            if (!runner || !provider) {
+              return { success: false, error: "manual approve unavailable" } as const;
+            }
+
+            const txData = token.interface.encodeFunctionData("approve", [CONTRACTS.NEXUS, amount]);
+            const fee = await provider.getFeeData().catch(() => null);
+            const txReq: ethers.TransactionRequest = {
+              to: await token.getAddress(),
+              data: txData,
+              gasLimit: 220_000n,
+            };
+            if (fee?.gasPrice && fee.gasPrice > 0n) {
+              txReq.gasPrice = fee.gasPrice;
+            }
+
+            const tx = await runner.sendTransaction(txReq);
+            const receipt = await tx.wait();
+            return { success: true, hash: receipt?.hash || tx.hash } as const;
+          } catch (err: any) {
+            return { success: false, error: err?.shortMessage || err?.message || "manual approve failed" } as const;
+          }
+        };
+
         setNftaStage("approving");
         // First try: let the wallet/RPC estimate gas naturally (avoids CNC chain coalesce errors)
         let approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
@@ -374,6 +401,9 @@ export function NodesPage() {
         if (/could not coalesce error|missing revert data|network error/i.test(approveRes.error || "")) {
           approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
           if (approveRes.success) return true;
+
+          const rawApproveRes = await manualApprove(required);
+          if (rawApproveRes.success) return true;
         }
 
         // Compatibility fallback for USDT-like tokens that require resetting allowance to 0 first.
@@ -444,6 +474,33 @@ export function NodesPage() {
         const allowance = await token.allowance(address, CONTRACTS.NEXUS);
         if (allowance >= required) return true;
 
+        const manualApprove = async (amount: bigint) => {
+          try {
+            const runner = token.runner as ethers.Signer;
+            const provider = (runner as { provider?: ethers.Provider } | undefined)?.provider;
+            if (!runner || !provider) {
+              return { success: false, error: "manual approve unavailable" } as const;
+            }
+
+            const txData = token.interface.encodeFunctionData("approve", [CONTRACTS.NEXUS, amount]);
+            const fee = await provider.getFeeData().catch(() => null);
+            const txReq: ethers.TransactionRequest = {
+              to: await token.getAddress(),
+              data: txData,
+              gasLimit: 220_000n,
+            };
+            if (fee?.gasPrice && fee.gasPrice > 0n) {
+              txReq.gasPrice = fee.gasPrice;
+            }
+
+            const tx = await runner.sendTransaction(txReq);
+            const receipt = await tx.wait();
+            return { success: true, hash: receipt?.hash || tx.hash } as const;
+          } catch (err: any) {
+            return { success: false, error: err?.shortMessage || err?.message || "manual approve failed" } as const;
+          }
+        };
+
         setNftbStage("approving");
         // First try: let the wallet/RPC estimate gas naturally (avoids CNC chain coalesce errors)
         let approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required));
@@ -453,6 +510,9 @@ export function NodesPage() {
         if (/could not coalesce error|missing revert data|network error/i.test(approveRes.error || "")) {
           approveRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
           if (approveRes.success) return true;
+
+          const rawApproveRes = await manualApprove(required);
+          if (rawApproveRes.success) return true;
         }
 
         if (allowance > 0n) {
@@ -509,6 +569,35 @@ export function NodesPage() {
         if (tofCost <= 0n) {
           toast({ title: t("toastBuyNftbFailed"), description: t("toastTofRateNotInitialized"), variant: "destructive" });
           return;
+        }
+
+        const tofBalance = await tof.balanceOf(address);
+        if (tofBalance < tofCost) {
+          toast({ title: t("toastBuyNftbFailed"), description: t("toastTofBalanceInsufficient"), variant: "destructive" });
+          return;
+        }
+
+        // TOF is non-transferable by default; either user or Nexus must be whitelisted.
+        try {
+          const tofWhitelistView = new ethers.Contract(
+            CONTRACTS.TOF,
+            ["function transferWhitelist(address) view returns (bool)"],
+            tof.runner
+          );
+          const [isUserWhitelisted, isNexusWhitelisted] = await Promise.all([
+            tofWhitelistView.transferWhitelist(address),
+            tofWhitelistView.transferWhitelist(CONTRACTS.NEXUS),
+          ]);
+          if (!isUserWhitelisted && !isNexusWhitelisted) {
+            toast({
+              title: t("toastBuyNftbFailed"),
+              description: "TOF不可转账：当前钱包与Nexus均未加入白名单，请联系管理员处理",
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch {
+          // Ignore whitelist-read failures; tx execution path will provide final error.
         }
 
         if (!(await ensureAllowance(tof, tofCost, t("toastTofApproveFailed")))) {
@@ -732,6 +821,7 @@ export function NodesPage() {
     if (/Transaction rejected by user/i.test(raw)) return t("toastTxRejectedByUser");
     if (/could not coalesce error/i.test(raw)) return "RPC返回异常，请重试或切换网络后再试";
     if (/insufficient funds/i.test(raw)) return "主网Gas不足，请先充值后再试";
+    if (/TOF non-transferable/i.test(raw)) return "TOF不可转账：当前钱包与Nexus需至少一方在白名单";
     if (/unknown custom error/i.test(raw)) return t("toastTofAllowanceOrBalanceHint");
     if (/ERC20InsufficientAllowance/i.test(raw)) return t("toastTofApproveRequired");
     if (/ERC20InsufficientBalance/i.test(raw)) return t("toastTofBalanceInsufficient");
