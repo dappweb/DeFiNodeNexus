@@ -149,7 +149,8 @@ export function AdminPage() {
   const [externalDexEnabled, setExternalDexEnabled] = useState(false);
   const [swapPaused, setSwapPaused] = useState(false);
 
-  // Swap Owner 转移
+  // Owner 转移
+  const [newNexusOwnerAddr, setNewNexusOwnerAddr] = useState("");
   const [newSwapOwnerAddr, setNewSwapOwnerAddr] = useState("");
 
   const isOwner = useMemo(() => {
@@ -163,6 +164,8 @@ export function AdminPage() {
   }, [address, swapOwnerAddress]);
 
   const isAdmin = isOwner || isSwapOwner;
+  const nexusAdminLabel = isOwner ? "✅ Nexus 管理员" : "👁️ Nexus 只读";
+  const swapAdminLabel = isSwapOwner ? "✅ Swap 管理员" : "👁️ Swap 只读";
 
   const NEXUS_ADDR = process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "";
   const SWAP_ADDR  = process.env.NEXT_PUBLIC_SWAP_ADDRESS  || "";
@@ -231,10 +234,22 @@ export function AdminPage() {
       setProjectAddr(proj);
 
       if (swap) {
+        const readonlySwap = new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider());
+
         try {
           const swapOwner = await swap.owner();
-          const [router, pair, factory, enabled, paused] = await swap.getRouterConfig();
           setSwapOwnerAddress(String(swapOwner || ""));
+        } catch {
+          try {
+            const swapOwner = await readonlySwap.owner();
+            setSwapOwnerAddress(String(swapOwner || ""));
+          } catch {
+            setSwapOwnerAddress("");
+          }
+        }
+
+        try {
+          const [router, pair, factory, enabled, paused] = await swap.getRouterConfig();
           setDexRouterAddr(String(router || ""));
           setDexPairAddr(String(pair || ""));
           setDexFactoryAddr(String(factory || ""));
@@ -242,17 +257,16 @@ export function AdminPage() {
           setSwapPaused(Boolean(paused));
         } catch {
           try {
-            const readonlySwap = new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider());
-            const swapOwner = await readonlySwap.owner();
             const [router, pair, factory, enabled, paused] = await readonlySwap.getRouterConfig();
-            setSwapOwnerAddress(String(swapOwner || ""));
             setDexRouterAddr(String(router || ""));
             setDexPairAddr(String(pair || ""));
             setDexFactoryAddr(String(factory || ""));
             setExternalDexEnabled(Boolean(enabled));
             setSwapPaused(Boolean(paused));
           } catch {
-            setSwapOwnerAddress("");
+            setDexRouterAddr("");
+            setDexPairAddr("");
+            setDexFactoryAddr("");
             setExternalDexEnabled(false);
             setSwapPaused(false);
           }
@@ -815,6 +829,37 @@ export function AdminPage() {
     await runTx("应急提取", () => swap.emergencyWithdraw(emergencyTokenAddr.trim(), amount));
   };
 
+  const onTransferNexusOwner = async () => {
+    if (!isOwner) {
+      toast({ title: "权限不足", description: "只有Nexus Owner才能转移所有权", variant: "destructive" });
+      return;
+    }
+
+    if (!nexus) {
+      toast({ title: "错误", description: "Nexus合约未加载", variant: "destructive" });
+      return;
+    }
+
+    if (!ethers.isAddress(newNexusOwnerAddr.trim())) {
+      toast({ title: "参数错误", description: "新Owner地址无效", variant: "destructive" });
+      return;
+    }
+
+    if (newNexusOwnerAddr.trim().toLowerCase() === ownerAddress.toLowerCase()) {
+      toast({ title: "参数错误", description: "新Owner与当前Owner相同", variant: "destructive" });
+      return;
+    }
+
+    // Confirm with user
+    const confirmed = window.confirm(
+      `确认转移Nexus Owner权限吗？\n当前Owner: ${ownerAddress}\n新Owner: ${newNexusOwnerAddr}\n\n此操作不可逆！`
+    );
+    if (!confirmed) return;
+
+    await runTx("转移Nexus Owner", () => nexus.transferOwnership(newNexusOwnerAddr.trim()));
+    setNewNexusOwnerAddr("");
+  };
+
   const onTransferSwapOwner = async () => {
     if (!isSwapOwner) {
       toast({ title: "权限不足", description: "只有Swap Owner才能转移所有权", variant: "destructive" });
@@ -852,18 +897,36 @@ export function AdminPage() {
         <CardHeader>
           <CardTitle>管理员面板</CardTitle>
           <CardDescription>
-            Nexus Owner: {formatAddress(ownerAddress)} ｜ Swap Owner: {formatAddress(swapOwnerAddress)} ｜ 当前钱包: {isAdmin ? "✅ 管理员" : "👁️ 只读"}
+            分离展示 Nexus 与 Swap 的治理权限，避免不同合约角色混淆。
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-xs text-muted-foreground">
-          {!isConnected ? "请先连接钱包。" : "Nexus治理按Nexus Owner鉴权，DEX配置按Swap Owner鉴权。"}
+        <CardContent className="space-y-3 text-xs text-muted-foreground">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+              <div className="font-medium text-foreground">Nexus 治理</div>
+              <div>Owner: {ownerAddress ? formatAddress(ownerAddress) : "读取中..."}</div>
+              <div>{nexusAdminLabel}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+              <div className="font-medium text-foreground">Swap 治理</div>
+              <div>Owner: {swapOwnerAddress ? formatAddress(swapOwnerAddress) : "读取中..."}</div>
+              <div>{swapAdminLabel}</div>
+            </div>
+          </div>
+          <div>
+            {!isConnected
+              ? "请先连接钱包。"
+              : isAdmin
+                ? "当前钱包至少拥有一个管理角色；Nexus 与 Swap 将按各自 Owner 分别鉴权。"
+                : "当前钱包没有管理权限，页面仅展示只读信息。"}
+          </div>
         </CardContent>
       </Card>
 
       <Card className="glass-panel border-blue-500/30">
         <CardHeader>
-          <CardTitle>主合约（Nexus）配置区</CardTitle>
-          <CardDescription>以下卡片均为主合约治理与业务参数配置</CardDescription>
+          <CardTitle>Nexus 配置面板</CardTitle>
+          <CardDescription>主合约治理、节点参数、钱包与分发配置</CardDescription>
         </CardHeader>
       </Card>
 
@@ -875,6 +938,35 @@ export function AdminPage() {
         setLoading={setLoading}
         onRefreshParent={refresh}
       />
+
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>Nexus Owner 转移</CardTitle>
+          <CardDescription>转移主合约所有权到新地址（仅Owner可操作，不可逆）</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Alert className="border-amber-500/50 bg-amber-500/5">
+            <AlertDescription className="text-xs text-amber-400">
+              ⚠️ <strong>警告：</strong>此操作将永久转移 Nexus 合约的所有权。请确保新地址有效且由您控制。此操作不可逆！
+            </AlertDescription>
+          </Alert>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <Input 
+              value={newNexusOwnerAddr} 
+              onChange={(e) => setNewNexusOwnerAddr(e.target.value)} 
+              placeholder="新Owner地址 0x..."
+              disabled={!isOwner || loading}
+            />
+            <Button 
+              variant="destructive" 
+              disabled={!isOwner || loading || !newNexusOwnerAddr.trim() || !nexus}
+              onClick={onTransferNexusOwner}
+            >
+              {loading ? "处理中..." : "转移Owner"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="glass-panel">
         <CardHeader>
@@ -1274,8 +1366,8 @@ export function AdminPage() {
 
       <Card className="glass-panel border-amber-500/30">
         <CardHeader>
-          <CardTitle>Swap 合约配置区</CardTitle>
-          <CardDescription>以下卡片均为 Swap 合约参数与交易引擎配置</CardDescription>
+          <CardTitle>Swap 配置面板</CardTitle>
+          <CardDescription>交易引擎、DEX 路由、流动性与费率配置</CardDescription>
         </CardHeader>
       </Card>
 
@@ -1345,7 +1437,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={addLiquidityTot} onChange={(e) => setAddLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={addLiquidityUsdt} onChange={(e) => setAddLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
+              <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
             </div>
           </div>
           <div className="space-y-2">
@@ -1353,7 +1445,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={removeLiquidityTot} onChange={(e) => setRemoveLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={removeLiquidityUsdt} onChange={(e) => setRemoveLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button variant="outline" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
+              <Button variant="outline" disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
             </div>
           </div>
         </CardContent>
@@ -1386,31 +1478,31 @@ export function AdminPage() {
             <Input value={buyFeeBps} onChange={(e) => setBuyFeeBps(e.target.value)} placeholder="买入费率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetBuyFeeBps}>设置买入费率</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetBuyFeeBps}>设置买入费率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={sellFeeBps} onChange={(e) => setSellFeeBps(e.target.value)} placeholder="卖出费率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetSellFeeBps}>设置卖出费率</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetSellFeeBps}>设置卖出费率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={profitTaxBps} onChange={(e) => setProfitTaxBps(e.target.value)} placeholder="利润税率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetProfitTaxBps}>设置利润税率</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetProfitTaxBps}>设置利润税率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={deflationBps} onChange={(e) => setDeflationBps(e.target.value)} placeholder="通胀比率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onSetDeflationBps}>设置通胀比率</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onSetDeflationBps}>设置通胀比率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <div className="text-xs text-muted-foreground flex items-center">触发一次 4h 通缩逻辑</div>
             <div />
             <div />
-            <Button variant="secondary" disabled={!isOwner || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
+            <Button variant="secondary" disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>
@@ -1443,17 +1535,17 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={distributionThreshold} onChange={(e) => setDistributionThreshold(e.target.value)} placeholder="分配阈值" />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetDistributionThreshold}>设置分配阈值</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDistributionThreshold}>设置分配阈值</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={maxDailyBuy} onChange={(e) => setMaxDailyBuy(e.target.value)} placeholder="日购买上限" />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetMaxDailyBuy}>设置日购买上限</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetMaxDailyBuy}>设置日购买上限</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={maxSellBps} onChange={(e) => setMaxSellBps(e.target.value)} placeholder="最大卖出比例 bps" />
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetMaxSellBps}>设置卖出比例</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetMaxSellBps}>设置卖出比例</Button>
           </div>
         </CardContent>
       </Card>
@@ -1490,19 +1582,19 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Input value={newNexusAddr} onChange={(e) => setNewNexusAddr(e.target.value)} placeholder="Nexus合约地址 0x..." />
               <div />
-              <Button variant="outline" disabled={!isOwner || loading || !swap} onClick={onSetNexus}>设置Nexus</Button>
+              <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetNexus}>设置Nexus</Button>
             </div>
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">强制分配</strong></div>
-            <Button disabled={!isOwner || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
+            <Button disabled={!isSwapOwner || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">应急提取</strong></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Input value={emergencyTokenAddr} onChange={(e) => setEmergencyTokenAddr(e.target.value)} placeholder="Token地址 0x..." />
               <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="提取金额" />
-              <Button variant="destructive" disabled={!isOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
+              <Button variant="destructive" disabled={!isSwapOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
             </div>
           </div>
 
