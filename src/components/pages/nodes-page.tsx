@@ -301,36 +301,31 @@ export function NodesPage() {
   }, [address, nexus]);
 
   /**
-   * Send an ERC-20 approve() via window.ethereum.request (bypasses ethers completely).
-   * Receipt polling also bypasses ethers – uses raw fetch + JSON-RPC.
+   * Send any transaction via window.ethereum.request (bypasses ethers completely).
+   * Receipt polling uses raw fetch + JSON-RPC to avoid ethers RPC parsing issues on CNC chain.
    */
-  const rawApproveViaWallet = useCallback(async (
-    tokenAddress: string,
-    spenderAddress: string,
-    amount: bigint,
+  const rawSendViaWallet = useCallback(async (
+    to: string,
+    data: string,
     from: string,
+    gasLimit = 220_000,
   ): Promise<{ success: boolean; hash?: string; error?: string }> => {
     const ethereum = (window as Window & { ethereum?: { request: (a: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
     if (!ethereum) return { success: false, error: "wallet unavailable" };
 
     try {
-      const spenderHex = spenderAddress.toLowerCase().replace("0x", "").padStart(64, "0");
-      const amtHex = amount.toString(16).padStart(64, "0");
-      const data = "0x095ea7b3" + spenderHex + amtHex;
-
       const txHash = await ethereum.request({
         method: "eth_sendTransaction",
         params: [{
           from,
-          to: tokenAddress.toLowerCase(),
+          to: to.toLowerCase(),
           data,
-          gas: "0x" + (220_000).toString(16),
+          gas: "0x" + gasLimit.toString(16),
         }],
       }) as string;
 
       if (!txHash) return { success: false, error: "no tx hash returned" };
 
-      // Poll receipt via raw fetch (avoid ethers RPC response parsing issues)
       const rpcUrl = "https://rpc.cncchainpro.com";
       const pollReceipt = async (hash: string, attempts = 40, intervalMs = 3000): Promise<number | null> => {
         for (let i = 0; i < attempts; i++) {
@@ -350,16 +345,29 @@ export function NodesPage() {
 
       const status = await pollReceipt(txHash);
       if (status === 1) return { success: true, hash: txHash };
-      if (status === 0) return { success: false, hash: txHash, error: "交易已上链但被回滚(reverted)，请检查合约状态" };
-      return { success: false, hash: txHash, error: "等待交易确认超时，请在浏览器中查询 " + txHash.slice(0, 10) + "..." };
+      if (status === 0) return { success: false, hash: txHash, error: "交易已上链但被回滚(reverted)" };
+      return { success: false, hash: txHash, error: "等待交易确认超时，请查询 " + txHash.slice(0, 10) + "..." };
     } catch (err: unknown) {
       const e = err as { message?: string; shortMessage?: string; code?: number };
       if (e.code === 4001 || /user rejected|user denied|ACTION_REJECTED/i.test(e.message || "")) {
-        return { success: false, error: "用户取消了授权" };
+        return { success: false, error: "用户取消了操作" };
       }
       return { success: false, error: e.shortMessage || e.message || "钱包发送交易失败" };
     }
   }, []);
+
+  /** Build approve calldata and send via rawSendViaWallet */
+  const rawApproveViaWallet = useCallback(async (
+    tokenAddress: string,
+    spenderAddress: string,
+    amount: bigint,
+    from: string,
+  ): Promise<{ success: boolean; hash?: string; error?: string }> => {
+    const spenderHex = spenderAddress.toLowerCase().replace("0x", "").padStart(64, "0");
+    const amtHex = amount.toString(16).padStart(64, "0");
+    const data = "0x095ea7b3" + spenderHex + amtHex;
+    return rawSendViaWallet(tokenAddress, data, from);
+  }, [rawSendViaWallet]);
 
   const ensureTofReady = useCallback(async (
     requiredTof: bigint,
@@ -390,7 +398,11 @@ export function NodesPage() {
       // Primary: try raw wallet approve (bypasses ethers completely – avoids CNC chain RPC parse issues)
       const tofAddr = await tof.getAddress();
       const rawRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, requiredTof, address);
-      if (rawRes.success) return true;
+      if (rawRes.success) {
+        // Verify allowance actually changed on-chain before proceeding
+        const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
+        if (newAllowance >= requiredTof) return true;
+      }
 
       // If user cancelled, stop immediately
       if (/用户取消/i.test(rawRes.error || "")) {
@@ -400,19 +412,25 @@ export function NodesPage() {
 
       // Fallback: try ethers with explicit gasLimit
       const ethersRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof, { gasLimit: 200_000n }));
-      if (ethersRes.success) return true;
+      if (ethersRes.success) {
+        const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
+        if (newAllowance >= requiredTof) return true;
+      }
 
       // If existing allowance > 0, try reset-to-zero pattern
       if (allowance > 0n) {
         const clearRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, 0n, address);
         if (clearRes.success) {
           const retryRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, requiredTof, address);
-          if (retryRes.success) return true;
+          if (retryRes.success) {
+            const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
+            if (newAllowance >= requiredTof) return true;
+          }
         }
       }
 
-      // All attempts failed – show the raw wallet error (most informative)
-      toast({ title: failTitle, description: rawRes.error || "授权失败，请重试", variant: "destructive" });
+      // All attempts failed – show error
+      toast({ title: failTitle, description: rawRes.error || "TOF授权失败，请重试", variant: "destructive" });
       return false;
     }
 
@@ -454,19 +472,28 @@ export function NodesPage() {
 
         // Primary: raw wallet approve (bypasses ethers completely)
         const rawRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-        if (rawRes.success) return true;
+        if (rawRes.success) {
+          const verified = await token.allowance(address, CONTRACTS.NEXUS);
+          if (verified >= required) return true;
+        }
         if (/用户取消/i.test(rawRes.error || "")) { toast({ title: failTitle, description: rawRes.error, variant: "destructive" }); return false; }
 
         // Fallback: ethers with explicit gasLimit
         const ethersRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
-        if (ethersRes.success) return true;
+        if (ethersRes.success) {
+          const verified = await token.allowance(address, CONTRACTS.NEXUS);
+          if (verified >= required) return true;
+        }
 
         // If existing allowance > 0, try reset-to-zero pattern
         if (allowance > 0n) {
           const clearRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, 0n, address!);
           if (clearRes.success) {
             const retryRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-            if (retryRes.success) return true;
+            if (retryRes.success) {
+              const verified = await token.allowance(address, CONTRACTS.NEXUS);
+              if (verified >= required) return true;
+            }
           }
         }
 
@@ -532,19 +559,28 @@ export function NodesPage() {
 
         // Primary: raw wallet approve (bypasses ethers completely)
         const rawRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-        if (rawRes.success) return true;
+        if (rawRes.success) {
+          const verified = await token.allowance(address, CONTRACTS.NEXUS);
+          if (verified >= required) return true;
+        }
         if (/用户取消/i.test(rawRes.error || "")) { toast({ title: failTitle, description: rawRes.error, variant: "destructive" }); return false; }
 
         // Fallback: ethers with explicit gasLimit
         const ethersRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
-        if (ethersRes.success) return true;
+        if (ethersRes.success) {
+          const verified = await token.allowance(address, CONTRACTS.NEXUS);
+          if (verified >= required) return true;
+        }
 
         // If existing allowance > 0, try reset-to-zero pattern
         if (allowance > 0n) {
           const clearRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, 0n, address!);
           if (clearRes.success) {
             const retryRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-            if (retryRes.success) return true;
+            if (retryRes.success) {
+              const verified = await token.allowance(address, CONTRACTS.NEXUS);
+              if (verified >= required) return true;
+            }
           }
         }
 
@@ -689,18 +725,30 @@ export function NodesPage() {
       if (!tofReady) return;
 
       setNftaStage("confirming");
-      const claimRes = await execTx(() => nexus.claimAllNftaYield());
+      let claimRes = await execTx(() => nexus.claimAllNftaYield());
       if (!claimRes.success) {
-        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
-        return;
+        // Fallback: raw wallet send
+        const nexusAddr = await nexus.getAddress();
+        const rawClaim = await rawSendViaWallet(nexusAddr, "0x9a291bf2", address, 900_000);
+        if (!rawClaim.success) {
+          toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error) || rawClaim.error, variant: "destructive" });
+          return;
+        }
+        claimRes = rawClaim;
       }
 
       setNftaStage("confirming");
-      const withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
+      const amtHex = claimAmount.toString(16).padStart(64, "0");
+      let withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
       if (!withdrawRes.success) {
-        toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-        await refreshData(false);
-        return;
+        const nexusAddr = await nexus.getAddress();
+        const rawWithdraw = await rawSendViaWallet(nexusAddr, "0x699a4d40" + amtHex, address, 900_000);
+        if (!rawWithdraw.success) {
+          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+        withdrawRes = rawWithdraw;
       }
 
       toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
@@ -735,17 +783,28 @@ export function NodesPage() {
       );
       if (!tofReady) return;
 
-      const claimRes = await execTx(() => nexus.claimAllNftbDividends());
+      let claimRes = await execTx(() => nexus.claimAllNftbDividends());
       if (!claimRes.success) {
-        toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error), variant: "destructive" });
-        return;
+        const nexusAddr = await nexus.getAddress();
+        const rawClaim = await rawSendViaWallet(nexusAddr, "0x43f61cd8", address, 900_000);
+        if (!rawClaim.success) {
+          toast({ title: t("toastClaimFailed"), description: toFriendlyTxError(claimRes.error) || rawClaim.error, variant: "destructive" });
+          return;
+        }
+        claimRes = rawClaim;
       }
 
-      const withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
+      const amtHex = claimAmount.toString(16).padStart(64, "0");
+      let withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
       if (!withdrawRes.success) {
-        toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-        await refreshData(false);
-        return;
+        const nexusAddr = await nexus.getAddress();
+        const rawWithdraw = await rawSendViaWallet(nexusAddr, "0x699a4d40" + amtHex, address, 900_000);
+        if (!rawWithdraw.success) {
+          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
+          await refreshData(false);
+          return;
+        }
+        withdrawRes = rawWithdraw;
       }
 
       toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
