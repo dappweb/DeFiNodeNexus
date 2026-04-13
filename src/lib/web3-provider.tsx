@@ -1,9 +1,10 @@
 
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi';
 import { ethers } from 'ethers';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import type { WalletClient } from 'viem';
+import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi';
 
 type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -19,6 +20,7 @@ interface Web3ContextType {
   isConnecting: boolean;
   provider: ethers.Provider | null;
   signer: ethers.Signer | null;
+  walletClient: WalletClient | null;
   connect: () => void;
   addProjectTokens: () => Promise<void>;
   disconnect: () => void;
@@ -97,6 +99,7 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       isConnecting,
       provider: ethersProvider,
       signer: ethersSigner,
+      walletClient: walletClient ?? null,
       connect: handleConnect,
       addProjectTokens,
       disconnect,

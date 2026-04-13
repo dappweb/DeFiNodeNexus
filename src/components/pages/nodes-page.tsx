@@ -122,7 +122,7 @@ const DEFAULT_NFTB_TIERS: NftbTier[] = createDefaultSerializedNftbTiers().map((t
 
 export function NodesPage() {
   const { t } = useLanguage();
-  const { address, isConnected } = useWeb3();
+  const { address, isConnected, walletClient } = useWeb3();
   const { toast } = useToast();
   const nexus = useNexusContract();
   const usdt = useERC20Contract(CONTRACTS.USDT);
@@ -314,6 +314,7 @@ export function NodesPage() {
     if (!ethereum) return { success: false, error: "wallet unavailable" };
 
     try {
+      console.log("[rawSend] to:", to, "from:", from, "gas:", gasLimit, "data:", data.slice(0, 10));
       const txHash = await ethereum.request({
         method: "eth_sendTransaction",
         params: [{
@@ -324,6 +325,7 @@ export function NodesPage() {
         }],
       }) as string;
 
+      console.log("[rawSend] txHash:", txHash);
       if (!txHash) return { success: false, error: "no tx hash returned" };
 
       const rpcUrl = "https://rpc.cncchainpro.com";
@@ -344,11 +346,13 @@ export function NodesPage() {
       };
 
       const status = await pollReceipt(txHash);
+      console.log("[rawSend] receipt status:", status);
       if (status === 1) return { success: true, hash: txHash };
       if (status === 0) return { success: false, hash: txHash, error: "交易已上链但被回滚(reverted)" };
       return { success: false, hash: txHash, error: "等待交易确认超时，请查询 " + txHash.slice(0, 10) + "..." };
     } catch (err: unknown) {
       const e = err as { message?: string; shortMessage?: string; code?: number };
+      console.error("[rawSend] error:", e.code, e.message);
       if (e.code === 4001 || /user rejected|user denied|ACTION_REJECTED/i.test(e.message || "")) {
         return { success: false, error: "用户取消了操作" };
       }
@@ -356,18 +360,71 @@ export function NodesPage() {
     }
   }, []);
 
-  /** Build approve calldata and send via rawSendViaWallet */
-  const rawApproveViaWallet = useCallback(async (
+  /**
+   * Approve ERC-20 token via multiple methods:
+   * 1. viem walletClient.writeContract (best compatibility with wagmi wallet)
+   * 2. raw eth_sendTransaction (bypasses all libraries)
+   * 3. ethers with explicit gasLimit (last resort)
+   * Approves maxUint256 so user only needs to approve once.
+   */
+  const viemApprove = useCallback(async (
     tokenAddress: string,
     spenderAddress: string,
-    amount: bigint,
     from: string,
   ): Promise<{ success: boolean; hash?: string; error?: string }> => {
+    const maxApproval = 2n ** 256n - 1n;
+
+    const rpcUrl = "https://rpc.cncchainpro.com";
+    const pollReceipt = async (hash: string, attempts = 40, intervalMs = 3000): Promise<number | null> => {
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const res = await fetch(rpcUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getTransactionReceipt", params: [hash], id: 1 }),
+          });
+          const json = await res.json() as { result?: { status?: string } | null };
+          if (json.result?.status) return parseInt(json.result.status, 16);
+        } catch { /* retry */ }
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
+      return null;
+    };
+
+    // Method 1: viem walletClient.writeContract
+    if (walletClient) {
+      try {
+        console.log("[viemApprove] using walletClient.writeContract, token:", tokenAddress, "spender:", spenderAddress);
+        const hash = await walletClient.writeContract({
+          address: tokenAddress as Hex,
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [spenderAddress as Hex, maxApproval],
+          gas: 220_000n,
+        });
+        console.log("[viemApprove] txHash:", hash);
+        const status = await pollReceipt(hash);
+        console.log("[viemApprove] receipt status:", status);
+        if (status === 1) return { success: true, hash };
+        if (status === 0) return { success: false, hash, error: "approve交易被回滚" };
+        return { success: false, hash, error: "等待确认超时" };
+      } catch (err: unknown) {
+        const e = err as { message?: string; shortMessage?: string; code?: number; name?: string };
+        console.error("[viemApprove] walletClient error:", e.code, e.name, e.message?.slice(0, 200));
+        if (e.code === 4001 || /user rejected|user denied|ACTION_REJECTED/i.test(e.message || "")) {
+          return { success: false, error: "用户取消了授权" };
+        }
+        // Fall through to raw method
+      }
+    }
+
+    // Method 2: raw eth_sendTransaction
+    console.log("[viemApprove] fallback to rawSendViaWallet");
     const spenderHex = spenderAddress.toLowerCase().replace("0x", "").padStart(64, "0");
-    const amtHex = amount.toString(16).padStart(64, "0");
+    const amtHex = maxApproval.toString(16).padStart(64, "0");
     const data = "0x095ea7b3" + spenderHex + amtHex;
     return rawSendViaWallet(tokenAddress, data, from);
-  }, [rawSendViaWallet]);
+  }, [walletClient, rawSendViaWallet]);
 
   const ensureTofReady = useCallback(async (
     requiredTof: bigint,
@@ -395,47 +452,34 @@ export function NodesPage() {
     if (allowance < requiredTof) {
       setNftaStage(stage);
 
-      // Primary: try raw wallet approve (bypasses ethers completely – avoids CNC chain RPC parse issues)
+      // Primary: viem walletClient.writeContract (maxUint256 approve)
       const tofAddr = await tof.getAddress();
-      const rawRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, requiredTof, address);
-      if (rawRes.success) {
-        // Verify allowance actually changed on-chain before proceeding
-        const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
-        if (newAllowance >= requiredTof) return true;
-      }
+      console.log("[ensureTofReady] approve needed, tofAddr:", tofAddr, "required:", requiredTof.toString());
+      const approveRes = await viemApprove(tofAddr, CONTRACTS.NEXUS, address);
 
-      // If user cancelled, stop immediately
-      if (/用户取消/i.test(rawRes.error || "")) {
-        toast({ title: failTitle, description: rawRes.error, variant: "destructive" });
+      if (/用户取消/i.test(approveRes.error || "")) {
+        toast({ title: failTitle, description: approveRes.error, variant: "destructive" });
         return false;
       }
 
-      // Fallback: try ethers with explicit gasLimit
+      // Always verify allowance on-chain regardless of reported success
+      const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
+      console.log("[ensureTofReady] post-approve allowance:", newAllowance.toString());
+      if (newAllowance >= requiredTof) return true;
+
+      // Last resort: ethers with explicit gasLimit
       const ethersRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof, { gasLimit: 200_000n }));
       if (ethersRes.success) {
-        const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
-        if (newAllowance >= requiredTof) return true;
+        const verifiedAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
+        if (verifiedAllowance >= requiredTof) return true;
       }
 
-      // If existing allowance > 0, try reset-to-zero pattern
-      if (allowance > 0n) {
-        const clearRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, 0n, address);
-        if (clearRes.success) {
-          const retryRes = await rawApproveViaWallet(tofAddr, CONTRACTS.NEXUS, requiredTof, address);
-          if (retryRes.success) {
-            const newAllowance = await tof.allowance(address, CONTRACTS.NEXUS);
-            if (newAllowance >= requiredTof) return true;
-          }
-        }
-      }
-
-      // All attempts failed – show error
-      toast({ title: failTitle, description: rawRes.error || "TOF授权失败，请重试", variant: "destructive" });
+      toast({ title: failTitle, description: approveRes.error || "TOF授权失败，请打开浏览器控制台查看详情后联系客服", variant: "destructive" });
       return false;
     }
 
     return true;
-  }, [address, rawApproveViaWallet, t, toast, tof]);
+  }, [address, viemApprove, t, toast, tof]);
 
   const buyNfta = async () => {
     if (!isConnected || !address || !nexus || selectedNftaTier === null) return;
@@ -470,34 +514,20 @@ export function NodesPage() {
         const tokenAddr = await token.getAddress();
         setNftaStage("approving");
 
-        // Primary: raw wallet approve (bypasses ethers completely)
-        const rawRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-        if (rawRes.success) {
-          const verified = await token.allowance(address, CONTRACTS.NEXUS);
-          if (verified >= required) return true;
-        }
-        if (/用户取消/i.test(rawRes.error || "")) { toast({ title: failTitle, description: rawRes.error, variant: "destructive" }); return false; }
+        const approveRes = await viemApprove(tokenAddr, CONTRACTS.NEXUS, address!);
+        if (/用户取消/i.test(approveRes.error || "")) { toast({ title: failTitle, description: approveRes.error, variant: "destructive" }); return false; }
 
-        // Fallback: ethers with explicit gasLimit
+        const verified = await token.allowance(address, CONTRACTS.NEXUS);
+        if (verified >= required) return true;
+
+        // Last resort: ethers
         const ethersRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
         if (ethersRes.success) {
-          const verified = await token.allowance(address, CONTRACTS.NEXUS);
-          if (verified >= required) return true;
+          const v2 = await token.allowance(address, CONTRACTS.NEXUS);
+          if (v2 >= required) return true;
         }
 
-        // If existing allowance > 0, try reset-to-zero pattern
-        if (allowance > 0n) {
-          const clearRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, 0n, address!);
-          if (clearRes.success) {
-            const retryRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-            if (retryRes.success) {
-              const verified = await token.allowance(address, CONTRACTS.NEXUS);
-              if (verified >= required) return true;
-            }
-          }
-        }
-
-        toast({ title: failTitle, description: rawRes.error || "授权失败，请重试", variant: "destructive" });
+        toast({ title: failTitle, description: approveRes.error || "授权失败，请打开控制台查看详情", variant: "destructive" });
         return false;
       };
 
@@ -557,34 +587,20 @@ export function NodesPage() {
         const tokenAddr = await token.getAddress();
         setNftbStage("approving");
 
-        // Primary: raw wallet approve (bypasses ethers completely)
-        const rawRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-        if (rawRes.success) {
-          const verified = await token.allowance(address, CONTRACTS.NEXUS);
-          if (verified >= required) return true;
-        }
-        if (/用户取消/i.test(rawRes.error || "")) { toast({ title: failTitle, description: rawRes.error, variant: "destructive" }); return false; }
+        const approveRes = await viemApprove(tokenAddr, CONTRACTS.NEXUS, address!);
+        if (/用户取消/i.test(approveRes.error || "")) { toast({ title: failTitle, description: approveRes.error, variant: "destructive" }); return false; }
 
-        // Fallback: ethers with explicit gasLimit
+        const verified = await token.allowance(address, CONTRACTS.NEXUS);
+        if (verified >= required) return true;
+
+        // Last resort: ethers
         const ethersRes = await execTx(() => token.approve(CONTRACTS.NEXUS, required, { gasLimit: 200_000n }));
         if (ethersRes.success) {
-          const verified = await token.allowance(address, CONTRACTS.NEXUS);
-          if (verified >= required) return true;
+          const v2 = await token.allowance(address, CONTRACTS.NEXUS);
+          if (v2 >= required) return true;
         }
 
-        // If existing allowance > 0, try reset-to-zero pattern
-        if (allowance > 0n) {
-          const clearRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, 0n, address!);
-          if (clearRes.success) {
-            const retryRes = await rawApproveViaWallet(tokenAddr, CONTRACTS.NEXUS, required, address!);
-            if (retryRes.success) {
-              const verified = await token.allowance(address, CONTRACTS.NEXUS);
-              if (verified >= required) return true;
-            }
-          }
-        }
-
-        toast({ title: failTitle, description: rawRes.error || "授权失败，请重试", variant: "destructive" });
+        toast({ title: failTitle, description: approveRes.error || "授权失败，请打开控制台查看详情", variant: "destructive" });
         return false;
       };
 
