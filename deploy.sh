@@ -19,6 +19,9 @@ APP_NAME="definodenexus"
 APP_PORT="9002"
 PROXY_CADDY_TEMPLATE="$APP_DIR/deploy/linux/Caddyfile"
 CADDY_CONF_DST="/etc/caddy/Caddyfile"
+CADDY_SITES_DIR="/etc/caddy/sites-enabled"
+CADDY_SITE_NAME="${CADDY_SITE_NAME:-definodenexus-t1}"
+CADDY_SITE_CONF_DST="$CADDY_SITES_DIR/${CADDY_SITE_NAME}.caddy"
 OPENRESTY_CONF_DST="/etc/openresty/conf.d/definodexus.conf"
 OPENRESTY_1PANEL_CONF_DST="/opt/1panel/docker/compose/openresty/conf.d/definodexus.conf"
 NGINX_CONF_DST="/etc/nginx/sites-available/definodexus"
@@ -126,31 +129,36 @@ step "[5/6] 检查反向代理配置 (Caddy 优先)"
 # 保证目录有反向代理可读权限
 sudo chmod o+x /home/ubuntu 2>/dev/null || true
 
-# 同步 Caddy 模板。如果 Caddyfile 已含多站点配置（非模板生成），跳过覆盖避免破坏。
+# 同步 Caddy 站点模板（不会覆盖主 Caddyfile，避免影响其他站点）。
 if command -v caddy &>/dev/null && [[ -f "$PROXY_CADDY_TEMPLATE" ]] && [[ -d "/etc/caddy" ]]; then
-  if grep -q "__APP_DOMAIN__\|__UPSTREAM__" "$CADDY_CONF_DST" 2>/dev/null || [[ ! -f "$CADDY_CONF_DST" ]]; then
-    TMP_CADDY="$(mktemp)"
-    sed \
-      -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
-      -e "s|__UPSTREAM__|127.0.0.1:$APP_PORT|g" \
-      "$PROXY_CADDY_TEMPLATE" > "$TMP_CADDY"
+  TMP_CADDY="$(mktemp)"
+  sed \
+    -e "s|__APP_DOMAIN__|$APP_DOMAIN|g" \
+    -e "s|__UPSTREAM__|127.0.0.1:$APP_PORT|g" \
+    "$PROXY_CADDY_TEMPLATE" > "$TMP_CADDY"
 
-    sudo install -m 644 "$TMP_CADDY" "$CADDY_CONF_DST"
-    rm -f "$TMP_CADDY"
+  sudo mkdir -p "$CADDY_SITES_DIR"
+  sudo install -m 644 "$TMP_CADDY" "$CADDY_SITE_CONF_DST"
+  rm -f "$TMP_CADDY"
 
-    sudo caddy validate --config "$CADDY_CONF_DST"
-    if systemctl is-active --quiet caddy; then
-      sudo systemctl reload caddy
-    else
-      sudo systemctl enable --now caddy
+  if [[ -f "$CADDY_CONF_DST" ]]; then
+    if ! sudo grep -qF "import $CADDY_SITES_DIR/*.caddy" "$CADDY_CONF_DST"; then
+      warn "主 Caddyfile 未包含 sites-enabled，自动追加 import（不改动其他站点配置）"
+      printf "\n# DeFiNodeNexus managed include\nimport %s/*.caddy\n" "$CADDY_SITES_DIR" \
+        | sudo tee -a "$CADDY_CONF_DST" >/dev/null
     fi
-    echo "  Caddy 配置已同步并重载: $CADDY_CONF_DST"
   else
-    warn "检测到自定义多站点 Caddyfile，跳过模板覆盖（如需更新请手动编辑 $CADDY_CONF_DST）"
-    if systemctl is-active --quiet caddy; then
-      echo "  Caddy 当前运行中，无需重载"
-    fi
+    printf "import %s/*.caddy\n" "$CADDY_SITES_DIR" | sudo tee "$CADDY_CONF_DST" >/dev/null
+    echo "  已创建主 Caddyfile 并启用 sites-enabled 导入: $CADDY_CONF_DST"
   fi
+
+  sudo caddy validate --config "$CADDY_CONF_DST"
+  if systemctl is-active --quiet caddy; then
+    sudo systemctl reload caddy
+  else
+    sudo systemctl enable --now caddy
+  fi
+  echo "  Caddy 站点已同步并重载: $CADDY_SITE_CONF_DST (domain: $APP_DOMAIN)"
 elif [[ -d "/opt/1panel/docker/compose/openresty/conf.d" ]]; then
   if [[ -f "$APP_DIR/deploy/linux/nginx-definode.conf" ]]; then
     sudo install -m 644 "$APP_DIR/deploy/linux/nginx-definode.conf" "$OPENRESTY_1PANEL_CONF_DST"

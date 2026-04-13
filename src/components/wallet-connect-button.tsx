@@ -167,21 +167,12 @@ export function WalletConnectButton() {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <button
-        type="button"
-        className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm flex items-center"
-      >
-        CNC 主网
-      </button>
-
-      <button
-        onClick={() => disconnect()}
-        type="button"
-        className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm"
-      >
-        {shortAddress}
-      </button>
-    </div>
+    <button
+      onClick={() => disconnect()}
+      type="button"
+      className="bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-full px-3 py-1.5 sm:px-4 sm:py-2 font-semibold text-xs sm:text-sm"
+    >
+      {shortAddress}
+    </button>
   );
 }

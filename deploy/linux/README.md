@@ -60,7 +60,7 @@ sudo APP_DOMAIN=your-domain.com APP_PORT=9002 bash deploy/linux/setup-caddy.sh
 
 ### 使用 deploy.sh 自动同步 Caddy
 
-deploy.sh 已更新为 Caddy 优先：
+deploy.sh 已更新为 Caddy 优先，且采用站点级配置同步（不会覆盖主 `/etc/caddy/Caddyfile`，可与其他站点共存）：
 
 ```bash
 bash deploy.sh
@@ -71,6 +71,18 @@ bash deploy.sh
 ```bash
 APP_DOMAIN=your-domain.com bash deploy.sh
 ```
+
+本地 Caddy 的 t1 站点部署示例（推荐）：
+
+```bash
+APP_DOMAIN=t1 CADDY_SITE_NAME=t1 bash deploy.sh --skip-pull
+```
+
+说明：
+
+- 站点配置将写入 `/etc/caddy/sites-enabled/t1.caddy`
+- 脚本会自动确保主 Caddyfile 含 `import /etc/caddy/sites-enabled/*.caddy`
+- 其他已有站点配置保持不变
 
 ### 验证 Caddy 状态
 
