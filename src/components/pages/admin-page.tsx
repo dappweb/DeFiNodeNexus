@@ -1616,25 +1616,25 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexRouterAddr} onChange={(e) => setDexRouterAddr(e.target.value)} placeholder="Router 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDexRouter}>设置 Router</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexRouter}>设置 Router</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexPairAddr} onChange={(e) => setDexPairAddr(e.target.value)} placeholder="Pair 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDexPair}>设置 Pair</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexPair}>设置 Pair</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexFactoryAddr} onChange={(e) => setDexFactoryAddr(e.target.value)} placeholder="Factory 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDexFactory}>设置 Factory</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexFactory}>设置 Factory</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={() => onToggleExternalDex(true)}>启用外部 DEX 模式</Button>
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap || !externalDexEnabled} onClick={() => onToggleExternalDex(false)}>关闭外部 DEX 模式</Button>
+            <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={() => onToggleExternalDex(true)}>启用外部 DEX 模式</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !externalDexEnabled} onClick={() => onToggleExternalDex(false)}>关闭外部 DEX 模式</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button variant="secondary" disabled={!isSwapManager || loading || !swap || swapPaused} onClick={() => onToggleSwapPaused(true)}>暂停外部兑换</Button>
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap || !swapPaused} onClick={() => onToggleSwapPaused(false)}>恢复外部兑换</Button>
+            <Button variant="secondary" disabled={!isSwapOwner || loading || !swap || swapPaused} onClick={() => onToggleSwapPaused(true)}>暂停外部兑换</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !swapPaused} onClick={() => onToggleSwapPaused(false)}>恢复外部兑换</Button>
           </div>
         </CardContent>
       </Card>

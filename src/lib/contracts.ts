@@ -6,8 +6,8 @@ import { ethers } from "ethers";
 // env vars are not configured - these are public on-chain addresses, not secrets.
 // Update DEPLOYED values here after each new deployment.
 const DEPLOYED = {
-  NEXUS: "0x5427c5E2c9f6aD20eaA06b49844D2F7008F1Ef04",
-  SWAP:  "0xbb90415bb460E11Bf64014a7f333A3733ab5b06b",
+  NEXUS: "0x6D862Bc5E9486C89c959905D18760204851f6203",
+  SWAP:  "0xfE20139dCFA053b819A3745E9ed801b9C6cc84aC",
   TOT:   "0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA",
   TOF:   "0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D",
   USDT:  "0xf54cC0F6CE272125c39C45A8141b84989A8765f4",
