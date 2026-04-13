@@ -1,16 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ethers } from "ethers";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Users, UserPlus, Coins, Copy, Link2 } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useReadonlyNexusContract } from "@/hooks/use-contract";
+import { useToast } from "@/hooks/use-toast";
+import { formatAddress } from "@/lib/ui-config";
 import { useWeb3 } from "@/lib/web3-provider";
-import { formatAddress, formatBalance } from "@/lib/ui-config";
+import { ethers } from "ethers";
+import { Coins, Copy, Link2, UserPlus, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 type TeamMember = {
   address: string;
@@ -266,9 +266,15 @@ export function TeamPage() {
           ) : (
             members.map((member) => (
               <div key={member.address} className="rounded-xl border border-border/50 bg-muted/20 p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-muted-foreground">{member.address}</span>
-                  <span className="text-xs text-muted-foreground">{t("directMemberLabel")}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span
+                    className="font-mono text-xs text-muted-foreground truncate cursor-pointer hover:text-foreground transition-colors"
+                    title={member.address}
+                    onClick={() => { copyText(member.address).then((ok) => ok && toast({ title: t("contractAddressCopied") })); }}
+                  >
+                    {formatAddress(member.address)}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0">{t("directMemberLabel")}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
