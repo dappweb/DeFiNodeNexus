@@ -324,10 +324,75 @@ export function NodesPage() {
     }
 
     if (allowance < requiredTof) {
+      const toFriendlyApproveError = (message?: string) => {
+        const raw = (message || "").trim();
+        if (!raw) return t("toastUnknownTxError");
+        if (/could not coalesce error|missing revert data|network error/i.test(raw)) {
+          return "RPC返回异常，请重试或切换网络后再试";
+        }
+        if (/insufficient funds/i.test(raw)) {
+          return "主网Gas不足，请先充值后再试";
+        }
+        if (/unknown custom error/i.test(raw)) {
+          return t("toastTofAllowanceOrBalanceHint");
+        }
+        return raw;
+      };
+
+      const manualApprove = async (amount: bigint) => {
+        try {
+          const runner = tof.runner as ethers.Signer;
+          const provider = (runner as { provider?: ethers.Provider } | undefined)?.provider;
+          if (!runner || !provider) {
+            return { success: false, error: "manual approve unavailable" } as const;
+          }
+
+          const txData = tof.interface.encodeFunctionData("approve", [CONTRACTS.NEXUS, amount]);
+          const fee = await provider.getFeeData().catch(() => null);
+          const txReq: ethers.TransactionRequest = {
+            to: await tof.getAddress(),
+            data: txData,
+            gasLimit: 220_000n,
+          };
+          if (fee?.gasPrice && fee.gasPrice > 0n) {
+            txReq.gasPrice = fee.gasPrice;
+          }
+
+          const tx = await runner.sendTransaction(txReq);
+          const receipt = await tx.wait();
+          return { success: true, hash: receipt?.hash || tx.hash } as const;
+        } catch (err: any) {
+          return { success: false, error: err?.shortMessage || err?.message || "manual approve failed" } as const;
+        }
+      };
+
       setNftaStage(stage);
-      const approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
+      // First try: normal wallet flow.
+      let approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
+      if (approveRes.success) return true;
+
+      // Second try: explicit gas limit for RPCs that fail gas estimation.
+      if (/could not coalesce error|missing revert data|network error/i.test(approveRes.error || "")) {
+        approveRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof, { gasLimit: 200_000n }));
+        if (approveRes.success) return true;
+
+        const rawApproveRes = await manualApprove(requiredTof);
+        if (rawApproveRes.success) return true;
+      }
+
+      // Compatibility fallback for tokens requiring 0-reset before new allowance.
+      if (allowance > 0n) {
+        const clearRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, 0n));
+        if (clearRes.success) {
+          const setRes = await execTx(() => tof.approve(CONTRACTS.NEXUS, requiredTof));
+          if (setRes.success) return true;
+          toast({ title: t("toastTofApproveFailed"), description: toFriendlyApproveError(setRes.error), variant: "destructive" });
+          return false;
+        }
+      }
+
       if (!approveRes.success) {
-        toast({ title: t("toastTofApproveFailed"), description: approveRes.error || t("toastUnknownTxError"), variant: "destructive" });
+        toast({ title: t("toastTofApproveFailed"), description: toFriendlyApproveError(approveRes.error), variant: "destructive" });
         return false;
       }
     }
