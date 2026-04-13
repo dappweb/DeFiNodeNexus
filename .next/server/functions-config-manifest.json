@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/announcements": {},
+    "/api/admin/announcements": {},
+    "/api/data-service/announcements": {},
+    "/api/keeper": {},
+    "/api/nodes/summary": {}
+  }
+}
