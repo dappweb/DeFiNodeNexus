@@ -184,6 +184,17 @@ export function SwapPage() {
         const allowance = await usdt.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
+          // USDT uses Tether-style approval: non-zero→non-zero is blocked.
+          // Must reset to 0 first if current allowance is non-zero.
+          if (allowance > BigInt(0)) {
+            const resetRes = await execTx(() => usdt.approve(CONTRACTS.SWAP, BigInt(0), { gasLimit: 100_000 }));
+            if (!resetRes.success) {
+              toast({ title: t("toastApproveFailed"), description: resetRes.error, variant: "destructive" });
+              setLoading(false);
+              setTxStage("idle");
+              return;
+            }
+          }
           const approveRes = await execTx(() => usdt.approve(CONTRACTS.SWAP, input, { gasLimit: 200_000 }));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
@@ -209,6 +220,16 @@ export function SwapPage() {
         const allowance = await tot.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
+          // Same reset-to-0 pattern for TOT, in case it also has race-condition protection.
+          if (allowance > BigInt(0)) {
+            const resetRes = await execTx(() => tot.approve(CONTRACTS.SWAP, BigInt(0), { gasLimit: 100_000 }));
+            if (!resetRes.success) {
+              toast({ title: t("toastApproveFailed"), description: resetRes.error, variant: "destructive" });
+              setLoading(false);
+              setTxStage("idle");
+              return;
+            }
+          }
           const approveRes = await execTx(() => tot.approve(CONTRACTS.SWAP, input, { gasLimit: 200_000 }));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
