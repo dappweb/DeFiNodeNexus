@@ -11,7 +11,7 @@ CNC Chain deployment has been configured with the following parameters:
 ### Token Addresses
 - **TOT Token**: 0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA
 - **TOF Token**: 0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D
-- **USDT Token**: 0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
+- **USDT Token**: 0xf54cC0F6CE272125c39C45A8141b84989A8765f4
 
 ### Configuration Files Updated
 1. `.env` - Added CNC token addresses and RPC URL
@@ -103,7 +103,7 @@ Deploying to CNC Chain with account: 0x...
 Network: Network { name: 'unknown', chainId: 50716, ... }
 TOT token: 0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA
 TOF token: 0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D
-USDT token: 0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
+USDT token: 0xf54cC0F6CE272125c39C45A8141b84989A8765f4
 
 --- Deploying DeFiNodeNexus ---
 DeFiNodeNexus deployed to: 0x...

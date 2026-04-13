@@ -5,7 +5,7 @@
 - [ ] Verify token addresses are correct on CNC chain explorer:
   - [ ] TOT: 0x0C720a3d1AB25b19c132Ba02C74A5D145d7CcDdA
   - [ ] TOF: 0x7300f4fd7C8d1baBC8220BFf04788E1B7A50e13D
-  - [ ] USDT: 0x01EDa43B6f88Fb93D48441758B32d26E501F57e0
+  - [ ] USDT: 0xf54cC0F6CE272125c39C45A8141b84989A8765f4
 - [ ] Run configuration verification: `node scripts/verify-cnc-config.js`
 - [ ] Review hardhat config includes CNC network
 - [ ] Review environment variables are correctly set

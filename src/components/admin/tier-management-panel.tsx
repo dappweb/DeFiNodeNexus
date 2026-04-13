@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -112,40 +112,65 @@ export function TierManagementPanel({ nexus, readonlyNexus, isOwner, loading, se
       const nA = Number(nextA);
       const nB = Number(nextB);
 
+      // Build tier ID lists to scan.
+      // Some deployments write tiers with explicit IDs (e.g. 1,2,3) without
+      // going through the auto-assign path, so nextNftaTierId may stay at 1.
+      // Fall back to a bounded scan (up to 20) to discover those tiers.
+      const nftaIds = nA > 1
+        ? Array.from({ length: nA - 1 }, (_, i) => i + 1)
+        : Array.from({ length: 20 }, (_, i) => i + 1);
+      const nftbIds = nB > 1
+        ? Array.from({ length: nB - 1 }, (_, i) => i + 1)
+        : Array.from({ length: 20 }, (_, i) => i + 1);
+
       // Fetch NFTA tiers
       const nftaResults: NftaTierInfo[] = [];
-      if (nA > 1) {
-        const promises = Array.from({ length: nA - 1 }, (_, i) => i + 1).map(async (id) => {
-          const t = await reader.nftaTiers(BigInt(id));
-          return {
-            tierId: id,
-            price: BigInt(t.price),
-            dailyYield: BigInt(t.dailyYield),
-            maxSupply: BigInt(t.maxSupply),
-            currentSupply: BigInt(t.currentSupply),
-            isActive: Boolean(t.isActive),
-          } as NftaTierInfo;
+      {
+        const promises = nftaIds.map(async (id) => {
+          try {
+            const t = await reader.nftaTiers(BigInt(id));
+            const maxSupply = BigInt(t.maxSupply);
+            if (maxSupply === 0n) return null;
+            return {
+              tierId: id,
+              price: BigInt(t.price),
+              dailyYield: BigInt(t.dailyYield),
+              maxSupply,
+              currentSupply: BigInt(t.currentSupply),
+              isActive: Boolean(t.isActive),
+            } as NftaTierInfo;
+          } catch {
+            return null;
+          }
         });
-        nftaResults.push(...(await Promise.all(promises)));
+        const results = await Promise.all(promises);
+        nftaResults.push(...results.filter((r): r is NftaTierInfo => r !== null));
       }
 
       // Fetch NFTB tiers
       const nftbResults: NftbTierInfo[] = [];
-      if (nB > 1) {
-        const promises = Array.from({ length: nB - 1 }, (_, i) => i + 1).map(async (id) => {
-          const t = await reader.nftbTiers(BigInt(id));
-          return {
-            tierId: id,
-            price: BigInt(t.price),
-            weight: BigInt(t.weight),
-            maxSupply: BigInt(t.maxSupply),
-            usdtMinted: BigInt(t.usdtMinted),
-            tofMinted: BigInt(t.tofMinted),
-            dividendBps: BigInt(t.dividendBps),
-            isActive: Boolean(t.isActive),
-          } as NftbTierInfo;
+      {
+        const promises = nftbIds.map(async (id) => {
+          try {
+            const t = await reader.nftbTiers(BigInt(id));
+            const maxSupply = BigInt(t.maxSupply);
+            if (maxSupply === 0n) return null;
+            return {
+              tierId: id,
+              price: BigInt(t.price),
+              weight: BigInt(t.weight),
+              maxSupply,
+              usdtMinted: BigInt(t.usdtMinted),
+              tofMinted: BigInt(t.tofMinted),
+              dividendBps: BigInt(t.dividendBps),
+              isActive: Boolean(t.isActive),
+            } as NftbTierInfo;
+          } catch {
+            return null;
+          }
         });
-        nftbResults.push(...(await Promise.all(promises)));
+        const results = await Promise.all(promises);
+        nftbResults.push(...results.filter((r): r is NftbTierInfo => r !== null));
       }
 
       setNftaTiers(nftaResults);

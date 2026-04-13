@@ -16,6 +16,14 @@ function sanitizeTxErrorMessage(raw: string): string {
     return "Unknown contract error (often insufficient token allowance or balance)"
   }
 
+  if (/could not coalesce error/i.test(text)) {
+    return "RPC returned an unexpected error. Please retry or switch network"
+  }
+
+  if (/insufficient funds/i.test(text)) {
+    return "Insufficient gas balance. Please top up before retrying"
+  }
+
   const revertedQuoted = text.match(/execution reverted:\s*"([^"]+)"/i)
   if (revertedQuoted?.[1]) {
     return revertedQuoted[1].trim()

@@ -77,6 +77,7 @@ export function AdminPage() {
   const [swapUsdtAddress, setSwapUsdtAddress] = useState("");
   const [isNexusAdminRole, setIsNexusAdminRole] = useState(false);
   const [isSwapAdminRole, setIsSwapAdminRole] = useState(false);
+  const [tofOwnerAddress, setTofOwnerAddress] = useState("");
   
   // NFTA 单笔/批量
   const [transferNodeId, setTransferNodeId] = useState("");
@@ -147,6 +148,7 @@ export function AdminPage() {
   const [emergencyTokenAddr, setEmergencyTokenAddr] = useState("");
   const [emergencyAmount, setEmergencyAmount] = useState("");
   const [newNexusAddr, setNewNexusAddr] = useState("");
+  const [currentSwapNexus, setCurrentSwapNexus] = useState("");
   const [dexRouterAddr, setDexRouterAddr] = useState("");
   const [dexPairAddr, setDexPairAddr] = useState("");
   const [dexFactoryAddr, setDexFactoryAddr] = useState("");
@@ -176,6 +178,10 @@ export function AdminPage() {
 
   const isNexusManager = isOwner || isNexusAdminRole;
   const isSwapManager = isSwapOwner || isSwapAdminRole;
+  const isTofOwner = useMemo(() => {
+    if (!address || !tofOwnerAddress) return false;
+    return address.toLowerCase() === tofOwnerAddress.toLowerCase();
+  }, [address, tofOwnerAddress]);
 
   const isAdmin = isNexusManager || isSwapManager;
   const nexusAdminLabel = isNexusManager ? `✅ Nexus 管理员${isOwner ? "(Owner)" : "(Admin)"}` : "👁️ Nexus 只读";
@@ -259,57 +265,66 @@ export function AdminPage() {
         setIsNexusAdminRole(false);
       }
 
-      if (swap) {
-        const readonlySwap = new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider());
+      // Always use a readonly Swap contract so params load even without wallet
+      const readonlySwap = CONTRACTS.SWAP
+        ? new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider())
+        : null;
+      const swapReader = readonlySwap ?? swap;
 
+      if (swapReader) {
         try {
-          const swapOwner = await swap.owner();
+          const swapOwner = await swapReader.owner();
           setSwapOwnerAddress(String(swapOwner || ""));
         } catch {
-          try {
-            const swapOwner = await readonlySwap.owner();
-            setSwapOwnerAddress(String(swapOwner || ""));
-          } catch {
-            setSwapOwnerAddress("");
-          }
+          setSwapOwnerAddress("");
         }
 
         try {
-          const [router, pair, factory, enabled, paused] = await swap.getRouterConfig();
+          const [router, pair, factory, enabled, paused] = await swapReader.getRouterConfig();
           setDexRouterAddr(String(router || ""));
           setDexPairAddr(String(pair || ""));
           setDexFactoryAddr(String(factory || ""));
           setExternalDexEnabled(Boolean(enabled));
           setSwapPaused(Boolean(paused));
-          setSwapUsdtAddress(String(await swap.usdtToken()));
+          setSwapUsdtAddress(String(await swapReader.usdtToken()));
         } catch {
-          try {
-            const [router, pair, factory, enabled, paused] = await readonlySwap.getRouterConfig();
-            setDexRouterAddr(String(router || ""));
-            setDexPairAddr(String(pair || ""));
-            setDexFactoryAddr(String(factory || ""));
-            setExternalDexEnabled(Boolean(enabled));
-            setSwapPaused(Boolean(paused));
-            setSwapUsdtAddress(String(await readonlySwap.usdtToken()));
-          } catch {
-            setDexRouterAddr("");
-            setDexPairAddr("");
-            setDexFactoryAddr("");
-            setExternalDexEnabled(false);
-            setSwapPaused(false);
-            setSwapUsdtAddress("");
-          }
+          setDexRouterAddr("");
+          setDexPairAddr("");
+          setDexFactoryAddr("");
+          setExternalDexEnabled(false);
+          setSwapPaused(false);
+          setSwapUsdtAddress("");
+        }
+
+        // Load Swap fee params & nexus address from chain
+        try {
+          const [bfBps, sfBps, ptBps, dfBps, mdBuy, msBps, dThresh, nexusRef] = await Promise.all([
+            swapReader.buyFeeBps(),
+            swapReader.sellFeeBps(),
+            swapReader.profitTaxBps(),
+            swapReader.deflationBps(),
+            swapReader.maxDailyBuy(),
+            swapReader.maxSellBps(),
+            swapReader.distributionThreshold(),
+            swapReader.nexus(),
+          ]);
+          setBuyFeeBps(bfBps.toString());
+          setSellFeeBps(sfBps.toString());
+          setProfitTaxBps(ptBps.toString());
+          setDeflationBps(dfBps.toString());
+          setMaxDailyBuy(ethers.formatUnits(mdBuy, 18));
+          setMaxSellBps(msBps.toString());
+          setDistributionThreshold(ethers.formatUnits(dThresh, 18));
+          setCurrentSwapNexus(String(nexusRef || ""));
+        } catch {
+          // Leave current values unchanged on error
         }
 
         if (address) {
           try {
-            setIsSwapAdminRole(Boolean(await swap.admins(address)));
+            setIsSwapAdminRole(Boolean(await swapReader.admins(address)));
           } catch {
-            try {
-              setIsSwapAdminRole(Boolean(await readonlySwap.admins(address)));
-            } catch {
-              setIsSwapAdminRole(false);
-            }
+            setIsSwapAdminRole(false);
           }
         } else {
           setIsSwapAdminRole(false);
@@ -317,6 +332,23 @@ export function AdminPage() {
       } else {
         setIsSwapAdminRole(false);
         setSwapUsdtAddress("");
+      }
+
+      // Fetch TOF owner for whitelist permission checks
+      if (tof) {
+        try {
+          setTofOwnerAddress(String(await tof.owner()));
+        } catch {
+          setTofOwnerAddress("");
+        }
+      }
+
+      // Probe whether Nexus on-chain supports admins() — call with zero address
+      try {
+        await reader.admins(ethers.ZeroAddress);
+        setNexusHasAdminFunctions(true);
+      } catch {
+        setNexusHasAdminFunctions(false);
       }
 
       const nextNftaTierIdRaw = await reader.nextNftaTierId();
@@ -388,7 +420,7 @@ export function AdminPage() {
 
   useEffect(() => {
     refresh();
-  }, [nexus, address, swap]);
+  }, [nexus, address, swap, tof]);
 
   const runTx = async (action: string, txRequest: () => Promise<any>) => {
     setLoading(true);
@@ -987,6 +1019,8 @@ export function AdminPage() {
     return uniq;
   };
 
+  const [nexusHasAdminFunctions, setNexusHasAdminFunctions] = useState(true);
+
   const onSetNexusAdmin = async () => {
     if (!nexus) return;
     const account = nexusAdminAddr.trim();
@@ -994,7 +1028,11 @@ export function AdminPage() {
       toast({ title: "参数错误", description: "Nexus 管理员地址无效", variant: "destructive" });
       return;
     }
-    await runTx("设置 Nexus 管理员", () => nexus.setAdmin(account, nexusAdminStatus === "true"));
+    try {
+      await runTx("设置 Nexus 管理员", () => nexus.setAdmin(account, nexusAdminStatus === "true"));
+    } catch {
+      toast({ title: "设置失败", description: "当前 Nexus 合约版本不支持 setAdmin，请先升级合约", variant: "destructive" });
+    }
   };
 
   const onBatchSetNexusAdmins = async () => {
@@ -1005,7 +1043,11 @@ export function AdminPage() {
       return;
     }
     const status = nexusAdminStatus === "true";
-    await runTx("批量设置 Nexus 管理员", () => nexus.setAdmins(accounts, Array(accounts.length).fill(status)));
+    try {
+      await runTx("批量设置 Nexus 管理员", () => nexus.setAdmins(accounts, Array(accounts.length).fill(status)));
+    } catch {
+      toast({ title: "设置失败", description: "当前 Nexus 合约版本不支持 setAdmins，请先升级合约", variant: "destructive" });
+    }
   };
 
   const onSetSwapAdmin = async () => {
@@ -1030,22 +1072,40 @@ export function AdminPage() {
   };
 
   const onReplaceUsdtToken = async () => {
-    if (!nexus || !swap) return;
+    if (!swap) return;
     const addr = newUsdtAddr.trim();
     if (!ethers.isAddress(addr)) {
       toast({ title: "参数错误", description: "USDT 地址无效", variant: "destructive" });
       return;
     }
 
+    const targets: string[] = [];
+    if (nexus && isNexusManager) targets.push("Nexus");
+    if (swap && isSwapManager) targets.push("Swap");
+    if (targets.length === 0) {
+      toast({ title: "权限不足", description: "当前钱包无任何合约管理权限", variant: "destructive" });
+      return;
+    }
+
     const confirmed = window.confirm(
-      `确认将 Nexus 和 Swap 的 usdtToken 同时替换为 ${addr} 吗？\n\n此操作会立即影响购买、分红和兑换。`
+      `确认将 ${targets.join(" 和 ")} 的 usdtToken 替换为 ${addr} 吗？\n\n此操作会立即影响购买、分红和兑换。`
     );
     if (!confirmed) return;
 
-    const okNexus = await runTx("替换 Nexus USDT 地址", () => nexus.setUsdtToken(addr));
-    if (!okNexus) return;
-    const okSwap = await runTx("替换 Swap USDT 地址", () => swap.setUsdtToken(addr));
-    if (!okSwap) return;
+    if (nexus && isNexusManager) {
+      try {
+        const okNexus = await runTx("替换 Nexus USDT 地址", () => nexus.setUsdtToken(addr));
+        if (!okNexus) {
+          toast({ title: "Nexus USDT 替换失败", description: "合约可能尚未支持此功能（需升级 Nexus）", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Nexus USDT 替换失败", description: "合约可能尚未支持此功能（需升级 Nexus）", variant: "destructive" });
+      }
+    }
+    if (swap && isSwapManager) {
+      const okSwap = await runTx("替换 Swap USDT 地址", () => swap.setUsdtToken(addr));
+      if (!okSwap) return;
+    }
     setNewUsdtAddr("");
   };
 
@@ -1098,6 +1158,14 @@ export function AdminPage() {
             </div>
           </div>
 
+          {!nexusHasAdminFunctions && (
+            <Alert className="border-amber-500/40 bg-amber-500/5">
+              <AlertDescription className="text-xs text-amber-400">
+                ⚠️ 当前部署的 Nexus 合约版本不支持 setAdmin / setAdmins 功能，Nexus 管理员操作将失败。请先升级 Nexus 合约后再使用。
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={nexusAdminAddr} onChange={(e) => setNexusAdminAddr(e.target.value)} placeholder="Nexus 管理员地址" />
             <Select value={nexusAdminStatus} onValueChange={setNexusAdminStatus}>
@@ -1108,12 +1176,12 @@ export function AdminPage() {
               </SelectContent>
             </Select>
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onSetNexusAdmin}>设置 Nexus 管理员</Button>
+            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onSetNexusAdmin}>设置 Nexus 管理员</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Textarea value={nexusAdminBatchInput} onChange={(e) => setNexusAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Nexus 地址，支持换行/逗号分隔" />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 管理员</Button>
+            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 管理员</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -1150,7 +1218,7 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={newUsdtAddr} onChange={(e) => setNewUsdtAddr(e.target.value)} placeholder="新 USDT 合约地址 0x..." />
             <div />
-            <Button disabled={!isAdmin || loading || !nexus || !swap} onClick={onReplaceUsdtToken}>同时替换 Nexus + Swap USDT</Button>
+            <Button disabled={(!isNexusManager && !isSwapManager) || loading || !swap} onClick={onReplaceUsdtToken}>替换 USDT 地址（按权限分别执行）</Button>
           </div>
         </CardContent>
       </Card>
@@ -1669,7 +1737,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={addLiquidityTot} onChange={(e) => setAddLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={addLiquidityUsdt} onChange={(e) => setAddLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
+              <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
             </div>
           </div>
           <div className="space-y-2">
@@ -1677,7 +1745,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={removeLiquidityTot} onChange={(e) => setRemoveLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={removeLiquidityUsdt} onChange={(e) => setRemoveLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button variant="outline" disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
+              <Button variant="outline" disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
             </div>
           </div>
         </CardContent>
@@ -1811,6 +1879,7 @@ export function AdminPage() {
           </Collapsible>
           <div className="space-y-2">
             <div><strong className="text-xs">设置Nexus地址</strong></div>
+            <div className="text-xs text-muted-foreground mb-1">当前 Swap.nexus(): {currentSwapNexus ? formatAddress(currentSwapNexus) : "读取中..."}</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Input value={newNexusAddr} onChange={(e) => setNewNexusAddr(e.target.value)} placeholder="Nexus合约地址 0x..." />
               <div />
@@ -1819,14 +1888,14 @@ export function AdminPage() {
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">强制分配</strong></div>
-            <Button disabled={!isSwapManager || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
+            <Button disabled={!isSwapOwner || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">应急提取</strong></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Input value={emergencyTokenAddr} onChange={(e) => setEmergencyTokenAddr(e.target.value)} placeholder="Token地址 0x..." />
               <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="提取金额" />
-              <Button variant="destructive" disabled={!isSwapManager || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
+              <Button variant="destructive" disabled={!isSwapOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
             </div>
           </div>
 
@@ -1880,10 +1949,14 @@ export function AdminPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
+            <div>TOF Owner: {tofOwnerAddress ? formatAddress(tofOwnerAddress) : "读取中..."}</div>
+            <div>{isTofOwner ? "✅ 当前钱包是 TOF Owner，可操作白名单" : "👁️ 仅 TOF Owner 可操作白名单"}</div>
+          </div>
           {/* 一键修复按钮 */}
           <div className="flex gap-2 flex-wrap">
             <Button
-              disabled={!isOwner || loading || !tof}
+              disabled={!isTofOwner || loading || !tof}
               onClick={onWhitelistNexusAndSwap}
               className="bg-red-600 hover:bg-red-500 text-white"
             >
@@ -1922,7 +1995,7 @@ export function AdminPage() {
                 <SelectItem value="false">移除白名单</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" disabled={!isOwner || loading || !tof} onClick={onSetTofWhitelist}>设置</Button>
+            <Button variant="outline" disabled={!isTofOwner || loading || !tof} onClick={onSetTofWhitelist}>设置</Button>
           </div>
         </CardContent>
       </Card>

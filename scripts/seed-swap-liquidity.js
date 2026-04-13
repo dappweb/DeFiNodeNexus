@@ -9,7 +9,7 @@ async function main() {
 
   const swapAddr = process.env.SWAP_ADDRESS || "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
   const totAddr  = process.env.TOT_TOKEN_ADDRESS || "0x7091Fe8Aaf5b5Bb327F903fF3488fc0D82c44a4b";
-  const usdtAddr = process.env.USDT_TOKEN_ADDRESS || "0x3E12B98Fc5b469f06939883d782bD894cc02240C";
+  const usdtAddr = process.env.USDT_TOKEN_ADDRESS || "0xf54cC0F6CE272125c39C45A8141b84989A8765f4";
 
   // 6% of 1B = 60,000,000 TOT; match with 60,000,000 USDT (1:1 initial price)
   const seedTotRaw  = process.env.SWAP_SEED_TOT  || "60000000";

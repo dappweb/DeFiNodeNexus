@@ -1,18 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ethers } from "ethers";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowDownUp, Info, TrendingUp, Clock, ShieldAlert } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { useWeb3 } from "@/lib/web3-provider";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { execTx, useERC20Contract, useSwapContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
-import { execTx, useERC20Contract, useSwapContract } from "@/hooks/use-contract";
-import { formatBalance, formatPercent } from "@/lib/ui-config";
-import { toFriendlyError } from "@/lib/api-common";
+import { useWeb3 } from "@/lib/web3-provider";
+import { ethers } from "ethers";
+import { ArrowDownUp, Clock, Info, ShieldAlert, TrendingUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type SwapSide = "BUY" | "SELL";
 
@@ -186,7 +184,7 @@ export function SwapPage() {
         const allowance = await usdt.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
-          const approveRes = await execTx(() => usdt.approve(CONTRACTS.SWAP, input));
+          const approveRes = await execTx(() => usdt.approve(CONTRACTS.SWAP, input, { gasLimit: 200_000 }));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
@@ -198,7 +196,7 @@ export function SwapPage() {
         const quote = await swap.quoteBuy(input);
         const minTotOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         setTxStage("submitting");
-        const txRes = await execTx(() => swap.buyTot(input, minTotOut));
+        const txRes = await execTx(() => swap.buyTot(input, minTotOut, { gasLimit: 500_000 }));
         if (!txRes.success) {
           toast({ title: t("toastBuyFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);
@@ -211,7 +209,7 @@ export function SwapPage() {
         const allowance = await tot.allowance(address, CONTRACTS.SWAP);
         if (allowance < input) {
           setTxStage("approving");
-          const approveRes = await execTx(() => tot.approve(CONTRACTS.SWAP, input));
+          const approveRes = await execTx(() => tot.approve(CONTRACTS.SWAP, input, { gasLimit: 200_000 }));
           if (!approveRes.success) {
             toast({ title: t("toastApproveFailed"), description: approveRes.error, variant: "destructive" });
             setLoading(false);
@@ -223,7 +221,7 @@ export function SwapPage() {
         const quote = await swap.quoteSell(input);
         const minUsdtOut = (quote[0] * BigInt(9950)) / BigInt(10000);
         setTxStage("submitting");
-        const txRes = await execTx(() => swap.sellTot(input, minUsdtOut));
+        const txRes = await execTx(() => swap.sellTot(input, minUsdtOut, { gasLimit: 500_000 }));
         if (!txRes.success) {
           toast({ title: t("toastSellFailed"), description: txRes.error, variant: "destructive" });
           setLoading(false);

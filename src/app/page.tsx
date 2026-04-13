@@ -13,14 +13,14 @@ import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
 import {
-    ArrowDownUp,
-    CheckCircle2,
-    Cpu,
-    Home,
-    ShieldCheck,
-    TrendingUp,
-    UserPlus,
-    Users
+  ArrowDownUp,
+  CheckCircle2,
+  Cpu,
+  Home,
+  ShieldCheck,
+  TrendingUp,
+  UserPlus,
+  Users
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -353,7 +353,9 @@ export default function DashboardPage() {
 
     setIsBindingReferrer(true);
     try {
-      const res = await execTx(() => nexus.bindReferrer(normalizedReferrer));
+      // Use manual gas limit to avoid CNC RPC gas estimation issues
+      // ("could not coalesce error") that cause frequent failures
+      const res = await execTx(() => nexus.bindReferrer(normalizedReferrer, { gasLimit: 200_000 }));
       if (!res.success) {
         setReferrerError(res.error || t('referralInvalidAddress'));
         return;
