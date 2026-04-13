@@ -46,7 +46,7 @@ cp "$PROJECT_PATH/.env.local" "$DEPLOYMENT_PATH/.env.local" 2>/dev/null || true
 # Step 6: Install production dependencies
 echo "📥 Installing production dependencies..."
 cd "$DEPLOYMENT_PATH"
-npm install --omit=dev
+npm install --omit=dev --legacy-peer-deps
 
 # Step 7: Create systemd service for Next.js
 echo "⚙️  Creating systemd service..."
@@ -61,7 +61,7 @@ User=$USER
 WorkingDirectory=$DEPLOYMENT_PATH
 Environment="NODE_ENV=production"
 Environment="PORT=$PORT"
-ExecStart=/usr/bin/node $DEPLOYMENT_PATH/.next/standalone/server.js
+ExecStart=/usr/bin/npm run start -- --port $PORT
 Restart=always
 RestartSec=10
 StandardOutput=journal

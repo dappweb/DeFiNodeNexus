@@ -66,22 +66,46 @@ function extractTxErrorMessage(err: unknown): string {
     info?: { error?: { message?: string } }
     error?: { message?: string; reason?: string }
     data?: { message?: string }
+    errors?: unknown[] // ethers.js v6 coalesced error array
   }
 
-  const candidates = [
+  // Check flat candidates first (excluding e.message which may be "could not coalesce error")
+  const shallowCandidates = [
     e.shortMessage,
     e.reason,
     e.info?.error?.message,
     e.error?.reason,
     e.error?.message,
     e.data?.message,
-    e.message,
   ]
 
-  for (const candidate of candidates) {
+  for (const candidate of shallowCandidates) {
     if (typeof candidate === "string" && candidate.trim()) {
-      return sanitizeTxErrorMessage(candidate)
+      const sanitized = sanitizeTxErrorMessage(candidate)
+      if (sanitized !== "RPC returned an unexpected error. Please retry or switch network") {
+        return sanitized
+      }
     }
+  }
+
+  // ethers.js v6 "could not coalesce error" wraps real errors in e.errors[]
+  // Dig into them to find the actual revert reason
+  if (Array.isArray(e.errors) && e.errors.length > 0) {
+    for (const nested of e.errors) {
+      const nestedMsg = extractTxErrorMessage(nested)
+      if (
+        nestedMsg &&
+        nestedMsg !== "Unknown error" &&
+        nestedMsg !== "RPC returned an unexpected error. Please retry or switch network"
+      ) {
+        return nestedMsg
+      }
+    }
+  }
+
+  // Fall back to e.message (handles "could not coalesce error" and other plain messages)
+  if (typeof e.message === "string" && e.message.trim()) {
+    return sanitizeTxErrorMessage(e.message)
   }
 
   return "Unknown error"

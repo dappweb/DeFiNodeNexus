@@ -1,6 +1,7 @@
 # Approve Failed 快速修复
 
 ## 🔴 问题
+
 ```
 Error: Approve Failed
 Message: transaction execution reverted
@@ -61,12 +62,12 @@ Ctrl+S 保存
 const usdt = new ethers.Contract(
   "0xf54cC0F6CE272125c39C45A8141b84989A8765f4",
   ["function decimals() view returns (uint8)"],
-  new ethers.JsonRpcProvider("https://rpc.cncchainpro.com")
+  new ethers.JsonRpcProvider("https://rpc.cncchainpro.com"),
 );
 
 // 获取实际小数位
 const dec = await usdt.decimals();
-console.log("USDT Decimals:", dec.toString());  
+console.log("USDT Decimals:", dec.toString());
 // 应该输出: 6
 ```
 
@@ -77,6 +78,7 @@ console.log("USDT Decimals:", dec.toString());
 详见：[docs/APPROVE-FAILED-FIX.md](docs/APPROVE-FAILED-FIX.md)
 
 包含：
+
 - 问题详细分析
 - 为什么会这样
 - 3 个修复方案

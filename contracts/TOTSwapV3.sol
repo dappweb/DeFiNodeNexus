@@ -40,6 +40,7 @@ contract TOTSwapV3 is TOTSwap {
     address public dexFactory;
     bool public externalDexEnabled;
     bool public swapPaused;
+    mapping(address => bool) public admins;
 
     event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
     event DexPairUpdated(address indexed oldPair, address indexed newPair);
@@ -316,8 +317,25 @@ contract TOTSwapV3 is TOTSwap {
     }
 
     function _approveExact(IERC20 token, address spender, uint256 amount) internal {
-        token.approve(spender, 0);
-        token.approve(spender, amount);
+        _approveOptionalReturn(token, spender, 0);
+        _approveOptionalReturn(token, spender, amount);
+    }
+
+    function _approveOptionalReturn(IERC20 token, address spender, uint256 amount) private {
+        (bool success, bytes memory returndata) =
+            address(token).call(abi.encodeWithSelector(IERC20.approve.selector, spender, amount));
+        require(success, "Approve failed");
+        if (returndata.length > 0) {
+            require(abi.decode(returndata, (bool)), "Approve returned false");
+        }
+    }
+
+    function _isAdmin(address account) internal view override returns (bool) {
+        return admins[account];
+    }
+
+    function _setAdmin(address account, bool enabled) internal override {
+        admins[account] = enabled;
     }
 
     function _grossUpNetAmount(uint256 netAmount, uint256 feeBps) internal pure returns (uint256) {

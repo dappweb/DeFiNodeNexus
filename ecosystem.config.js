@@ -15,7 +15,7 @@ module.exports = {
     {
       name: 'definodenexus',
       script: 'npm',
-      args: 'run start -- --port 3001',
+      args: 'run start -- --port 9002',
       cwd: APP_DIR,
       instances: 1,          // Use 'max' to enable cluster mode across all CPU cores
       exec_mode: 'fork',     // Change to 'cluster' when using instances: 'max'
@@ -24,7 +24,7 @@ module.exports = {
       // Runtime environment
       env: {
         NODE_ENV: 'production',
-        PORT: 3001,
+        PORT: 9002,
         HOSTNAME: '0.0.0.0',
       },
 

@@ -83,7 +83,6 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     uint256 public maxSellBps; // §2.4: 50%
     uint256 public nftbUsdtDividendPool;
     uint256 public usdtDistributionThreshold; // 10,000 USDT triggers distribution
-    mapping(address => bool) public admins;
 
     // ======================== Events ========================
 
@@ -126,8 +125,18 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(msg.sender == owner() || _isAdmin(msg.sender), "Not admin");
         _;
+    }
+
+    function _isAdmin(address account) internal view virtual returns (bool) {
+        account;
+        return false;
+    }
+
+    function _setAdmin(address account, bool enabled) internal virtual {
+        account;
+        enabled;
     }
 
     // ================================================================
@@ -596,7 +605,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function setAdmin(address account, bool enabled) external onlyOwner {
         require(account != address(0), "Zero");
-        admins[account] = enabled;
+        _setAdmin(account, enabled);
         emit AdminUpdated(account, enabled);
     }
 
@@ -606,7 +615,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         for (uint256 i = 0; i < len; i++) {
             address account = accounts_[i];
             require(account != address(0), "Zero");
-            admins[account] = enabled_[i];
+            _setAdmin(account, enabled_[i]);
             emit AdminUpdated(account, enabled_[i]);
         }
         emit AdminBatchUpdated(len);
