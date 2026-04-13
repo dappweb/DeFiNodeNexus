@@ -1,19 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ethers } from "ethers";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, Wallet, CalendarDays, Coins } from "lucide-react";
 import { useLanguage } from "@/components/language-provider";
-import { useWeb3 } from "@/lib/web3-provider";
-import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { execTx, useERC20Contract, useNexusContract, useReadonlyNexusContract } from "@/hooks/use-contract";
+import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
-import { getNftaTierName, getNftbTierName, formatBalance, formatDatetime } from "@/lib/ui-config";
-import { toFriendlyError } from "@/lib/api-common";
+import { useWeb3 } from "@/lib/web3-provider";
+import { ethers } from "ethers";
+import { CalendarDays, Coins, TrendingUp, Wallet } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type EarningRecord = {
   key: string;
@@ -30,6 +28,7 @@ export function EarningsPage() {
   const { address, provider } = useWeb3();
   const nexus = useNexusContract();
   const readonlyNexus = useReadonlyNexusContract();
+  const tot = useERC20Contract(CONTRACTS.TOT);
   const tof = useERC20Contract(CONTRACTS.TOF);
   const { toast } = useToast();
 
@@ -209,6 +208,17 @@ export function EarningsPage() {
       const level = Number(await nexus.getUserLevel(address));
       const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
       const requiredTof = (pendingTot * withdrawFeeBps) / 10000n;
+
+      if (!tot) {
+        toast({ title: t("toastWithdrawFailed"), description: t("toastTotTokenUnavailable"), variant: "destructive" });
+        return;
+      }
+
+      const nexusTotBalance = BigInt(await tot.balanceOf(CONTRACTS.NEXUS));
+      if (nexusTotBalance < pendingTot) {
+        toast({ title: t("toastWithdrawFailed"), description: t("toastNexusTotInsufficient"), variant: "destructive" });
+        return;
+      }
 
       if (requiredTof > 0n) {
         if (!tof) {

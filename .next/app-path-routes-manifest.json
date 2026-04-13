@@ -3,8 +3,8 @@
   "/favicon.ico/route": "/favicon.ico",
   "/api/nodes/summary/route": "/api/nodes/summary",
   "/page": "/",
-  "/api/announcements/route": "/api/announcements",
   "/api/admin/announcements/route": "/api/admin/announcements",
+  "/api/data-service/announcements/route": "/api/data-service/announcements",
   "/api/keeper/route": "/api/keeper",
-  "/api/data-service/announcements/route": "/api/data-service/announcements"
+  "/api/announcements/route": "/api/announcements"
 }

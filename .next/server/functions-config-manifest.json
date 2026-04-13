@@ -3,8 +3,8 @@
   "functions": {
     "/api/admin/announcements": {},
     "/api/announcements": {},
-    "/api/data-service/announcements": {},
     "/api/keeper": {},
+    "/api/data-service/announcements": {},
     "/api/nodes/summary": {}
   }
 }
