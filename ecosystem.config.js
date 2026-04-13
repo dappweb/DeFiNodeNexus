@@ -15,7 +15,7 @@ module.exports = {
     {
       name: 'definodenexus',
       script: 'npm',
-      args: 'run start -- --port 9002',
+      args: 'run start -- --port 3001',
       cwd: APP_DIR,
       instances: 1,          // Use 'max' to enable cluster mode across all CPU cores
       exec_mode: 'fork',     // Change to 'cluster' when using instances: 'max'
@@ -24,12 +24,12 @@ module.exports = {
       // Runtime environment
       env: {
         NODE_ENV: 'production',
-        PORT: 9002,
+        PORT: 3001,
         HOSTNAME: '0.0.0.0',
       },
 
       // Resource limits
-      max_memory_restart: '512M',
+      max_memory_restart: '1G',
       node_args: '--max-old-space-size=460',
 
       // Logging
@@ -42,7 +42,7 @@ module.exports = {
       // Restart policy
       autorestart: true,
       restart_delay: 3000,    // 3 s cooldown before restart
-      max_restarts: 10,
+      max_restarts: 50,
       min_uptime: '10s',
 
       // Graceful shutdown
