@@ -295,9 +295,14 @@ export function NodesPage() {
   const getWithdrawTofFee = useCallback(async (amount: bigint) => {
     if (!nexus || !address || amount <= 0n) return 0n;
 
-    const level = Number(await nexus.getUserLevel(address));
-    const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
-    return (amount * withdrawFeeBps) / 10000n;
+    try {
+      const level = Number(await nexus.getUserLevel(address));
+      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
+      return (amount * withdrawFeeBps) / 10000n;
+    } catch (err) {
+      console.warn("[getWithdrawTofFee] failed, defaulting to 0:", (err as Error)?.message?.slice(0, 100));
+      return 0n;
+    }
   }, [address, nexus]);
 
   /**
