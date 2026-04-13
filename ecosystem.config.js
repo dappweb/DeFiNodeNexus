@@ -14,7 +14,8 @@ module.exports = {
     // ── Web Application ────────────────────────────────────────────────────
     {
       name: 'definodenexus',
-      script: '.next/standalone/server.js',
+      script: 'npm',
+      args: 'run start -- --port 9002',
       cwd: APP_DIR,
       instances: 1,          // Use 'max' to enable cluster mode across all CPU cores
       exec_mode: 'fork',     // Change to 'cluster' when using instances: 'max'
