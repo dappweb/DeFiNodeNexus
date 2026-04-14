@@ -1,5 +1,6 @@
 require("./env_conf");
 require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-verify");
 require("@openzeppelin/hardhat-upgrades");
 
 const cncRpcUrl = process.env.CNC_RPC_URL || "";
@@ -27,5 +28,20 @@ module.exports = {
       chainId: 50716,
       accounts: deployerPrivateKey ? [deployerPrivateKey] : []
     }
+  },
+  etherscan: {
+    apiKey: {
+      cnc: "blockscout"
+    },
+    customChains: [
+      {
+        network: "cnc",
+        chainId: 50716,
+        urls: {
+          apiURL: "https://cncchainpro.com/api",
+          browserURL: "https://cncchainpro.com"
+        }
+      }
+    ]
   }
 };
