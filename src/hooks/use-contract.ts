@@ -1,6 +1,6 @@
 "use client";
 
-import { getCncRpcUrls } from "@/lib/cnc-rpc";
+import { getCncRpcUrls, getPrimaryCncRpcUrl } from "@/lib/cnc-rpc";
 import { CONTRACTS, ERC20_ABI, NEXUS_ABI, SWAP_ABI, TOF_ABI } from "@/lib/contracts";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
@@ -29,11 +29,9 @@ let _fallbackProvider: ethers.Provider | null = null;
 function getFallbackProvider(): ethers.Provider {
   if (!_fallbackProvider) {
     const cncNetwork = ethers.Network.from(50716);
-    const rpcUrls = getCncRpcUrls(
-      "https://rpc.cncchainpro.com",
-      process.env.NEXT_PUBLIC_CNC_RPC_URL,
-      process.env.CNC_RPC_URL
-    );
+    // Use the same RPC resolution as wagmi.ts to ensure consistency across all providers
+    const primaryRpc = getPrimaryCncRpcUrl(process.env.NEXT_PUBLIC_CNC_RPC_URL);
+    const rpcUrls = getCncRpcUrls(primaryRpc, process.env.CNC_RPC_URL);
 
     const providers = rpcUrls.map(
       (url) => new ethers.JsonRpcProvider(url, cncNetwork, { staticNetwork: cncNetwork })
@@ -82,6 +80,8 @@ export function useSwapContract() {
     if (!CONTRACTS.SWAP) return null;
     const mock = getE2EContractMock(CONTRACTS.SWAP);
     if (mock) return mock as ethers.Contract;
+    // Prioritize signer for write operations, fallback to provider/fallback for reads
+    // This ensures cross-device consistency: write ops will fail clearly if signer not ready
     const signerOrProvider = signer || provider || getFallbackProvider();
     return new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, signerOrProvider);
   }, [signer, provider]);

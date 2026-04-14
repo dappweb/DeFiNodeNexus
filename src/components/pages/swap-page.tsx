@@ -16,7 +16,7 @@ type SwapSide = "BUY" | "SELL";
 
 export function SwapPage() {
   const { t } = useLanguage();
-  const { address, isConnected } = useWeb3();
+  const { address, isConnected, signer } = useWeb3();
   const { toast } = useToast();
 
   const swap = useSwapContract();
@@ -168,6 +168,10 @@ export function SwapPage() {
       toast({ title: t("connectWalletFirst"), variant: "destructive" });
       return;
     }
+    if (!signer) {
+      toast({ title: "钱包未就绪", description: "请断开钱包后重新连接", variant: "destructive" });
+      return;
+    }
     if (!swap || !tot || !usdt) {
       toast({ title: t("toastContractMissing"), description: t("toastContractMissingDesc"), variant: "destructive" });
       return;
@@ -269,6 +273,8 @@ export function SwapPage() {
   const fromBalance = useMemo(() => (side === "BUY" ? usdtBalance : totBalance), [side, usdtBalance, totBalance]);
   const disableReason = useMemo(() => {
     if (!isConnected) return t("connectWalletFirst");
+    if (!signer) return "钱包未就绪";
+    if (!swap || !tot || !usdt) return "合约初始化中...";
     if (!amountIn || Number(amountIn) <= 0) return t("enterAmount");
 
     if (side === "BUY" && Number(amountIn) > Number(usdtBalance)) {
@@ -282,7 +288,7 @@ export function SwapPage() {
     }
 
     return "";
-  }, [isConnected, amountIn, side, usdtBalance, totBalance, maxSellAmount, t]);
+  }, [isConnected, signer, amountIn, side, usdtBalance, totBalance, maxSellAmount, t]);
 
   const txStageLabel = useMemo(() => {
     switch (txStage) {

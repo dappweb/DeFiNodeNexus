@@ -1,10 +1,11 @@
 
 "use client";
 
+import { useConnectModal } from '@rainbow-me/rainbowkit';
 import { ethers } from 'ethers';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { WalletClient } from 'viem';
-import { useAccount, useConnect, useDisconnect, useWalletClient } from 'wagmi';
+import { useAccount, useDisconnect, useWalletClient } from 'wagmi';
 
 type Eip1193Provider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
@@ -31,34 +32,48 @@ const Web3Context = createContext<Web3ContextType | undefined>(undefined);
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const { address, isConnected, isConnecting, chainId } = useAccount();
-  const { connect } = useConnect();
   const { disconnect } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
   const { data: walletClient } = useWalletClient();
 
   // Convert viem WalletClient → ethers v6 BrowserProvider + Signer
   const [ethersSigner, setEthersSigner] = useState<ethers.Signer | null>(null);
   const [ethersProvider, setEthersProvider] = useState<ethers.Provider | null>(null);
-  const ethereumProvider =
-    typeof window === 'undefined'
-      ? undefined
-      : (window as Window & { ethereum?: Eip1193Provider }).ethereum;
+  const [signerError, setSignerError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (walletClient && ethereumProvider) {
-      const browserProvider = new ethers.BrowserProvider(ethereumProvider as ethers.Eip1193Provider);
-      setEthersProvider(browserProvider);
-      browserProvider.getSigner()
-        .then((s) => setEthersSigner(s))
-        .catch(() => setEthersSigner(null));
+    if (walletClient) {
+      // Use walletClient.transport (the actual connected wallet's EIP-1193 provider)
+      // instead of window.ethereum, so OKX Wallet, TP Wallet, etc. work correctly.
+      // This is critical for cross-device consistency: each device uses its own connected wallet's provider.
+      try {
+        const browserProvider = new ethers.BrowserProvider(walletClient.transport as ethers.Eip1193Provider);
+        setEthersProvider(browserProvider);
+        browserProvider.getSigner()
+          .then((s) => {
+            setEthersSigner(s);
+            setSignerError(null);
+          })
+          .catch((err) => {
+            console.error("Failed to get signer from wallet:", err);
+            setEthersSigner(null);
+            setSignerError(err?.message || "Signer initialization failed");
+          });
+      } catch (err) {
+        console.error("Failed to initialize BrowserProvider from walletClient:", err);
+        setEthersSigner(null);
+        setEthersProvider(null);
+        setSignerError(err instanceof Error ? err.message : "Provider initialization failed");
+      }
     } else {
       setEthersSigner(null);
       setEthersProvider(null);
+      setSignerError(null);
     }
-  }, [ethereumProvider, walletClient]);
+  }, [walletClient]);
 
   const handleConnect = () => {
-    // RainbowKit will handle connector selection via its modal
-    // This function is kept for compatibility with existing code
+    openConnectModal?.();
   };
 
   const addProjectTokens = async () => {
@@ -91,6 +106,17 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
       }
     }
   };
+
+  // Debug: log signer errors in dev mode to help diagnose cross-device issues
+  useEffect(() => {
+    if (signerError && typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+      console.warn(
+        "[Web3Provider] Signer initialization error (cross-device issue?)",
+        signerError,
+        { isConnected, hasWalletClient: !!walletClient, address }
+      );
+    }
+  }, [signerError, isConnected, walletClient, address]);
 
   return (
     <Web3Context.Provider value={{
