@@ -8,13 +8,15 @@ const { ethers } = require("ethers");
 
 const SWAP_ABI = [
   "function swapPaused() public view returns (bool)",
-  "function quoteBuy(uint256 usdtAmount) public view returns (uint256 netTotOut, uint256 grossTotOut)",
-  "function quoteSell(uint256 totAmount) public view returns (uint256 netUsdtOut, uint256 grossUsdtOut)",
+  "function quoteBuy(uint256 usdtAmount) public view returns (uint256 netTotOut, uint256 fee)",
+  "function quoteSell(uint256 totAmount) public view returns (uint256 usdtOut, uint256 sellFee)",
   "function buyTot(uint256 usdtAmount, uint256 minTotOut) external",
   "function sellTot(uint256 totAmount, uint256 minUsdtOut) external",
   "function getDailyBoughtAmount(address user) public view returns (uint256)",
   "function getMaxSellAmount(address user) public view returns (uint256)",
   "function maxDailyBuy() public view returns (uint256)",
+  "function buyFeeBps() public view returns (uint256)",
+  "function sellFeeBps() public view returns (uint256)",
 ];
 
 const ERC20_ABI = [
@@ -49,17 +51,21 @@ async function main() {
     const usdt = new ethers.Contract(usdtAddress, ERC20_ABI, provider);
 
     console.log("═══ STEP 1: Get Contract State ═══");
-    const [swapPaused, usdtDec, totDec, maxDailyBuy] = await Promise.all([
+    const [swapPaused, usdtDec, totDec, maxDailyBuy, buyFeeBps, sellFeeBps] = await Promise.all([
       swap.swapPaused(),
       usdt.decimals(),
       tot.decimals(),
       swap.maxDailyBuy(),
+      swap.buyFeeBps(),
+      swap.sellFeeBps(),
     ]);
 
     console.log(`✅ Swap Paused:    ${swapPaused ? "🚫 YES" : "✅ NO"}`);
     console.log(`✅ USDT Decimals:  ${usdtDec}`);
     console.log(`✅ TOT Decimals:   ${totDec}`);
     console.log(`✅ Max Daily Buy:  ${ethers.formatUnits(maxDailyBuy, totDec)} TOT\n`);
+    console.log(`✅ Buy Fee Bps:    ${buyFeeBps} (${Number(buyFeeBps) / 100}%)`);
+    console.log(`✅ Sell Fee Bps:   ${sellFeeBps} (${Number(sellFeeBps) / 100}%)\n`);
 
     if (swapPaused) {
       console.error("❌ CRITICAL: Swap is PAUSED - all transactions will fail!");
@@ -73,10 +79,14 @@ async function main() {
     console.log(`Testing buy with: ${ethers.formatUnits(testBuyAmount, usdtDec)} USDT\n`);
 
     try {
-      const [netTot, grossTot] = await swap.quoteBuy(testBuyAmount);
+      const [netTot, buyFee] = await swap.quoteBuy(testBuyAmount);
+      const grossTot = netTot + buyFee;
       console.log(`✅ quoteBuy returned successfully:`);
       console.log(`   User receives: ${ethers.formatUnits(netTot, totDec)} TOT`);
+      console.log(`   Buy fee:       ${ethers.formatUnits(buyFee, totDec)} TOT`);
       console.log(`   Gross output:  ${ethers.formatUnits(grossTot, totDec)} TOT`);
+      const observedBuyFeeBps = grossTot > 0n ? Number((buyFee * 10000n) / grossTot) : 0;
+      console.log(`   Observed fee:  ${observedBuyFeeBps / 100}%\n`);
 
       if (netTot === BigInt(0)) {
         console.error("   ❌ WARNING: Net TOT output is 0!");
@@ -99,10 +109,12 @@ async function main() {
     console.log(`Testing sell with: ${ethers.formatUnits(testSellAmount, totDec)} TOT\n`);
 
     try {
-      const [netUsdt, grossUsdt] = await swap.quoteSell(testSellAmount);
+      const [netUsdt, sellFee] = await swap.quoteSell(testSellAmount);
       console.log(`✅ quoteSell returned successfully:`);
       console.log(`   User receives: ${ethers.formatUnits(netUsdt, usdtDec)} USDT`);
-      console.log(`   Gross output:  ${ethers.formatUnits(grossUsdt, usdtDec)} USDT`);
+      console.log(`   Sell fee:      ${ethers.formatUnits(sellFee, totDec)} TOT`);
+      const observedSellFeeBps = testSellAmount > 0n ? Number((sellFee * 10000n) / testSellAmount) : 0;
+      console.log(`   Observed fee:  ${observedSellFeeBps / 100}%`);
 
       if (netUsdt === BigInt(0)) {
         console.error("   ❌ WARNING: Net USDT output is 0!");

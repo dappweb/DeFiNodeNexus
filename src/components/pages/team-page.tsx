@@ -53,19 +53,32 @@ export function TeamPage() {
         setMyReferrer(null);
       }
 
-      const userLower = address.toLowerCase();
-
       const getDirectChildren = async (referrerAddress: string) => {
-        const events = await nexus.queryFilter(nexus.filters.ReferrerBound(null, referrerAddress));
-        const set = new Set<string>();
+        const normalizedReferrer = ethers.getAddress(referrerAddress);
+        const events = await nexus.queryFilter(nexus.filters.ReferrerBound(null, normalizedReferrer));
+        const candidates = new Set<string>();
         for (const ev of events as any[]) {
-          set.add(String(ev.args.user).toLowerCase());
+          candidates.add(String(ev.args.user).toLowerCase());
         }
-        return Array.from(set);
+
+        const currentChildren = await Promise.allSettled(
+          Array.from(candidates).map(async (candidate) => {
+            const memberAccount = await nexus.accounts(candidate);
+            const currentReferrer = String(memberAccount.referrer);
+            if (currentReferrer.toLowerCase() !== normalizedReferrer.toLowerCase()) {
+              return null;
+            }
+            return ethers.getAddress(candidate);
+          })
+        );
+
+        return currentChildren.flatMap((result) => {
+          if (result.status !== "fulfilled" || !result.value) return [];
+          return [result.value];
+        });
       };
 
-      const directAddresses = await getDirectChildren(userLower);
-      const directSet = new Set(directAddresses);
+      const directAddresses = await getDirectChildren(address);
 
       const downlineSet = new Set<string>(directAddresses);
       const queue = [...directAddresses];

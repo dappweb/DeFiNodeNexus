@@ -43,6 +43,31 @@ type NftaIssuedUserRecord = {
   txHash: string;
 };
 
+type DividendHealthCheck = {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail?: string;
+};
+
+type DividendTierEstimate = {
+  tierId: number;
+  dividendBps: string;
+  tierWeight: string;
+  nodeWeight: string;
+  tierTot: bigint;
+  tierUsdt: bigint;
+  perNodeTot: bigint;
+  perNodeUsdt: bigint;
+};
+
+type UserDividendEstimate = {
+  user: string;
+  activeNodes: number;
+  addTot: bigint;
+  addUsdt: bigint;
+};
+
 function parseNodeId(value: string): bigint | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -60,6 +85,20 @@ function parseBps(value: string): bigint | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric < 0 || numeric > 10000) return null;
   return BigInt(Math.trunc(numeric));
+}
+
+function formatToken(value: bigint, decimals = 18, precision = 6): string {
+  const formatted = ethers.formatUnits(value, decimals);
+  const [intPart, decPart = ""] = formatted.split(".");
+  if (precision <= 0 || decPart.length === 0) return intPart;
+  const trimmed = decPart.slice(0, precision).replace(/0+$/, "");
+  return trimmed ? `${intPart}.${trimmed}` : intPart;
+}
+
+function formatPercent(numerator: bigint, denominator: bigint): string {
+  if (denominator <= 0n) return "0.00%";
+  const bps = Number((numerator * 10000n) / denominator) / 100;
+  return `${bps.toFixed(2)}%`;
 }
 
 export function AdminPage() {
@@ -172,6 +211,17 @@ export function AdminPage() {
   const [swapAdminBatchInput, setSwapAdminBatchInput] = useState("");
   const [newUsdtAddr, setNewUsdtAddr] = useState("");
 
+  // P0: 分红池实时监控与触发前模拟
+  const [totDividendPool, setTotDividendPool] = useState<bigint>(0n);
+  const [usdtDividendPool, setUsdtDividendPool] = useState<bigint>(0n);
+  const [totDistributionThreshold, setTotDistributionThreshold] = useState<bigint>(0n);
+  const [usdtDistributionThreshold, setUsdtDistributionThreshold] = useState<bigint>(0n);
+  const [dividendHealthChecks, setDividendHealthChecks] = useState<DividendHealthCheck[]>([]);
+  const [tierEstimates, setTierEstimates] = useState<DividendTierEstimate[]>([]);
+  const [userEstimates, setUserEstimates] = useState<UserDividendEstimate[]>([]);
+  const [simulatingDividends, setSimulatingDividends] = useState(false);
+  const [simulateBlockRange, setSimulateBlockRange] = useState("1500000");
+
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
     return address.toLowerCase() === ownerAddress.toLowerCase();
@@ -245,6 +295,193 @@ export function AdminPage() {
     } catch (error: any) {
       console.error("Failed to query Swap admin list:", error);
       setSwapAdminList([]);
+    }
+  };
+
+  const runDividendHealthChecks = async (reader: any, swapReader: any) => {
+    const checks: DividendHealthCheck[] = [];
+
+    try {
+      const nextNftbTierIdRaw = await reader.nextNftbTierId();
+      const nextNftbTierId = Number(nextNftbTierIdRaw);
+      checks.push({
+        key: "nextTierId",
+        label: "NFTB 层级计数器",
+        ok: nextNftbTierId > 1,
+        detail: `nextNftbTierId=${nextNftbTierId}`,
+      });
+
+      let activeTierCount = 0;
+      let bpsSum = 0n;
+      let zeroWeightTierCount = 0;
+
+      for (let tid = 1; tid < nextNftbTierId; tid++) {
+        const [tier, tierWeight] = await Promise.all([
+          reader.nftbTiers(BigInt(tid)),
+          reader.totalWeightByTier(BigInt(tid)),
+        ]);
+        if (!tier.isActive) continue;
+        activeTierCount += 1;
+        bpsSum += BigInt(tier.dividendBps);
+        if (BigInt(tierWeight) === 0n) zeroWeightTierCount += 1;
+      }
+
+      checks.push({
+        key: "activeTier",
+        label: "活跃 NFTB 层级",
+        ok: activeTierCount > 0,
+        detail: `active=${activeTierCount}`,
+      });
+      checks.push({
+        key: "bpsSum",
+        label: "分红比例总和 (建议9000)",
+        ok: bpsSum === 9000n,
+        detail: `sum=${bpsSum.toString()}`,
+      });
+      checks.push({
+        key: "tierWeight",
+        label: "活跃层级权重",
+        ok: zeroWeightTierCount === 0,
+        detail: zeroWeightTierCount > 0 ? `zeroWeightTierCount=${zeroWeightTierCount}` : "all-good",
+      });
+
+      if (swapReader) {
+        const swapNexus = String(await swapReader.nexus());
+        checks.push({
+          key: "nexusLink",
+          label: "Swap 与 Nexus 绑定",
+          ok: !CONTRACTS.NEXUS || swapNexus.toLowerCase() === CONTRACTS.NEXUS.toLowerCase(),
+          detail: `swap.nexus=${formatAddress(swapNexus)}`,
+        });
+      }
+    } catch (error: any) {
+      checks.push({
+        key: "checkError",
+        label: "健康检查执行",
+        ok: false,
+        detail: error?.shortMessage || error?.message || "未知错误",
+      });
+    }
+
+    setDividendHealthChecks(checks);
+  };
+
+  const runDividendSimulation = async () => {
+    const reader = readonlyNexus || nexus;
+    const readonlySwap = CONTRACTS.SWAP
+      ? new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider())
+      : null;
+    const swapReader = readonlySwap ?? swap;
+
+    if (!reader || !swapReader) {
+      toast({ title: "模拟失败", description: "合约未连接，无法执行分红模拟", variant: "destructive" });
+      return;
+    }
+
+    setSimulatingDividends(true);
+    try {
+      const [totPool, usdtPool, nextNftbTierIdRaw] = await Promise.all([
+        swapReader.nftbDividendPool(),
+        swapReader.nftbUsdtDividendPool(),
+        reader.nextNftbTierId(),
+      ]);
+
+      const nextNftbTierId = Number(nextNftbTierIdRaw);
+      const tierRows: DividendTierEstimate[] = [];
+      const perWeightTot = new Map<string, bigint>();
+      const perWeightUsdt = new Map<string, bigint>();
+
+      for (let tid = 1; tid < nextNftbTierId; tid++) {
+        const [tier, tierWeightRaw] = await Promise.all([
+          reader.nftbTiers(BigInt(tid)),
+          reader.totalWeightByTier(BigInt(tid)),
+        ]);
+
+        const tierWeight = BigInt(tierWeightRaw);
+        const tierTot = (BigInt(totPool) * BigInt(tier.dividendBps)) / 10000n;
+        const tierUsdt = (BigInt(usdtPool) * BigInt(tier.dividendBps)) / 10000n;
+        const perTot = tierWeight > 0n ? (tierTot * 10n ** 18n) / tierWeight : 0n;
+        const perUsdt = tierWeight > 0n ? (tierUsdt * 10n ** 18n) / tierWeight : 0n;
+        const perNodeTot = (BigInt(tier.weight) * perTot) / (10n ** 18n);
+        const perNodeUsdt = (BigInt(tier.weight) * perUsdt) / (10n ** 18n);
+
+        perWeightTot.set(String(tid), perTot);
+        perWeightUsdt.set(String(tid), perUsdt);
+
+        tierRows.push({
+          tierId: tid,
+          dividendBps: BigInt(tier.dividendBps).toString(),
+          tierWeight: tierWeight.toString(),
+          nodeWeight: BigInt(tier.weight).toString(),
+          tierTot,
+          tierUsdt,
+          perNodeTot,
+          perNodeUsdt,
+        });
+      }
+
+      const provider = ((reader.runner as any)?.provider ?? getCncReadonlyProvider()) as ethers.Provider;
+      const latest = await provider.getBlockNumber();
+      const lookback = Math.max(1, Number(simulateBlockRange) || 1_500_000);
+      const fromBlock = Math.max(0, latest - lookback);
+
+      const purchaseEvents = await reader.queryFilter(reader.filters.NftbPurchased(), fromBlock, latest);
+      const userSet = new Set<string>();
+      for (const event of purchaseEvents as any[]) {
+        const user = String(event.args?.user || "").toLowerCase();
+        if (user && user !== ethers.ZeroAddress.toLowerCase()) userSet.add(user);
+      }
+
+      const users = Array.from(userSet);
+      const userRows: UserDividendEstimate[] = [];
+
+      for (const user of users) {
+        let nodes: bigint[] = [];
+        try {
+          nodes = await reader.getUserNftbNodes(user);
+        } catch {
+          continue;
+        }
+
+        let addTot = 0n;
+        let addUsdt = 0n;
+        let activeNodes = 0;
+
+        for (const nodeId of nodes) {
+          const node = await reader.nftbNodes(nodeId);
+          if (!node.isActive) continue;
+          const tid = BigInt(node.tierId).toString();
+          const perTot = perWeightTot.get(tid) || 0n;
+          const perUsdt = perWeightUsdt.get(tid) || 0n;
+          addTot += (BigInt(node.weight) * perTot) / (10n ** 18n);
+          addUsdt += (BigInt(node.weight) * perUsdt) / (10n ** 18n);
+          activeNodes += 1;
+        }
+
+        if (addTot === 0n && addUsdt === 0n) continue;
+        userRows.push({
+          user: ethers.getAddress(user),
+          activeNodes,
+          addTot,
+          addUsdt,
+        });
+      }
+
+      userRows.sort((a, b) => (a.addTot === b.addTot ? 0 : a.addTot > b.addTot ? -1 : 1));
+      setTierEstimates(tierRows);
+      setUserEstimates(userRows);
+      toast({
+        title: "分红模拟完成",
+        description: `覆盖 ${userRows.length} 个地址，区块范围 ${fromBlock} -> ${latest}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "分红模拟失败",
+        description: error?.shortMessage || error?.message || "未知错误",
+        variant: "destructive",
+      });
+    } finally {
+      setSimulatingDividends(false);
     }
   };
 
@@ -345,7 +582,7 @@ export function AdminPage() {
 
         // Load Swap fee params & nexus address from chain
         try {
-          const [bfBps, sfBps, ptBps, dfBps, mdBuy, msBps, dThresh, nexusRef] = await Promise.all([
+          const [bfBps, sfBps, ptBps, dfBps, mdBuy, msBps, dThresh, usdtDThresh, totPool, usdtPool, nexusRef] = await Promise.all([
             swapReader.buyFeeBps(),
             swapReader.sellFeeBps(),
             swapReader.profitTaxBps(),
@@ -353,6 +590,9 @@ export function AdminPage() {
             swapReader.maxDailyBuy(),
             swapReader.maxSellBps(),
             swapReader.distributionThreshold(),
+            swapReader.usdtDistributionThreshold(),
+            swapReader.nftbDividendPool(),
+            swapReader.nftbUsdtDividendPool(),
             swapReader.nexus(),
           ]);
           setBuyFeeBps(bfBps.toString());
@@ -362,6 +602,10 @@ export function AdminPage() {
           setMaxDailyBuy(ethers.formatUnits(mdBuy, 18));
           setMaxSellBps(msBps.toString());
           setDistributionThreshold(ethers.formatUnits(dThresh, 18));
+          setTotDistributionThreshold(BigInt(dThresh));
+          setUsdtDistributionThreshold(BigInt(usdtDThresh));
+          setTotDividendPool(BigInt(totPool));
+          setUsdtDividendPool(BigInt(usdtPool));
           setCurrentSwapNexus(String(nexusRef || ""));
         } catch {
           // Leave current values unchanged on error
@@ -424,6 +668,9 @@ export function AdminPage() {
       } catch {
         setSwapHasEnumerableFunctions(false);
       }
+
+      // P0: 分红触发前健康检查
+      await runDividendHealthChecks(reader, swapReader);
 
       const nextNftaTierIdRaw = await reader.nextNftaTierId();
       const nextNftaTierId = Number(nextNftaTierIdRaw);
@@ -1275,6 +1522,107 @@ export function AdminPage() {
             <Textarea value={swapAdminBatchInput} onChange={(e) => setSwapAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Swap 地址，支持换行/逗号分隔" />
             <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onBatchSetSwapAdmins}>批量设置 Swap 管理员</Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="glass-panel border-cyan-500/30">
+        <CardHeader>
+          <CardTitle>P0 分红监控与触发前模拟</CardTitle>
+          <CardDescription>不发交易即可预演本轮分红效果，并在触发前检查关键配置风险。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+              <div className="font-medium text-foreground">TOT 分红池</div>
+              <div>当前池子: {formatToken(totDividendPool)} TOT</div>
+              <div>触发阈值: {formatToken(totDistributionThreshold)} TOT</div>
+              <div>达成进度: {formatPercent(totDividendPool, totDistributionThreshold)}</div>
+            </div>
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-1">
+              <div className="font-medium text-foreground">USDT 分红池</div>
+              <div>当前池子: {formatToken(usdtDividendPool)} USDT</div>
+              <div>触发阈值: {formatToken(usdtDistributionThreshold)} USDT</div>
+              <div>达成进度: {formatPercent(usdtDividendPool, usdtDistributionThreshold)}</div>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 text-xs">
+            <div className="font-medium text-foreground">触发前健康检查</div>
+            {dividendHealthChecks.length === 0 ? (
+              <div className="text-muted-foreground">暂无检查结果，请点击刷新或等待页面自动加载。</div>
+            ) : (
+              dividendHealthChecks.map((check) => (
+                <div key={check.key} className="flex items-center justify-between gap-3">
+                  <span>{check.ok ? "✅" : "⚠️"} {check.label}</span>
+                  <span className="text-muted-foreground">{check.detail || "-"}</span>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 text-xs">
+            <div className="font-medium text-foreground">触发前模拟参数</div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center">
+              <Input
+                value={simulateBlockRange}
+                onChange={(e) => setSimulateBlockRange(e.target.value)}
+                placeholder="事件回溯区块数（默认1500000）"
+              />
+              <div className="md:col-span-2 text-muted-foreground">
+                模拟逻辑：读取当前分红池 + 当前节点权重 + 最近购买事件，估算“如果现在触发”每个地址的新增额度。
+              </div>
+              <Button variant="outline" disabled={simulatingDividends || loading} onClick={runDividendSimulation}>
+                {simulatingDividends ? "模拟中..." : "运行模拟（只读）"}
+              </Button>
+            </div>
+          </div>
+
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mb-2">
+              <ChevronDown className="h-4 w-4" /> 使用说明（建议先看）
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mb-2">
+              <Alert className="border-blue-500/50 bg-blue-500/5 text-xs">
+                <AlertDescription className="space-y-1">
+                  <div>1. 先看“健康检查”：若出现 ⚠️，先修配置再触发分红。</div>
+                  <div>2. 再看“分红池达成进度”：低于阈值时建议只做模拟，不要强制分配。</div>
+                  <div>3. 点击“运行模拟（只读）”：确认本轮项目方份额、各层份额和用户预计新增额度。</div>
+                  <div>4. 模拟结果满意后，再去下方“强制分配”执行真实链上交易。</div>
+                  <div>5. 本区块不会发交易，不会改变链上状态。</div>
+                </AlertDescription>
+              </Alert>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {tierEstimates.length > 0 && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 text-xs">
+              <div className="font-medium text-foreground">分层预估结果（本轮）</div>
+              <div className="space-y-1">
+                {tierEstimates.map((tier) => (
+                  <div key={tier.tierId} className="rounded border border-border/40 p-2 bg-background/40">
+                    <div>Tier {tier.tierId} | bps={tier.dividendBps} | tierWeight={tier.tierWeight} | nodeWeight={tier.nodeWeight}</div>
+                    <div>层总额: TOT {formatToken(tier.tierTot)} | USDT {formatToken(tier.tierUsdt)}</div>
+                    <div>单卡预估: TOT +{formatToken(tier.perNodeTot)} | USDT +{formatToken(tier.perNodeUsdt)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {userEstimates.length > 0 && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2 text-xs">
+              <div className="font-medium text-foreground">用户预估结果（按 TOT 降序）</div>
+              <div className="max-h-[240px] overflow-y-auto space-y-1">
+                {userEstimates.map((row) => (
+                  <div key={row.user} className="rounded border border-border/40 p-2 bg-background/40">
+                    <div className="font-mono">{formatAddress(row.user)}</div>
+                    <div>活跃NFTB节点: {row.activeNodes}</div>
+                    <div>预计新增: TOT +{formatToken(row.addTot)} | USDT +{formatToken(row.addUsdt)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
