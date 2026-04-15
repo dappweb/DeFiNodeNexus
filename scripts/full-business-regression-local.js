@@ -181,9 +181,13 @@ async function main() {
   await (await tof.connect(userD).approve(await nexus.getAddress(), requiredTofFor500U)).wait();
   await (await nexus.connect(userD).buyNftbWithTof(1, owner.address)).wait();
 
-  const expectedTofTreasuryIncrease = requiredTofFor500U;
-  const treasuryTofBalance = await tof.balanceOf(treasury.address);
-  assertCondition(treasuryTofBalance >= expectedTofTreasuryIncrease, "NFTB TOF exchange rate should be 200 TOF per 1U");
+  // buyNftbWithTof now distributes: 10/10/10/40% to wallets + 30% team commission
+  const institutionTofBalance = await tof.balanceOf(institution.address);
+  const expectedInstitutionTof = (requiredTofFor500U * 4000n) / 10000n; // 40%
+  assertCondition(institutionTofBalance >= expectedInstitutionTof, "NFTB TOF institution should receive 40%");
+  const zeroLineTofBalance = await tof.balanceOf(zeroLine.address);
+  const expectedZeroLineTof = (requiredTofFor500U * 1000n) / 10000n; // 10%
+  assertCondition(zeroLineTofBalance >= expectedZeroLineTof, "NFTB TOF zeroLine should receive 10%");
 
   await expectRevert(() => nexus.connect(userE).buyNftbWithTof(1, owner.address), "NFTB TOF quota blocked");
 

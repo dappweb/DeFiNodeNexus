@@ -298,6 +298,13 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @notice Buy an NFTB card with USDT.
      * Each tier has maxSupply total cards, half purchasable with USDT.
      * Tiers: Junior (500U), Intermediate (1000U), Advanced (2000U).
+     *
+     * Fund distribution:
+     *   30% → 17-generation team referral commission (USDT)
+     *   10% → 0号线 wallet
+     *   10% → 社区建设 wallet
+     *   10% → 基金会 wallet
+     *   40% → 机构 wallet
      */
     function buyNftbWithUsdt(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftbTier storage tier = nftbTiers[tierId];
@@ -307,13 +314,35 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         _bindReferrerIfNeeded(msg.sender, referrer);
 
-        usdtToken.safeTransferFrom(msg.sender, address(this), tier.price);
-        usdtToken.safeTransfer(treasury, tier.price);
+        uint256 price = tier.price;
+
+        // Pull full USDT from buyer into this contract
+        usdtToken.safeTransferFrom(msg.sender, address(this), price);
+
+        // 1) Distribute 30% team referral commission
+        uint256 teamDistributed = _distributeTeamCommission(msg.sender, price);
+
+        // 2) Fixed wallet distributions
+        uint256 zeroLineShare    = (price * 1000) / BASIS_POINTS;  // 10%
+        uint256 communityShare   = (price * 1000) / BASIS_POINTS;  // 10%
+        uint256 foundationShare  = (price * 1000) / BASIS_POINTS;  // 10%
+        uint256 institutionShare = (price * 4000) / BASIS_POINTS;  // 40%
+
+        usdtToken.safeTransfer(zeroLineWallet, zeroLineShare);
+        usdtToken.safeTransfer(communityWallet, communityShare);
+        usdtToken.safeTransfer(foundationWallet, foundationShare);
+        usdtToken.safeTransfer(institutionWallet, institutionShare);
+
+        // 3) Any rounding dust → treasury
+        uint256 totalSent = teamDistributed + zeroLineShare + communityShare + foundationShare + institutionShare;
+        if (price > totalSent) {
+            usdtToken.safeTransfer(treasury, price - totalSent);
+        }
 
         tier.usdtMinted += 1;
         nodeId = _createNftbNode(msg.sender, tierId, tier.weight);
 
-        emit NftbPurchased(msg.sender, nodeId, tierId, tier.price);
+        emit NftbPurchased(msg.sender, nodeId, tierId, price);
     }
 
     /**
@@ -332,7 +361,25 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         require(tofCost > 0, "TOF cost is zero");
 
         tofToken.safeTransferFrom(msg.sender, address(this), tofCost);
-        tofToken.safeTransfer(treasury, tofCost);
+
+        // 1) 30% team referral commission (paid in TOF)
+        uint256 teamDistributed = _distributeTeamCommissionTof(msg.sender, tofCost);
+
+        // 2) Fixed wallet distributions (paid in TOF)
+        uint256 zeroLineShare    = (tofCost * 1000) / BASIS_POINTS;  // 10%
+        uint256 communityShare   = (tofCost * 1000) / BASIS_POINTS;  // 10%
+        uint256 foundationShare  = (tofCost * 1000) / BASIS_POINTS;  // 10%
+        uint256 institutionShare = (tofCost * 4000) / BASIS_POINTS;  // 40%
+        tofToken.safeTransfer(zeroLineWallet, zeroLineShare);
+        tofToken.safeTransfer(communityWallet, communityShare);
+        tofToken.safeTransfer(foundationWallet, foundationShare);
+        tofToken.safeTransfer(institutionWallet, institutionShare);
+
+        // 3) Dust (rounding remainder) → treasury
+        uint256 totalSent = teamDistributed + zeroLineShare + communityShare + foundationShare + institutionShare;
+        if (tofCost > totalSent) {
+            tofToken.safeTransfer(treasury, tofCost - totalSent);
+        }
 
         tier.tofMinted += 1;
         nodeId = _createNftbNode(msg.sender, tierId, tier.weight);
@@ -946,6 +993,30 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
                 current = accounts[current].referrer;
             } else {
                 usdtToken.safeTransfer(treasury, share);
+            }
+
+            totalDistributed += share;
+        }
+    }
+
+    /// @dev Same as _distributeTeamCommission but pays in TOF (for buyNftbWithTof)
+    function _distributeTeamCommissionTof(address buyer, uint256 tofAmount) internal returns (uint256 totalDistributed) {
+        address current = accounts[buyer].referrer;
+
+        for (uint256 gen = 1; gen <= MAX_TEAM_DEPTH; gen++) {
+            uint256 bps;
+            if (gen == 1)      bps = 1000;   // 10%
+            else if (gen == 2) bps = 500;    // 5%
+            else               bps = 100;    // 1%
+
+            uint256 share = (tofAmount * bps) / BASIS_POINTS;
+            if (share == 0) continue;
+
+            if (current != address(0)) {
+                tofToken.safeTransfer(current, share);
+                current = accounts[current].referrer;
+            } else {
+                tofToken.safeTransfer(treasury, share);
             }
 
             totalDistributed += share;
