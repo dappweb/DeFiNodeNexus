@@ -125,6 +125,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(uint256 => uint256) public predictionFlowBpsByTier;
     mapping(address => uint256) public nftaLastClaimDayByUser;
     mapping(address => bool) public admins;
+    address[] private adminList;  // Enumerable admin list
+    mapping(address => uint256) private adminIndex;  // admin address => index in adminList
 
     // ======================== Events ========================
 
@@ -154,6 +156,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event AdminUpdated(address indexed account, bool enabled);
     event AdminBatchUpdated(uint256 count);
     event UsdtTokenUpdated(address indexed oldToken, address indexed newToken);
+    event ReferrerUpdated(address indexed user, address indexed oldReferrer, address indexed newReferrer);
 
     // ======================== Constructor ========================
 
@@ -598,6 +601,33 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         tofRemaining  = tier.tofMinted >= halfSupply ? 0 : halfSupply - tier.tofMinted;
     }
 
+    function getAdminCount() external view returns (uint256) {
+        return adminList.length;
+    }
+
+    function getAdminAt(uint256 index) external view returns (address) {
+        require(index < adminList.length, "Index out of bounds");
+        return adminList[index];
+    }
+
+    function getAdmins(uint256 offset, uint256 limit) external view returns (address[] memory) {
+        require(limit > 0, "Limit must be > 0");
+        uint256 totalCount = adminList.length;
+        if (offset >= totalCount) return new address[](0);
+        uint256 end = offset + limit;
+        if (end > totalCount) end = totalCount;
+        uint256 count = end - offset;
+        address[] memory result = new address[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = adminList[offset + i];
+        }
+        return result;
+    }
+
+    function isAdminAddress(address account) external view returns (bool) {
+        return admins[account];
+    }
+
     // ================================================================
     //                       OWNER FUNCTIONS
     // ================================================================
@@ -868,7 +898,23 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function setAdmin(address account, bool enabled) external onlyOwner {
         require(account != address(0), "Zero");
+        bool wasAdmin = admins[account];
         admins[account] = enabled;
+        
+        if (enabled && !wasAdmin) {
+            adminIndex[account] = adminList.length;
+            adminList.push(account);
+        } else if (!enabled && wasAdmin) {
+            uint256 idx = adminIndex[account];
+            if (idx < adminList.length - 1) {
+                address lastAdmin = adminList[adminList.length - 1];
+                adminList[idx] = lastAdmin;
+                adminIndex[lastAdmin] = idx;
+            }
+            adminList.pop();
+            delete adminIndex[account];
+        }
+        
         emit AdminUpdated(account, enabled);
     }
 
@@ -878,7 +924,23 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         for (uint256 i = 0; i < len; i++) {
             address account = accounts_[i];
             require(account != address(0), "Zero");
+            bool wasAdmin = admins[account];
             admins[account] = enabled_[i];
+            
+            if (enabled_[i] && !wasAdmin) {
+                adminIndex[account] = adminList.length;
+                adminList.push(account);
+            } else if (!enabled_[i] && wasAdmin) {
+                uint256 idx = adminIndex[account];
+                if (idx < adminList.length - 1) {
+                    address lastAdmin = adminList[adminList.length - 1];
+                    adminList[idx] = lastAdmin;
+                    adminIndex[lastAdmin] = idx;
+                }
+                adminList.pop();
+                delete adminIndex[account];
+            }
+            
             emit AdminUpdated(account, enabled_[i]);
         }
         emit AdminBatchUpdated(len);
@@ -889,6 +951,37 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         address oldToken = address(usdtToken);
         usdtToken = IERC20(newUsdt);
         emit UsdtTokenUpdated(oldToken, newUsdt);
+    }
+
+    /**
+     * @notice Owner-only emergency operation to rebind or clear a user's referrer.
+     * @dev Use newReferrer = address(0) to cut an existing referral chain.
+     *      This function only updates direct referral pointers/counters.
+     */
+    function forceSetReferrer(address user, address newReferrer) external onlyOwner {
+        require(user != address(0), "User is zero");
+        require(newReferrer != user, "Self referral");
+
+        if (newReferrer != address(0)) {
+            _ensureNoReferralCycle(user, newReferrer);
+        }
+
+        address oldReferrer = accounts[user].referrer;
+        if (oldReferrer == newReferrer) {
+            return;
+        }
+
+        if (oldReferrer != address(0) && accounts[oldReferrer].directReferrals > 0) {
+            accounts[oldReferrer].directReferrals -= 1;
+        }
+
+        accounts[user].referrer = newReferrer;
+
+        if (newReferrer != address(0)) {
+            accounts[newReferrer].directReferrals += 1;
+        }
+
+        emit ReferrerUpdated(user, oldReferrer, newReferrer);
     }
 
     // ================================================================
@@ -1040,6 +1133,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         require(referrer != user, "Self referral");
         require(accounts[user].referrer == address(0), "Already bound");
 
+        _ensureNoReferralCycle(user, referrer);
+
         accounts[user].referrer = referrer;
         accounts[referrer].directReferrals += 1;
 
@@ -1050,6 +1145,16 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         address current = accounts[user].referrer;
         for (uint256 depth = 0; depth < MAX_TEAM_DEPTH && current != address(0); depth++) {
             accounts[current].teamNodes += amount;
+            current = accounts[current].referrer;
+        }
+    }
+
+    function _ensureNoReferralCycle(address user, address referrer) internal view {
+        address current = referrer;
+
+        // Matching commission depth (17) keeps this check bounded and inexpensive.
+        for (uint256 depth = 0; depth <= MAX_TEAM_DEPTH && current != address(0); depth++) {
+            require(current != user, "Referral cycle");
             current = accounts[current].referrer;
         }
     }
