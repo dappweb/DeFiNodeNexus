@@ -41,6 +41,7 @@
     "verify:cnc": "npx hardhat run scripts/verify-cnc.js --network cnc",
     "replace:swap:v3:cnc": "npx hardhat run scripts/replace-swap-v3.js --network cnc",
     "upgrade:totswap:v3:cnc": "npx hardhat run scripts/upgrade-totswap-v3.js --network cnc",
+    "upgrade:nexus:cnc": "npx hardhat run scripts/upgrade-nexus.js --network cnc",
     "configure:totswap:v3:cnc": "npx hardhat run scripts/configure-totswap-v3.js --network cnc",
     "create:pair:cnc": "npx hardhat run scripts/create-dex-pair.js --network cnc"
   },
