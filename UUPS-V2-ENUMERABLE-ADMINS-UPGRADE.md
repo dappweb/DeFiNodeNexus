@@ -10,17 +10,21 @@
 ## 📋 升级内容总结
 
 ### 问题背景
+
 - 当前管理员存储使用 `mapping(address => bool)` 不可枚举
 - 前端无法列出现有的管理员列表
 - 批量查询管理员需要事件日志，效率不高
 
 ### 解决方案
+
 在 **DeFiNodeNexus v2** 中添加可枚举的管理员列表：
+
 - 新增 `address[] private adminList` — 有序存储
 - 新增 `mapping(address => uint256) private adminIndex` — O(1) 查找
 - 修改 `setAdmin()` 和 `setAdmins()` 维护列表
 
 ### 新增查询函数（4个）
+
 ```solidity
 function getAdminCount() view returns (uint256)
 function getAdminAt(uint256 index) view returns (address)
@@ -33,6 +37,7 @@ function isAdminAddress(address account) view returns (bool)
 ## ✅ 完成的工作
 
 ### 1. 合约修改 ✅
+
 - **文件**: [contracts/DeFiNodeNexus.sol](contracts/DeFiNodeNexus.sol)
 - **修改点**:
   - 第 126-129 行：添加 adminList 和 adminIndex 存储变量
@@ -42,11 +47,13 @@ function isAdminAddress(address account) view returns (bool)
 - **编译结果**: ✅ 通过
 
 ### 2. 前端 ABI 更新 ✅
+
 - **文件**: [src/lib/contracts.ts](src/lib/contracts.ts)
 - **修改**: 在 `NEXUS_ABI` 中添加 4 个新函数签名
 - **影响**: 允许前端调用新的查询函数
 
 ### 3. 升级脚本 ✅
+
 - **文件**: [scripts/upgrade-nexus-v2-enumerable-admins.js](scripts/upgrade-nexus-v2-enumerable-admins.js)
 - **功能**:
   - 部署新的 DeFiNodeNexus 实现
@@ -54,6 +61,7 @@ function isAdminAddress(address account) view returns (bool)
   - 记录日志输出
 
 ### 4. 本地测试验证 ✅
+
 - **文件**: [scripts/test-enumerable-admins-local.js](scripts/test-enumerable-admins-local.js)
 - **测试覆盖**:
   - ✅ 添加管理员（单个和批量）
@@ -65,6 +73,7 @@ function isAdminAddress(address account) view returns (bool)
 - **结果**: **所有 6 个测试用例通过** ✅
 
 ### 5. NPM 脚本 ✅
+
 - **文件**: [package.json](package.json)
 - **新增命令**: `npm run upgrade:nexus:v2:cnc`
 
@@ -73,6 +82,7 @@ function isAdminAddress(address account) view returns (bool)
 ## 🚀 升级执行步骤
 
 ### 步骤 1: 提交代码变更
+
 ```bash
 cd /home/ubuntu/DeFiNodeNexus
 git add contracts/DeFiNodeNexus.sol \
@@ -95,11 +105,13 @@ git push truth-oracle feat/totswap-external-dex-v3
 ```
 
 ### 步骤 2: 执行 CNC 主网升级
+
 ```bash
 npm run upgrade:nexus:v2:cnc
 ```
 
 **预期输出**:
+
 ```
 Deploying new DeFiNodeNexus implementation...
 New implementation deployed at: 0x...
@@ -109,6 +121,7 @@ New implementation address: 0x...
 ```
 
 ### 步骤 3: 验证升级
+
 ```bash
 # 检查代理指向的新实现
 npx hardhat verify --network cnc 0x<新实现地址>
@@ -118,17 +131,20 @@ npx hardhat verify --network cnc 0x<新实现地址>
 ```
 
 ### 步骤 4: 更新前端管理员面板（可选但推荐）
+
 现在前端可以使用新的查询函数替代事件日志提取：
+
 ```javascript
 // 旧方法：遍历日志
 const events = await contract.queryFilter(contract.filters.AdminSet());
 
 // 新方法：直接查询
 const adminCount = await contract.getAdminCount();
-const admins = await contract.getAdmins(0, 100);  // 分页查询
+const admins = await contract.getAdmins(0, 100); // 分页查询
 ```
 
 ### 步骤 5: 重建并部署前端
+
 ```bash
 npm run build
 npm run deploy
@@ -189,6 +205,7 @@ Admins after removal:
 ## 📝 rollback 计划（如需要）
 
 如果升级失败或出现问题：
+
 ```bash
 # 恢复到 v1（替换为 v1 实现地址）
 npx hardhat run scripts/upgrade-nexus-back-to-v1.js --network cnc

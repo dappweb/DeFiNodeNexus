@@ -129,6 +129,12 @@ export function AdminPage() {
   const [nftaIssueTierOptions, setNftaIssueTierOptions] = useState<NftaIssueTierOption[]>([]);
   const [nftaIssuedUsers, setNftaIssuedUsers] = useState<NftaIssuedUserRecord[]>([]);
 
+  // Enumerable admin list (v2)
+  const [nexusAdminList, setNexusAdminList] = useState<string[]>([]);
+  const [swapAdminList, setSwapAdminList] = useState<string[]>([]);
+  const [nexusHasEnumerableFunctions, setNexusHasEnumerableFunctions] = useState(false);
+  const [swapHasEnumerableFunctions, setSwapHasEnumerableFunctions] = useState(false);
+
   // Swap 流动性管理
   const [addLiquidityTot, setAddLiquidityTot] = useState("");
   const [addLiquidityUsdt, setAddLiquidityUsdt] = useState("");
@@ -199,6 +205,47 @@ export function AdminPage() {
       catch { results[a] = null; }
     }));
     setTofWhitelistResult(results);
+  };
+
+  const queryNexusAdminList = async () => {
+    if (!readonlyNexus) return;
+    try {
+      const count = await readonlyNexus.getAdminCount();
+      const adminList: string[] = [];
+      for (let i = 0; i < Number(count) && i < 100; i++) {
+        const admin = await readonlyNexus.getAdminAt(i);
+        adminList.push(String(admin));
+      }
+      setNexusAdminList(adminList);
+    } catch (error: any) {
+      console.error("Failed to query Nexus admin list:", error);
+      setNexusAdminList([]);
+    }
+  };
+
+  const querySwapAdminList = async () => {
+    if (!swap) return;
+    const readonlySwap = CONTRACTS.SWAP
+      ? new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, getCncReadonlyProvider())
+      : null;
+    const swapReader = readonlySwap ?? swap;
+    if (!swapReader) return;
+    try {
+      // Swap may not have enumerable admins yet
+      // Only attempt if function exists
+      if (typeof (swapReader as any).getAdminCount === 'function') {
+        const count = await swapReader.getAdminCount();
+        const adminList: string[] = [];
+        for (let i = 0; i < Number(count) && i < 100; i++) {
+          const admin = await swapReader.getAdminAt(i);
+          adminList.push(String(admin));
+        }
+        setSwapAdminList(adminList);
+      }
+    } catch (error: any) {
+      console.error("Failed to query Swap admin list:", error);
+      setSwapAdminList([]);
+    }
   };
 
   const onSetTofWhitelist = async () => {
@@ -349,6 +396,33 @@ export function AdminPage() {
         setNexusHasAdminFunctions(true);
       } catch {
         setNexusHasAdminFunctions(false);
+      }
+
+      // Check if Nexus supports enumerable admin functions (v2)
+      try {
+        if (typeof (reader as any).getAdminCount === 'function') {
+          await reader.getAdminCount();
+          setNexusHasEnumerableFunctions(true);
+          // Query admin list if available
+          queryNexusAdminList();
+        } else {
+          setNexusHasEnumerableFunctions(false);
+        }
+      } catch {
+        setNexusHasEnumerableFunctions(false);
+      }
+
+      // Check if Swap supports enumerable admin functions
+      try {
+        if (typeof (swapReader as any).getAdminCount === 'function') {
+          await swapReader.getAdminCount();
+          setSwapHasEnumerableFunctions(true);
+          querySwapAdminList();
+        } else {
+          setSwapHasEnumerableFunctions(false);
+        }
+      } catch {
+        setSwapHasEnumerableFunctions(false);
       }
 
       const nextNftaTierIdRaw = await reader.nextNftaTierId();
@@ -1203,6 +1277,59 @@ export function AdminPage() {
           </div>
         </CardContent>
       </Card>
+
+      {(nexusHasEnumerableFunctions || swapHasEnumerableFunctions) && (
+        <Card className="glass-panel border-blue-500/30">
+          <CardHeader>
+            <CardTitle>管理员列表查询 (v2)</CardTitle>
+            <CardDescription>显示当前合约的所有管理员地址</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {nexusHasEnumerableFunctions && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">Nexus 管理员 ({nexusAdminList.length})</div>
+                  <Button variant="ghost" size="sm" onClick={queryNexusAdminList} disabled={loading}>
+                    刷新
+                  </Button>
+                </div>
+                <div className="border border-border/40 rounded-lg bg-muted/10 p-3 max-h-[200px] overflow-y-auto text-xs space-y-1">
+                  {nexusAdminList.length > 0 ? (
+                    nexusAdminList.map((admin, idx) => (
+                      <div key={idx} className="flex items-center justify-between font-mono p-1 hover:bg-muted/20 rounded">
+                        <span>[{idx}] {formatAddress(admin)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground">暂无管理员</div>
+                  )}
+                </div>
+              </div>
+            )}
+            {swapHasEnumerableFunctions && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">Swap 管理员 ({swapAdminList.length})</div>
+                  <Button variant="ghost" size="sm" onClick={querySwapAdminList} disabled={loading}>
+                    刷新
+                  </Button>
+                </div>
+                <div className="border border-border/40 rounded-lg bg-muted/10 p-3 max-h-[200px] overflow-y-auto text-xs space-y-1">
+                  {swapAdminList.length > 0 ? (
+                    swapAdminList.map((admin, idx) => (
+                      <div key={idx} className="flex items-center justify-between font-mono p-1 hover:bg-muted/20 rounded">
+                        <span>[{idx}] {formatAddress(admin)}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground">暂无管理员</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="glass-panel border-emerald-500/30">
         <CardHeader>
