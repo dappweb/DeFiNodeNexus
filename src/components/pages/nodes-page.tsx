@@ -735,13 +735,11 @@ export function NodesPage() {
     try {
       const claimFeeBps = BigInt(await nexus.tofClaimFeeBps());
       const claimTofFee = (claimAmount * claimFeeBps) / 10000n;
-      const withdrawTofFee = await getWithdrawTofFee(claimAmount);
-      const totalRequiredTof = claimTofFee + withdrawTofFee;
 
       const tofReady = await ensureTofReady(
-        totalRequiredTof,
+        claimTofFee,
         t("toastClaimFailed"),
-        t("toastNeedMoreTofForClaimAndWithdraw")
+        t("toastTofBalanceInsufficient")
       );
       if (!tofReady) return;
 
@@ -758,21 +756,7 @@ export function NodesPage() {
         claimRes = rawClaim;
       }
 
-      setNftaStage("confirming");
-      const amtHex = claimAmount.toString(16).padStart(64, "0");
-      let withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
-      if (!withdrawRes.success) {
-        const nexusAddr = await nexus.getAddress();
-        const rawWithdraw = await rawSendViaWallet(nexusAddr, "0x699a4d40" + amtHex, address, 900_000);
-        if (!rawWithdraw.success) {
-          toast({ title: t("toastNftaClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-        withdrawRes = rawWithdraw;
-      }
-
-      toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
+      toast({ title: t("toastNftaClaimed"), description: t("toastNftaClaimOnlyDesc") });
       await refreshData(false);
     } finally {
       setNftaStage("idle");
@@ -796,14 +780,6 @@ export function NodesPage() {
     }
     setLoading(true);
     try {
-      const withdrawTofFee = await getWithdrawTofFee(claimAmount);
-      const tofReady = await ensureTofReady(
-        withdrawTofFee,
-        t("toastClaimFailed"),
-        t("toastTofBalanceInsufficientForWithdraw")
-      );
-      if (!tofReady) return;
-
       let claimRes = await execTx(() => nexus.claimAllNftbDividends());
       if (!claimRes.success) {
         const nexusAddr = await nexus.getAddress();
@@ -815,20 +791,7 @@ export function NodesPage() {
         claimRes = rawClaim;
       }
 
-      const amtHex = claimAmount.toString(16).padStart(64, "0");
-      let withdrawRes = await execTx(() => nexus.withdrawTot(claimAmount));
-      if (!withdrawRes.success) {
-        const nexusAddr = await nexus.getAddress();
-        const rawWithdraw = await rawSendViaWallet(nexusAddr, "0x699a4d40" + amtHex, address, 900_000);
-        if (!rawWithdraw.success) {
-          toast({ title: t("toastNftbClaimed"), description: t("toastClaimedAutoWithdrawFailed"), variant: "destructive" });
-          await refreshData(false);
-          return;
-        }
-        withdrawRes = rawWithdraw;
-      }
-
-      toast({ title: t("toastClaimWithdrawSuccess"), description: withdrawRes.hash?.slice(0, 10) + "..." });
+      toast({ title: t("toastNftbClaimed"), description: t("toastNftbClaimOnlyDesc") });
       await refreshData(false);
     } finally {
       setLoading(false);

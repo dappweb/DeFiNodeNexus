@@ -41,6 +41,7 @@ contract TOTSwapV3 is TOTSwap {
     bool public externalDexEnabled;
     bool public swapPaused;
     mapping(address => bool) public admins;
+    uint256 public deflationPool; // TOT accumulated for deflation in external DEX mode
 
     event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
     event DexPairUpdated(address indexed oldPair, address indexed newPair);
@@ -164,7 +165,10 @@ contract TOTSwapV3 is TOTSwap {
         if (!externalDexEnabled) {
             return super.timeUntilNextDeflation();
         }
-        return 0;
+        // In external DEX mode, still respect the 4-hour interval
+        uint256 nextTime = lastDeflationTime + DEFLATION_INTERVAL;
+        if (block.timestamp >= nextTime) return 0;
+        return nextTime - block.timestamp;
     }
 
     function buyTot(uint256 usdtAmount, uint256 minTotOut) public override {
@@ -200,7 +204,12 @@ contract TOTSwapV3 is TOTSwap {
         uint256 totToUser = grossTotOut - fee;
         require(totToUser >= minTotOut, "Slippage exceeded");
 
-        nftbDividendPool += fee;
+        // Split fee: half to dividend pool, half to deflation pool
+        uint256 deflationShare = fee / 2;
+        uint256 dividendShare = fee - deflationShare;
+        nftbDividendPool += dividendShare;
+        deflationPool += deflationShare;
+
         dailyBought[msg.sender][today] += totToUser;
         userTotCost[msg.sender] += usdtAmount;
         userTotBought[msg.sender] += totToUser;
@@ -250,7 +259,11 @@ contract TOTSwapV3 is TOTSwap {
         uint256 usdtOut = grossUsdtOut - profitTax;
         require(usdtOut >= minUsdtOut, "Slippage exceeded");
 
-        nftbDividendPool += sellFee;
+        // Split sell fee: half to dividend pool, half to deflation pool
+        uint256 sellDeflationShare = sellFee / 2;
+        uint256 sellDividendShare = sellFee - sellDeflationShare;
+        nftbDividendPool += sellDividendShare;
+        deflationPool += sellDeflationShare;
         nftbUsdtDividendPool += profitTax;
         _reduceCostBasis(msg.sender, totAmount);
 
@@ -277,9 +290,31 @@ contract TOTSwapV3 is TOTSwap {
 
     function deflate() public override {
         if (externalDexEnabled) {
-            revert("Disabled in external DEX mode");
+            _tryDeflateExternal();
+        } else {
+            super.deflate();
         }
-        super.deflate();
+    }
+
+    /// @notice Deflation in external DEX mode: burn half of deflationPool, other half to dividend pool.
+    function _tryDeflateExternal() internal {
+        if (deflationPool == 0) return;
+        if (block.timestamp < lastDeflationTime + DEFLATION_INTERVAL) return;
+
+        uint256 amount = deflationPool;
+        deflationPool = 0;
+
+        lastDeflationTime = block.timestamp;
+
+        uint256 halfBurn = amount / 2;
+        uint256 halfDividend = amount - halfBurn;
+
+        if (halfBurn > 0) {
+            totToken.safeTransfer(BURN_ADDRESS, halfBurn);
+        }
+        nftbDividendPool += halfDividend;
+
+        emit Deflated(halfBurn, halfDividend, 1, block.timestamp);
     }
 
     function _validatePairMatchesTokens(address pair) internal view {

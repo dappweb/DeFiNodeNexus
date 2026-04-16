@@ -404,35 +404,17 @@ contract DeFiNodeNexus is Ownable {
         }
     }
 
-    /// @notice Withdraw pending TOT. Requires TOF fee based on user level.
+    /// @notice Withdraw pending TOT. No TOF fee required.
     function withdrawTot(uint256 amount) external {
         require(amount > 0, "Zero amount");
         require(accounts[msg.sender].pendingTot >= amount, "Insufficient TOT");
 
-        uint8 level = getUserLevel(msg.sender);
-        uint256 feeBps = withdrawFeeBpsByLevel[level];
-        uint256 tofFee = (amount * feeBps) / BASIS_POINTS;
-        uint256 burnedTof;
-
         accounts[msg.sender].pendingTot -= amount;
         accounts[msg.sender].withdrawnTot += amount;
 
-        if (tofFee > 0) {
-            tofToken.safeTransferFrom(msg.sender, address(this), tofFee);
-
-            burnedTof = (tofFee * tofBurnBps) / BASIS_POINTS;
-            if (burnedTof > 0) {
-                tofToken.safeTransfer(BURN_ADDRESS, burnedTof);
-            }
-            uint256 treasuryShare = tofFee - burnedTof;
-            if (treasuryShare > 0) {
-                tofToken.safeTransfer(treasury, treasuryShare);
-            }
-        }
-
         totToken.safeTransfer(msg.sender, amount);
 
-        emit TotWithdrawn(msg.sender, amount, tofFee, burnedTof);
+        emit TotWithdrawn(msg.sender, amount, 0, 0);
     }
 
     // ================================================================
@@ -570,6 +552,34 @@ contract DeFiNodeNexus is Ownable {
         nodeId = _createNftaNode(user, tierId, tier.dailyYield);
 
         emit NftaPurchased(user, nodeId, tierId, tier.price);
+    }
+
+    /// @notice Owner batch-registers NFTA purchases (off-chain payment).
+    function batchRegisterNftaPurchase(
+        address user,
+        uint256 tierId,
+        uint256 quantity,
+        address referrer
+    ) external onlyOwner returns (uint256 firstNodeId, uint256 lastNodeId) {
+        require(user != address(0), "User is zero");
+        require(quantity > 0, "Quantity is zero");
+
+        NftaTier storage tier = nftaTiers[tierId];
+        require(tier.isActive, "Tier inactive");
+        require(tier.currentSupply + quantity <= tier.maxSupply, "Tier sold out");
+
+        _bindReferrerIfNeeded(user, referrer);
+
+        tier.currentSupply += quantity;
+
+        for (uint256 i = 0; i < quantity; i++) {
+            uint256 nodeId = _createNftaNode(user, tierId, tier.dailyYield);
+            if (i == 0) {
+                firstNodeId = nodeId;
+            }
+            lastNodeId = nodeId;
+            emit NftaPurchased(user, nodeId, tierId, tier.price);
+        }
     }
 
     function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
-import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { fetchAnnouncementsFromService } from "@/lib/announcement-data-service";
+import { MOCK_USER_DATA } from "@/lib/mock-data";
+import { NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET() {
   try {
@@ -14,7 +14,7 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({ data: rows, source: "http-service" });
+    return NextResponse.json({ data: rows, source: "service" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown database error";
     return NextResponse.json(

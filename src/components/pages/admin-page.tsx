@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { execTx, useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract } from "@/hooks/use-contract";
+import { execTx, useERC20Contract, useNexusContract, useReadonlyNexusContract, useSwapContract, useTofTokenContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { getPrimaryCncRpcUrl } from "@/lib/cnc-rpc";
 import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
@@ -108,6 +108,8 @@ export function AdminPage() {
   const readonlyNexus = useReadonlyNexusContract();
   const swap = useSwapContract();
   const tof = useTofTokenContract();
+  const tot = useERC20Contract(CONTRACTS.TOT);
+  const usdt = useERC20Contract(CONTRACTS.USDT);
 
   const [loading, setLoading] = useState(false);
   const [ownerAddress, setOwnerAddress] = useState("");
@@ -164,6 +166,9 @@ export function AdminPage() {
   const [registerUserAddr, setRegisterUserAddr] = useState("");
   const [registerTierId, setRegisterTierId] = useState("");
   const [registerReferrerAddr, setRegisterReferrerAddr] = useState("");
+  const [registerQuantity, setRegisterQuantity] = useState("1");
+  const [registerChunkSize, setRegisterChunkSize] = useState("100");
+  const [registerBatchResult, setRegisterBatchResult] = useState("");
   const [registerType, setRegisterType] = useState("nfta");
   const [nftaIssueTierOptions, setNftaIssueTierOptions] = useState<NftaIssueTierOption[]>([]);
   const [nftaIssuedUsers, setNftaIssuedUsers] = useState<NftaIssuedUserRecord[]>([]);
@@ -214,6 +219,7 @@ export function AdminPage() {
   // P0: 分红池实时监控与触发前模拟
   const [totDividendPool, setTotDividendPool] = useState<bigint>(0n);
   const [usdtDividendPool, setUsdtDividendPool] = useState<bigint>(0n);
+  const [deflationPoolBalance, setDeflationPoolBalance] = useState<bigint>(0n);
   const [totDistributionThreshold, setTotDistributionThreshold] = useState<bigint>(0n);
   const [usdtDistributionThreshold, setUsdtDistributionThreshold] = useState<bigint>(0n);
   const [dividendHealthChecks, setDividendHealthChecks] = useState<DividendHealthCheck[]>([]);
@@ -221,6 +227,13 @@ export function AdminPage() {
   const [userEstimates, setUserEstimates] = useState<UserDividendEstimate[]>([]);
   const [simulatingDividends, setSimulatingDividends] = useState(false);
   const [simulateBlockRange, setSimulateBlockRange] = useState("1500000");
+
+  // 公告管理
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementContent, setAnnouncementContent] = useState("");
+  const [announcementType, setAnnouncementType] = useState("update");
+  const [announcementList, setAnnouncementList] = useState<{id: string | number; title: string; date: string; type: string}[]>([]);
+  const [announcementLoading, setAnnouncementLoading] = useState(false);
 
   const isOwner = useMemo(() => {
     if (!address || !ownerAddress) return false;
@@ -582,7 +595,7 @@ export function AdminPage() {
 
         // Load Swap fee params & nexus address from chain
         try {
-          const [bfBps, sfBps, ptBps, dfBps, mdBuy, msBps, dThresh, usdtDThresh, totPool, usdtPool, nexusRef] = await Promise.all([
+          const [bfBps, sfBps, ptBps, dfBps, mdBuy, msBps, dThresh, usdtDThresh, totPool, usdtPool, nexusRef, defPool] = await Promise.all([
             swapReader.buyFeeBps(),
             swapReader.sellFeeBps(),
             swapReader.profitTaxBps(),
@@ -594,6 +607,7 @@ export function AdminPage() {
             swapReader.nftbDividendPool(),
             swapReader.nftbUsdtDividendPool(),
             swapReader.nexus(),
+            swapReader.deflationPool().catch(() => BigInt(0)),
           ]);
           setBuyFeeBps(bfBps.toString());
           setSellFeeBps(sfBps.toString());
@@ -606,6 +620,7 @@ export function AdminPage() {
           setUsdtDistributionThreshold(BigInt(usdtDThresh));
           setTotDividendPool(BigInt(totPool));
           setUsdtDividendPool(BigInt(usdtPool));
+          setDeflationPoolBalance(BigInt(defPool));
           setCurrentSwapNexus(String(nexusRef || ""));
         } catch {
           // Leave current values unchanged on error
@@ -870,10 +885,6 @@ export function AdminPage() {
 
   const onDeflate = async () => {
     if (!swap) return;
-    if (externalDexEnabled) {
-      toast({ title: "外部DEX模式已启用", description: "当前模式下已禁用内部池通缩", variant: "destructive" });
-      return;
-    }
     await runTx("执行通缩", () => swap.deflate());
   };
 
@@ -883,34 +894,136 @@ export function AdminPage() {
     return ethers.parseUnits(value, 18);
   };
 
+  // 一键从 Swap 分红池分红（调用 swap.forceDistribute）
+  const onForceDistributeFromPool = async () => {
+    if (!swap) {
+      toast({ title: "错误", description: "Swap合约未连接", variant: "destructive" });
+      return;
+    }
+    if (totDividendPool <= 0n && usdtDividendPool <= 0n) {
+      toast({ title: "池子为空", description: "TOT和USDT分红池都为0，无需分红", variant: "destructive" });
+      return;
+    }
+    await runTx(
+      `从Swap池强制分红 (TOT: ${formatToken(totDividendPool)}, USDT: ${formatToken(usdtDividendPool)})`,
+      () => swap.forceDistribute()
+    );
+  };
+
+  // 手动从管理员钱包注入 TOT 分红
   const onDistributeNftbTot = async () => {
-    if (!nexus) return;
+    if (!nexus || !tot || !address) return;
     const amount = parsePositiveAmount(nftbTotDividendAmount);
     if (amount === null) {
       toast({ title: "参数错误", description: "NFTB TOT分红金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放NFTB TOT分红", () => nexus.distributeNftbDividends(amount));
+
+    setLoading(true);
+    try {
+      const signerAddr = address;
+      const balance = await tot.balanceOf(signerAddr);
+      if (balance < amount) {
+        toast({ title: "钱包余额不足", description: `需要 ${ethers.formatUnits(amount, 18)} TOT，您的钱包余额: ${ethers.formatUnits(balance, 18)}。如需从Swap分红池分红，请使用上方「一键从池子分红」按钮`, variant: "destructive" });
+        return;
+      }
+
+      const allowance = await tot.allowance(signerAddr, CONTRACTS.NEXUS);
+      if (allowance < amount) {
+        if (allowance > BigInt(0)) {
+          const resetRes = await execTx(() => tot.approve(CONTRACTS.NEXUS, BigInt(0), { gasLimit: 100_000 }));
+          if (!resetRes.success) { toast({ title: "授权失败", description: resetRes.error || "重置授权失败", variant: "destructive" }); return; }
+        }
+        const approveRes = await execTx(() => tot.approve(CONTRACTS.NEXUS, amount, { gasLimit: 200_000 }));
+        if (!approveRes.success) { toast({ title: "授权失败", description: approveRes.error || "TOT授权失败", variant: "destructive" }); return; }
+      }
+
+      await runTx("从钱包发放NFTB TOT分红", () => nexus.distributeNftbDividends(amount));
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // 手动从管理员钱包注入 USDT 分红
   const onDistributeNftbUsdt = async () => {
-    if (!nexus) return;
+    if (!nexus || !usdt || !address) return;
     const amount = parsePositiveAmount(nftbUsdtDividendAmount);
     if (amount === null) {
       toast({ title: "参数错误", description: "NFTB USDT分红金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放NFTB USDT分红", () => nexus.distributeNftbUsdtDividends(amount));
+
+    setLoading(true);
+    try {
+      const signerAddr = address;
+      const balance = await usdt.balanceOf(signerAddr);
+      if (balance < amount) {
+        toast({ title: "钱包余额不足", description: `需要 ${ethers.formatUnits(amount, 18)} USDT，您的钱包余额: ${ethers.formatUnits(balance, 18)}。如需从Swap分红池分红，请使用上方「一键从池子分红」按钮`, variant: "destructive" });
+        return;
+      }
+
+      const allowance = await usdt.allowance(signerAddr, CONTRACTS.NEXUS);
+      if (allowance < amount) {
+        if (allowance > BigInt(0)) {
+          const resetRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, BigInt(0), { gasLimit: 100_000 }));
+          if (!resetRes.success) { toast({ title: "授权失败", description: resetRes.error || "重置授权失败", variant: "destructive" }); return; }
+        }
+        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, amount, { gasLimit: 200_000 }));
+        if (!approveRes.success) { toast({ title: "授权失败", description: approveRes.error || "USDT授权失败", variant: "destructive" }); return; }
+      }
+
+      await runTx("从钱包发放NFTB USDT分红", () => nexus.distributeNftbUsdtDividends(amount));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onDistributePredictionFlow = async () => {
-    if (!nexus) return;
+    if (!nexus || !usdt || !address) return;
     const amount = parsePositiveAmount(predictionFlowAmount);
     if (amount === null) {
       toast({ title: "参数错误", description: "预测流水金额必须大于0", variant: "destructive" });
       return;
     }
-    await runTx("发放预测流水分红", () => nexus.distributePredictionFlowUsdt(amount));
+
+    setLoading(true);
+    try {
+      // Get current signer address from useWeb3 context
+      const signerAddr = address;
+
+      // Check balance
+      const balance = await usdt.balanceOf(signerAddr);
+      if (balance < amount) {
+        toast({ title: "余额不足", description: `需要 ${ethers.formatUnits(amount, 18)} USDT，当前余额: ${ethers.formatUnits(balance, 18)}`, variant: "destructive" });
+        return;
+      }
+
+      // Check current allowance
+      const allowance = await usdt.allowance(signerAddr, CONTRACTS.NEXUS);
+      
+      if (allowance < amount) {
+        // Reset to 0 first if current allowance is non-zero (Tether-style protection)
+        if (allowance > BigInt(0)) {
+          const resetRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, BigInt(0), { gasLimit: 100_000 }));
+          if (!resetRes.success) {
+            toast({ title: "授权失败", description: resetRes.error || "重置授权失败", variant: "destructive" });
+            return;
+          }
+        }
+
+        // Approve the amount
+        const approveRes = await execTx(() => usdt.approve(CONTRACTS.NEXUS, amount, { gasLimit: 200_000 }));
+        if (!approveRes.success) {
+          toast({ title: "授权失败", description: approveRes.error || "USDT授权失败", variant: "destructive" });
+          return;
+        }
+      }
+
+      // Now do the actual distribution
+      await runTx("发放预测流水分红", () => nexus.distributePredictionFlowUsdt(amount));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onSetPredictionFlowRates = async () => {
@@ -949,6 +1062,109 @@ export function AdminPage() {
   };
 
   // ===== 注册购买 =====
+  const collectNftaIssuedRows = (receipt: any, fallbackTxHash?: string): NftaIssuedUserRecord[] => {
+    if (!receipt) return [];
+    const rows: NftaIssuedUserRecord[] = [];
+    for (const log of receipt.logs || []) {
+      try {
+        const parsed = nexus?.interface.parseLog(log);
+        if (parsed?.name !== "NftaPurchased") continue;
+
+        const user = String(parsed.args?.user || "");
+        if (!user || user === ethers.ZeroAddress) continue;
+
+        rows.push({
+          user,
+          tierId: BigInt(parsed.args?.tierId ?? 0n).toString(),
+          nodeId: BigInt(parsed.args?.nodeId ?? 0n).toString(),
+          blockNumber: String(receipt.blockNumber ?? "-"),
+          txHash: String(receipt.hash || fallbackTxHash || ""),
+        });
+      } catch {
+        // Ignore unrelated logs
+      }
+    }
+    return rows;
+  };
+
+  const onBatchRegisterNfta = async () => {
+    if (!nexus) return;
+    const user = registerUserAddr.trim();
+    if (!ethers.isAddress(user)) {
+      toast({ title: "参数错误", description: "用户地址无效", variant: "destructive" });
+      return;
+    }
+
+    const tierId = parsePositiveInteger(registerTierId);
+    if (tierId === null) {
+      toast({ title: "参数错误", description: "Tier ID 必须是正整数", variant: "destructive" });
+      return;
+    }
+
+    const quantity = parsePositiveInteger(registerQuantity);
+    if (quantity === null) {
+      toast({ title: "参数错误", description: "数量必须是正整数", variant: "destructive" });
+      return;
+    }
+
+    const chunkSize = parsePositiveInteger(registerChunkSize);
+    if (chunkSize === null) {
+      toast({ title: "参数错误", description: "每批数量必须是正整数", variant: "destructive" });
+      return;
+    }
+
+    const referrer = registerReferrerAddr.trim() ? registerReferrerAddr.trim() : ethers.ZeroAddress;
+    if (!ethers.isAddress(referrer)) {
+      toast({ title: "参数错误", description: "推荐人地址无效", variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    setRegisterBatchResult("");
+    const resultLines: string[] = [];
+    try {
+      // Prefer one tx with new batch function; fallback to chunked single registration when old contract is still on-chain.
+      try {
+        const batchTx = await (nexus as any).batchRegisterNftaPurchase(user, BigInt(tierId), BigInt(quantity), referrer);
+        const receipt = await batchTx.wait();
+        const rows = collectNftaIssuedRows(receipt, batchTx.hash);
+        if (rows.length > 0) {
+          setNftaIssuedUsers((prev) => [...rows.reverse(), ...prev].slice(0, 100));
+        }
+        resultLines.push(`批量发放成功: ${quantity} 个, tx ${String(batchTx.hash || "").slice(0, 12)}`);
+        setRegisterBatchResult(resultLines.join("\n"));
+        toast({ title: "批量发放NFTA成功", description: `已发放 ${quantity} 个` });
+        await refresh();
+        return;
+      } catch (batchErr: any) {
+        resultLines.push(`链上批量接口不可用或执行失败，回退分批模式: ${(batchErr?.shortMessage || batchErr?.message || "未知错误").slice(0, 80)}`);
+      }
+
+      let completed = 0;
+      while (completed < quantity) {
+        const currentBatch = Math.min(chunkSize, quantity - completed);
+        for (let i = 0; i < currentBatch; i++) {
+          const tx = await nexus.registerNftaPurchase(user, BigInt(tierId), referrer);
+          const receipt = await tx.wait();
+          const rows = collectNftaIssuedRows(receipt, tx.hash);
+          if (rows.length > 0) {
+            setNftaIssuedUsers((prev) => [...rows.reverse(), ...prev].slice(0, 100));
+          }
+          completed += 1;
+        }
+        resultLines.push(`分批进度: ${completed}/${quantity}`);
+        setRegisterBatchResult(resultLines.join("\n"));
+      }
+
+      toast({ title: "批量发放NFTA成功", description: `已发放 ${completed} 个` });
+      await refresh();
+    } catch (err: any) {
+      toast({ title: "批量发放NFTA失败", description: err?.shortMessage || err?.message || "未知错误", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onRegisterPurchase = async () => {
     if (!nexus) return;
     if (!ethers.isAddress(registerUserAddr.trim())) {
@@ -972,34 +1188,9 @@ export function AdminPage() {
         const tx = await nexus.registerNftaPurchase(registerUserAddr.trim(), BigInt(tierId), referrer);
         const receipt = await tx.wait();
 
-        const parsedRow = (() => {
-          if (!receipt) return null;
-          for (const log of receipt.logs) {
-            try {
-              const parsed = nexus.interface.parseLog(log);
-              if (parsed?.name !== "NftaPurchased") continue;
-
-              const user = String(parsed.args?.user || "");
-              const tier = BigInt(parsed.args?.tierId ?? 0n).toString();
-              const node = BigInt(parsed.args?.nodeId ?? 0n).toString();
-              if (!user || user === ethers.ZeroAddress) return null;
-
-              return {
-                user,
-                tierId: tier,
-                nodeId: node,
-                blockNumber: String(receipt.blockNumber ?? "-"),
-                txHash: String(receipt.hash || tx.hash || ""),
-              } as NftaIssuedUserRecord;
-            } catch {
-              // Ignore unrelated logs
-            }
-          }
-          return null;
-        })();
-
-        if (parsedRow) {
-          setNftaIssuedUsers((prev) => [parsedRow, ...prev].slice(0, 100));
+        const parsedRows = collectNftaIssuedRows(receipt, tx.hash);
+        if (parsedRows.length > 0) {
+          setNftaIssuedUsers((prev) => [...parsedRows.reverse(), ...prev].slice(0, 100));
         }
 
         toast({ title: "注册NFTA购买成功", description: tx.hash?.slice(0, 12) || "已上链" });
@@ -1152,10 +1343,6 @@ export function AdminPage() {
 
   const onSetDeflationBps = async () => {
     if (!swap) return;
-    if (externalDexEnabled) {
-      toast({ title: "外部DEX模式已启用", description: "当前模式下不再使用内部池通缩参数", variant: "destructive" });
-      return;
-    }
     const def = parseBps(deflationBps);
     if (def === null) {
       toast({ title: "参数错误", description: "比率必须在0-10000之间", variant: "destructive" });
@@ -1898,17 +2085,58 @@ export function AdminPage() {
               </Alert>
             </CollapsibleContent>
           </Collapsible>
+
+          {/* 分红池余额信息卡 + 一键分红 */}
+          <Card className="glass-panel border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Swap 分红池（交易手续费累积）</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">TOT分红池:</span>
+                <span className="font-mono font-semibold">
+                  {`${formatToken(totDividendPool, 18)} TOT`}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">USDT分红池:</span>
+                <span className="font-mono font-semibold">
+                  {`${formatToken(usdtDividendPool, 18)} USDT`}
+                </span>
+              </div>
+              <Button
+                className="w-full"
+                disabled={loading || !swap || (totDividendPool <= 0n && usdtDividendPool <= 0n)}
+                onClick={onForceDistributeFromPool}
+              >
+                一键从池子分红（TOT + USDT 全部分发）
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                💡 点击上方按钮将把 Swap 合约中累积的手续费全部分发给 NFTB 持有者
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* 手动从钱包注入额外分红（高级） */}
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center gap-2 text-xs text-amber-400 hover:underline cursor-pointer">
+              <ChevronDown className="h-3 w-3" />
+              手动从钱包注入额外分红（需钱包持有对应代币）
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Input value={nftbTotDividendAmount} onChange={(e) => setNftbTotDividendAmount(e.target.value)} placeholder="NFTB TOT分红金额" />
+            <Input value={nftbTotDividendAmount} onChange={(e) => setNftbTotDividendAmount(e.target.value)} placeholder="TOT金额（从您的钱包转出）" />
             <div />
-            <Button disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbTot}>发放NFTB TOT分红</Button>
+            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbTot}>从钱包发放TOT分红</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Input value={nftbUsdtDividendAmount} onChange={(e) => setNftbUsdtDividendAmount(e.target.value)} placeholder="NFTB USDT分红金额" />
+            <Input value={nftbUsdtDividendAmount} onChange={(e) => setNftbUsdtDividendAmount(e.target.value)} placeholder="USDT金额（从您的钱包转出）" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbUsdt}>发放NFTB USDT分红</Button>
+            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbUsdt}>从钱包发放USDT分红</Button>
           </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={predictionFlowAmount} onChange={(e) => setPredictionFlowAmount(e.target.value)} placeholder="预测流水分红金额(USDT)" />
@@ -1990,6 +2218,22 @@ export function AdminPage() {
               </Button>
             </div>
           </div>
+
+          {registerType === "nfta" ? (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+              <div className="text-sm font-medium">批量发放NFTA（一键）</div>
+              <div className="text-xs text-muted-foreground">输入地址 + 级别/库存ID + 数量，系统优先走链上批量接口；如当前链未升级则自动回退分批单发。</div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="接收用户地址" />
+                <Input value={registerQuantity} onChange={(e) => setRegisterQuantity(e.target.value)} placeholder="发放数量，例如 2000" />
+                <Input value={registerChunkSize} onChange={(e) => setRegisterChunkSize(e.target.value)} placeholder="回退分批数量，例如 100" />
+                <Button disabled={!isNexusManager || loading || !nexus} onClick={onBatchRegisterNfta}>批量发放NFTA</Button>
+              </div>
+              {registerBatchResult ? (
+                <div className="text-xs whitespace-pre-wrap rounded border border-border/60 bg-muted/30 p-2">{registerBatchResult}</div>
+              ) : null}
+            </div>
+          ) : null}
 
           {registerType === "nfta" && (
             <div className="space-y-2 pt-1">
@@ -2271,13 +2515,21 @@ export function AdminPage() {
             <Input value={deflationBps} onChange={(e) => setDeflationBps(e.target.value)} placeholder="通胀比率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={onSetDeflationBps}>设置通胀比率</Button>
+            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDeflationBps}>设置通胀比率</Button>
           </div>
+          {externalDexEnabled && deflationPoolBalance > 0n && (
+            <div className="text-xs text-muted-foreground p-2 rounded bg-amber-500/10">
+              通缩池余额: <span className="font-mono font-semibold">{formatToken(deflationPoolBalance, 18)} TOT</span>
+              （50% 销毁 + 50% 回流分红池）
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <div className="text-xs text-muted-foreground flex items-center">触发一次 4h 通缩逻辑</div>
+            <div className="text-xs text-muted-foreground flex items-center">
+              {externalDexEnabled ? "从通缩池执行销毁（外部DEX模式）" : "触发一次 4h 通缩逻辑"}
+            </div>
             <div />
             <div />
-            <Button variant="secondary" disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={onDeflate}>执行通缩</Button>
+            <Button variant="secondary" disabled={!isSwapManager || loading || !swap} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>
@@ -2472,6 +2724,91 @@ export function AdminPage() {
             </Select>
             <Button variant="outline" disabled={!isTofOwner || loading || !tof} onClick={onSetTofWhitelist}>设置</Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== 公告管理 ===== */}
+      <Card className="glass-panel">
+        <CardHeader>
+          <CardTitle>公告管理</CardTitle>
+          <CardDescription>发布、查看和删除系统公告（存储于 JSONBin）</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} placeholder="公告标题" className="md:col-span-2" />
+            <Select value={announcementType} onValueChange={setAnnouncementType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="update">更新</SelectItem>
+                <SelectItem value="news">新闻</SelectItem>
+                <SelectItem value="maintenance">维护</SelectItem>
+                <SelectItem value="event">活动</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button disabled={announcementLoading || !announcementTitle.trim() || !announcementContent.trim()} onClick={async () => {
+              setAnnouncementLoading(true);
+              try {
+                const res = await fetch("/api/admin/announcements", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ title: announcementTitle.trim(), content: announcementContent.trim(), type: announcementType }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                  toast({ title: "发布成功", description: data.message });
+                  setAnnouncementTitle(""); setAnnouncementContent("");
+                  // Refresh list
+                  const listRes = await fetch("/api/announcements"); const listData = await listRes.json();
+                  if (Array.isArray(listData.data)) setAnnouncementList(listData.data);
+                } else {
+                  toast({ title: "发布失败", description: data.message || data.detail, variant: "destructive" });
+                }
+              } catch (e) {
+                toast({ title: "发布失败", description: String(e), variant: "destructive" });
+              } finally { setAnnouncementLoading(false); }
+            }}>发布公告</Button>
+          </div>
+          <Textarea value={announcementContent} onChange={(e) => setAnnouncementContent(e.target.value)} placeholder="公告内容" rows={3} />
+
+          {/* 公告列表 */}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">已发布公告 ({announcementList.length})</span>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              const res = await fetch("/api/announcements"); const data = await res.json();
+              if (Array.isArray(data.data)) setAnnouncementList(data.data);
+            }}>刷新</Button>
+          </div>
+          {announcementList.length > 0 && (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {announcementList.map((a) => (
+                <div key={a.id} className="flex items-center justify-between p-2 rounded bg-muted/30 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 mr-2">{a.type}</span>
+                    <span className="font-medium">{a.title}</span>
+                    <span className="text-xs text-muted-foreground ml-2">{a.date}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 ml-2" onClick={async () => {
+                    if (!confirm(`确认删除公告「${a.title}」？`)) return;
+                    setAnnouncementLoading(true);
+                    try {
+                      const res = await fetch("/api/admin/announcements", {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ id: a.id }),
+                      });
+                      if (res.ok) {
+                        setAnnouncementList(prev => prev.filter(x => String(x.id) !== String(a.id)));
+                        toast({ title: "已删除" });
+                      } else {
+                        const d = await res.json();
+                        toast({ title: "删除失败", description: d.message, variant: "destructive" });
+                      }
+                    } finally { setAnnouncementLoading(false); }
+                  }}>删除</Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -7,10 +7,10 @@ export const MOCK_USER_DATA = {
   },
   // --- Home: Announcements ---
   announcements: [
-    { id: 1, title: "NFTA 节点 V2 升级上线", date: "2026-03-20", type: "update" as const, content: "所有 NFTA 节点已升级至 V2，收益提升 15%。" },
-    { id: 2, title: "TOT 登陆主流交易所", date: "2026-03-18", type: "news" as const, content: "TOT 代币已上线 Top 5 中心化交易所。" },
-    { id: 3, title: "3月25日计划维护", date: "2026-03-15", type: "maintenance" as const, content: "平台将于 3 月 25 日 02:00-04:00 UTC 进行维护。" },
-    { id: 4, title: "NFTB 黄金档位奖励活动", date: "2026-03-12", type: "event" as const, content: "黄金档位 NFTB 持有者本月可获得双倍分红。" },
+    { id: 1, title: "TOTSwap V3 外部 DEX 集成上线", date: "2026-04-15", type: "update" as const, content: "TOTSwap 已升级至 V3，支持外部 DEX 价格同步。" },
+    { id: 2, title: "TOT 登陆主流交易所", date: "2026-04-10", type: "news" as const, content: "TOT 代币已上线 Top 5 中心化交易所。" },
+    { id: 3, title: "4月20日计划维护", date: "2026-04-08", type: "maintenance" as const, content: "平台将于 4 月 20 日 02:00-04:00 UTC 进行维护。" },
+    { id: 4, title: "NFTB 黄金档位奖励活动", date: "2026-04-05", type: "event" as const, content: "黄金档位 NFTB 持有者本月可获得双倍分红。" },
   ],
   // --- Home: Prices ---
   prices: [
