@@ -118,6 +118,8 @@ export function AdminPage() {
   const [swapUsdtAddress, setSwapUsdtAddress] = useState("");
   const [isNexusAdminRole, setIsNexusAdminRole] = useState(false);
   const [isSwapAdminRole, setIsSwapAdminRole] = useState(false);
+  const [isNexusManagerRole, setIsNexusManagerRole] = useState(false);
+  const [isSwapManagerRole, setIsSwapManagerRole] = useState(false);
   const [tofOwnerAddress, setTofOwnerAddress] = useState("");
   
   // NFTA 单笔/批量
@@ -141,8 +143,7 @@ export function AdminPage() {
   const [predictionRateTier2, setPredictionRateTier2] = useState("50");
   const [predictionRateTier3, setPredictionRateTier3] = useState("60");
 
-  // 提现费率按等级
-  const [withdrawLevel, setWithdrawLevel] = useState("0");
+  // 提现费率（统一）
   const [withdrawFeeBps, setWithdrawFeeBps] = useState("");
 
   // 钱包管理
@@ -175,6 +176,7 @@ export function AdminPage() {
 
   // Enumerable admin list (v2)
   const [nexusAdminList, setNexusAdminList] = useState<string[]>([]);
+  const [nexusManagerList, setNexusManagerList] = useState<string[]>([]);
   const [swapAdminList, setSwapAdminList] = useState<string[]>([]);
   const [nexusHasEnumerableFunctions, setNexusHasEnumerableFunctions] = useState(false);
   const [swapHasEnumerableFunctions, setSwapHasEnumerableFunctions] = useState(false);
@@ -216,6 +218,14 @@ export function AdminPage() {
   const [swapAdminBatchInput, setSwapAdminBatchInput] = useState("");
   const [newUsdtAddr, setNewUsdtAddr] = useState("");
 
+  // Manager 管理员
+  const [nexusManagerAddr, setNexusManagerAddr] = useState("");
+  const [nexusManagerStatus, setNexusManagerStatus] = useState("true");
+  const [nexusManagerBatchInput, setNexusManagerBatchInput] = useState("");
+  const [swapManagerAddr, setSwapManagerAddr] = useState("");
+  const [swapManagerStatus, setSwapManagerStatus] = useState("true");
+  const [swapManagerBatchInput, setSwapManagerBatchInput] = useState("");
+
   // P0: 分红池实时监控与触发前模拟
   const [totDividendPool, setTotDividendPool] = useState<bigint>(0n);
   const [usdtDividendPool, setUsdtDividendPool] = useState<bigint>(0n);
@@ -246,15 +256,17 @@ export function AdminPage() {
   }, [address, swapOwnerAddress]);
 
   const isNexusManager = isOwner || isNexusAdminRole;
+  const isNexusAuthorized = isOwner || isNexusAdminRole || isNexusManagerRole;
   const isSwapManager = isSwapOwner || isSwapAdminRole;
+  const isSwapAuthorized = isSwapOwner || isSwapAdminRole || isSwapManagerRole;
   const isTofOwner = useMemo(() => {
     if (!address || !tofOwnerAddress) return false;
     return address.toLowerCase() === tofOwnerAddress.toLowerCase();
   }, [address, tofOwnerAddress]);
 
-  const isAdmin = isNexusManager || isSwapManager;
-  const nexusAdminLabel = isNexusManager ? `✅ Nexus 管理员${isOwner ? "(Owner)" : "(Admin)"}` : "👁️ Nexus 只读";
-  const swapAdminLabel = isSwapManager ? `✅ Swap 管理员${isSwapOwner ? "(Owner)" : "(Admin)"}` : "👁️ Swap 只读";
+  const isAdmin = isNexusAuthorized || isSwapAuthorized;
+  const nexusAdminLabel = isOwner ? "✅ Nexus Owner" : isNexusAdminRole ? "✅ Nexus 超管(Admin)" : isNexusManagerRole ? "✅ Nexus 管理员(Manager)" : "👁️ Nexus 只读";
+  const swapAdminLabel = isSwapOwner ? "✅ Swap Owner" : isSwapAdminRole ? "✅ Swap 超管(Admin)" : isSwapManagerRole ? "✅ Swap 管理员(Manager)" : "👁️ Swap 只读";
 
   const NEXUS_ADDR = process.env.NEXT_PUBLIC_NEXUS_ADDRESS || "";
   const SWAP_ADDR  = process.env.NEXT_PUBLIC_SWAP_ADDRESS  || "";
@@ -283,6 +295,22 @@ export function AdminPage() {
     } catch (error: any) {
       console.error("Failed to query Nexus admin list:", error);
       setNexusAdminList([]);
+    }
+  };
+
+  const queryNexusManagerList = async () => {
+    if (!readonlyNexus) return;
+    try {
+      const count = await readonlyNexus.getManagerCount();
+      const managerList: string[] = [];
+      for (let i = 0; i < Number(count) && i < 100; i++) {
+        const manager = await readonlyNexus.getManagerAt(i);
+        managerList.push(String(manager));
+      }
+      setNexusManagerList(managerList);
+    } catch (error: any) {
+      console.error("Failed to query Nexus manager list:", error);
+      setNexusManagerList([]);
     }
   };
 
@@ -555,11 +583,14 @@ export function AdminPage() {
       if (address) {
         try {
           setIsNexusAdminRole(Boolean(await reader.admins(address)));
+          try { setIsNexusManagerRole(Boolean(await reader.managers(address))); } catch { setIsNexusManagerRole(false); }
         } catch {
           setIsNexusAdminRole(false);
+          setIsNexusManagerRole(false);
         }
       } else {
         setIsNexusAdminRole(false);
+        setIsNexusManagerRole(false);
       }
 
       // Always use a readonly Swap contract so params load even without wallet
@@ -629,14 +660,18 @@ export function AdminPage() {
         if (address) {
           try {
             setIsSwapAdminRole(Boolean(await swapReader.admins(address)));
+            try { setIsSwapManagerRole(Boolean(await swapReader.managers(address))); } catch { setIsSwapManagerRole(false); }
           } catch {
             setIsSwapAdminRole(false);
+            setIsSwapManagerRole(false);
           }
         } else {
           setIsSwapAdminRole(false);
+          setIsSwapManagerRole(false);
         }
       } else {
         setIsSwapAdminRole(false);
+        setIsSwapManagerRole(false);
         setSwapUsdtAddress("");
       }
 
@@ -664,6 +699,7 @@ export function AdminPage() {
           setNexusHasEnumerableFunctions(true);
           // Query admin list if available
           queryNexusAdminList();
+          queryNexusManagerList();
         } else {
           setNexusHasEnumerableFunctions(false);
         }
@@ -1211,17 +1247,12 @@ export function AdminPage() {
   // ===== 提现费率 =====
   const onSetWithdrawFee = async () => {
     if (!nexus) return;
-    const level = Number(withdrawLevel);
-    if (!Number.isFinite(level) || level < 0 || level > 5) {
-      toast({ title: "参数错误", description: "等级必须在0-5之间", variant: "destructive" });
-      return;
-    }
     const bps = parseBps(withdrawFeeBps);
     if (bps === null) {
       toast({ title: "参数错误", description: "费率必须在0-10000之间", variant: "destructive" });
       return;
     }
-    await runTx("设置提现费率", () => nexus.setWithdrawFeeBps(level, bps));
+    await runTx("设置提现费率", () => nexus.setWithdrawFeeBps(bps));
   };
 
   // ===== TOF 燃烧比率 =====
@@ -1579,6 +1610,49 @@ export function AdminPage() {
     await runTx("批量设置 Swap 管理员", () => swap.setAdmins(accounts, Array(accounts.length).fill(status)));
   };
 
+  // ===== Manager 管理 =====
+  const onSetNexusManager = async () => {
+    if (!nexus) return;
+    const account = nexusManagerAddr.trim();
+    if (!ethers.isAddress(account)) {
+      toast({ title: "参数错误", description: "Nexus Manager 地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置 Nexus Manager", () => nexus.setManager(account, nexusManagerStatus === "true"));
+  };
+
+  const onBatchSetNexusManagers = async () => {
+    if (!nexus) return;
+    const accounts = parseAddressBatch(nexusManagerBatchInput);
+    if (accounts.length === 0 || accounts.some((a) => !ethers.isAddress(a))) {
+      toast({ title: "参数错误", description: "批量 Nexus Manager 地址格式无效", variant: "destructive" });
+      return;
+    }
+    const status = nexusManagerStatus === "true";
+    await runTx("批量设置 Nexus Manager", () => nexus.setManagers(accounts, Array(accounts.length).fill(status)));
+  };
+
+  const onSetSwapManager = async () => {
+    if (!swap) return;
+    const account = swapManagerAddr.trim();
+    if (!ethers.isAddress(account)) {
+      toast({ title: "参数错误", description: "Swap Manager 地址无效", variant: "destructive" });
+      return;
+    }
+    await runTx("设置 Swap Manager", () => swap.setManager(account, swapManagerStatus === "true"));
+  };
+
+  const onBatchSetSwapManagers = async () => {
+    if (!swap) return;
+    const accounts = parseAddressBatch(swapManagerBatchInput);
+    if (accounts.length === 0 || accounts.some((a) => !ethers.isAddress(a))) {
+      toast({ title: "参数错误", description: "批量 Swap Manager 地址格式无效", variant: "destructive" });
+      return;
+    }
+    const status = swapManagerStatus === "true";
+    await runTx("批量设置 Swap Manager", () => swap.setManagers(accounts, Array(accounts.length).fill(status)));
+  };
+
   const onReplaceUsdtToken = async () => {
     if (!swap) return;
     const addr = newUsdtAddr.trim();
@@ -1651,18 +1725,18 @@ export function AdminPage() {
 
       <Card className="glass-panel">
         <CardHeader>
-          <CardTitle>多管理员权限管理</CardTitle>
-          <CardDescription>支持单个与批量设置管理员（仅各自 Owner 可操作）</CardDescription>
+          <CardTitle>权限管理（三级体系）</CardTitle>
+          <CardDescription>Owner → Admin超管 → Manager管理员。Owner 管理超管，超管管理管理员。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
               <div>当前 Nexus USDT: {nexusUsdtAddress ? formatAddress(nexusUsdtAddress) : "读取中..."}</div>
-              <div>当前钱包 Nexus 角色: {isOwner ? "Owner" : isNexusAdminRole ? "Admin" : "None"}</div>
+              <div>当前钱包 Nexus 角色: {isOwner ? "Owner" : isNexusAdminRole ? "Admin(超管)" : isNexusManagerRole ? "Manager(管理员)" : "None"}</div>
             </div>
             <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
               <div>当前 Swap USDT: {swapUsdtAddress ? formatAddress(swapUsdtAddress) : "读取中..."}</div>
-              <div>当前钱包 Swap 角色: {isSwapOwner ? "Owner" : isSwapAdminRole ? "Admin" : "None"}</div>
+              <div>当前钱包 Swap 角色: {isSwapOwner ? "Owner" : isSwapAdminRole ? "Admin(超管)" : isSwapManagerRole ? "Manager(管理员)" : "None"}</div>
             </div>
           </div>
 
@@ -1684,12 +1758,12 @@ export function AdminPage() {
               </SelectContent>
             </Select>
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onSetNexusAdmin}>设置 Nexus 管理员</Button>
+            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onSetNexusAdmin}>设置 Nexus 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <Textarea value={nexusAdminBatchInput} onChange={(e) => setNexusAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Nexus 地址，支持换行/逗号分隔" />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 管理员</Button>
+            <Textarea value={nexusAdminBatchInput} onChange={(e) => setNexusAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Nexus 超管地址，支持换行/逗号分隔" />
+            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -1702,12 +1776,52 @@ export function AdminPage() {
               </SelectContent>
             </Select>
             <div />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetSwapAdmin}>设置 Swap 管理员</Button>
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetSwapAdmin}>设置 Swap 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-            <Textarea value={swapAdminBatchInput} onChange={(e) => setSwapAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Swap 地址，支持换行/逗号分隔" />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onBatchSetSwapAdmins}>批量设置 Swap 管理员</Button>
+            <Textarea value={swapAdminBatchInput} onChange={(e) => setSwapAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Swap 超管地址，支持换行/逗号分隔" />
+            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onBatchSetSwapAdmins}>批量设置 Swap 超管</Button>
+          </div>
+
+          <div className="border-t border-border/40 pt-3 mt-3">
+            <div className="text-sm font-medium mb-2">Manager 管理员（超管或 Owner 可操作）</div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={nexusManagerAddr} onChange={(e) => setNexusManagerAddr(e.target.value)} placeholder="Nexus Manager 地址" />
+            <Select value={nexusManagerStatus} onValueChange={setNexusManagerStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">授权</SelectItem>
+                <SelectItem value="false">撤销</SelectItem>
+              </SelectContent>
+            </Select>
+            <div />
+            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onSetNexusManager}>设置 Nexus Manager</Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Textarea value={nexusManagerBatchInput} onChange={(e) => setNexusManagerBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Nexus Manager 地址，支持换行/逗号分隔" />
+            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onBatchSetNexusManagers}>批量设置 Nexus Manager</Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input value={swapManagerAddr} onChange={(e) => setSwapManagerAddr(e.target.value)} placeholder="Swap Manager 地址" />
+            <Select value={swapManagerStatus} onValueChange={setSwapManagerStatus}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="true">授权</SelectItem>
+                <SelectItem value="false">撤销</SelectItem>
+              </SelectContent>
+            </Select>
+            <div />
+            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetSwapManager}>设置 Swap Manager</Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Textarea value={swapManagerBatchInput} onChange={(e) => setSwapManagerBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Swap Manager 地址，支持换行/逗号分隔" />
+            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onBatchSetSwapManagers}>批量设置 Swap Manager</Button>
           </div>
         </CardContent>
       </Card>
@@ -1956,12 +2070,12 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={transferNodeId} onChange={(e) => setTransferNodeId(e.target.value)} placeholder="节点ID" />
             <Input value={transferTo} onChange={(e) => setTransferTo(e.target.value)} placeholder="接收地址" />
-            <Button disabled={!isNexusManager || loading || !nexus} onClick={onTransferNfta}>转让NFTA</Button>
+            <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onTransferNfta}>转让NFTA</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={claimNodeId} onChange={(e) => setClaimNodeId(e.target.value)} placeholder="节点ID" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onClaimNfta}>领取NFTA收益</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onClaimNfta}>领取NFTA收益</Button>
           </div>
         </CardContent>
       </Card>
@@ -2000,11 +2114,11 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Textarea value={bulkTransferInput} onChange={(e) => setBulkTransferInput(e.target.value)} className="min-h-[120px]" placeholder="0xabc...,123" />
-              <Button disabled={!isNexusManager || loading || !nexus} onClick={onBulkTransfer}>批量转卡</Button>
+              <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onBulkTransfer}>批量转卡</Button>
             </div>
             <div className="space-y-2">
               <Textarea value={bulkClaimInput} onChange={(e) => setBulkClaimInput(e.target.value)} className="min-h-[120px]" placeholder="123" />
-              <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onBulkClaim}>批量领取</Button>
+              <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onBulkClaim}>批量领取</Button>
             </div>
           </div>
           {bulkResult ? (
@@ -2044,12 +2158,12 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={tofClaimFeeBps} onChange={(e) => setTofClaimFeeBps(e.target.value)} placeholder="TOF领取费率 bps" />
             <div />
-            <Button disabled={!isNexusManager || loading || !nexus} onClick={onSetTofClaimFee}>更新TOF领取费率</Button>
+            <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onSetTofClaimFee}>更新TOF领取费率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={rewardFundAmount} onChange={(e) => setRewardFundAmount(e.target.value)} placeholder="奖励池注资 TOT 数量" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onFundRewardPool}>注资奖励池</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onFundRewardPool}>注资奖励池</Button>
           </div>
         </CardContent>
       </Card>
@@ -2127,13 +2241,13 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={nftbTotDividendAmount} onChange={(e) => setNftbTotDividendAmount(e.target.value)} placeholder="TOT金额（从您的钱包转出）" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbTot}>从钱包发放TOT分红</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onDistributeNftbTot}>从钱包发放TOT分红</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={nftbUsdtDividendAmount} onChange={(e) => setNftbUsdtDividendAmount(e.target.value)} placeholder="USDT金额（从您的钱包转出）" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onDistributeNftbUsdt}>从钱包发放USDT分红</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onDistributeNftbUsdt}>从钱包发放USDT分红</Button>
           </div>
             </CollapsibleContent>
           </Collapsible>
@@ -2141,14 +2255,14 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={predictionFlowAmount} onChange={(e) => setPredictionFlowAmount(e.target.value)} placeholder="预测流水分红金额(USDT)" />
             <div />
-            <Button variant="secondary" disabled={!isNexusManager || loading || !nexus} onClick={onDistributePredictionFlow}>发放预测流水分红</Button>
+            <Button variant="secondary" disabled={!isNexusAuthorized || loading || !nexus} onClick={onDistributePredictionFlow}>发放预测流水分红</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Input value={predictionRateTier1} onChange={(e) => setPredictionRateTier1(e.target.value)} placeholder="初级费率 bps" />
             <Input value={predictionRateTier2} onChange={(e) => setPredictionRateTier2(e.target.value)} placeholder="中级费率 bps" />
             <Input value={predictionRateTier3} onChange={(e) => setPredictionRateTier3(e.target.value)} placeholder="高级费率 bps" />
-            <Button disabled={!isNexusManager || loading || !nexus} onClick={onSetPredictionFlowRates}>更新预测流水费率</Button>
+            <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onSetPredictionFlowRates}>更新预测流水费率</Button>
           </div>
         </CardContent>
       </Card>
@@ -2213,7 +2327,7 @@ export function AdminPage() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button disabled={!isNexusManager || loading || !nexus} onClick={onRegisterPurchase} className="flex-1">
+              <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onRegisterPurchase} className="flex-1">
                 {registerType === "nfta" ? "发放 NFTA" : "注册 NFTB"}
               </Button>
             </div>
@@ -2227,7 +2341,7 @@ export function AdminPage() {
                 <Input value={registerUserAddr} onChange={(e) => setRegisterUserAddr(e.target.value)} placeholder="接收用户地址" />
                 <Input value={registerQuantity} onChange={(e) => setRegisterQuantity(e.target.value)} placeholder="发放数量，例如 2000" />
                 <Input value={registerChunkSize} onChange={(e) => setRegisterChunkSize(e.target.value)} placeholder="回退分批数量，例如 100" />
-                <Button disabled={!isNexusManager || loading || !nexus} onClick={onBatchRegisterNfta}>批量发放NFTA</Button>
+                <Button disabled={!isNexusAuthorized || loading || !nexus} onClick={onBatchRegisterNfta}>批量发放NFTA</Button>
               </div>
               {registerBatchResult ? (
                 <div className="text-xs whitespace-pre-wrap rounded border border-border/60 bg-muted/30 p-2">{registerBatchResult}</div>
@@ -2276,7 +2390,7 @@ export function AdminPage() {
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>费率管理</CardTitle>
-          <CardDescription>设置 TOF 费率和提现等级费用</CardDescription>
+          <CardDescription>设置 TOF 费率和提现费用</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Collapsible defaultOpen={false}>
@@ -2289,15 +2403,12 @@ export function AdminPage() {
                   <div><strong>TOF 燃烧比率</strong></div>
                   <div>• 用户领取收益时 TOF 代币被销毁的比例</div>
                   <div>• 单位为 bps（基点），1 bps = 0.01%，10000 bps = 100%</div>
-                  <div className="mt-2"><strong>提现费率等级</strong></div>
-                  <div>• 6个等级（0-5），不同等级对应不同的提现手续费</div>
-                  <div>• 等级越高，提现费率可能越低或越高（根据业务规则）</div>
+                  <div className="mt-2"><strong>提现费率</strong></div>
+                  <div>• 所有用户统一的提现手续费</div>
                   <div className="mt-2"><strong>费率配置示例</strong>：</div>
                   <div className="bg-black/30 p-2 rounded">
                     • TOF燃烧比率: 1000 (1%的TOF会被销毁)<br/>
-                    • Lv0 提现费率: 500 (0.5%)<br/>
-                    • Lv1 提现费率: 400 (0.4%)<br/>
-                    • Lv2 提现费率: 300 (0.3%)
+                    • 提现费率: 500 (0.5%)
                   </div>
                   <div className="text-zinc-400 mt-1">✓ 费率值范围：0-10000 bps</div>
                 </AlertDescription>
@@ -2307,18 +2418,12 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={tofBurnBps} onChange={(e) => setTofBurnBps(e.target.value)} placeholder="TOF 燃烧比率 bps" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onSetTofBurnBps}>设置TOF燃烧比率</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onSetTofBurnBps}>设置TOF燃烧比率</Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Select value={withdrawLevel} onValueChange={setWithdrawLevel}>
-              <SelectTrigger><SelectValue placeholder="等级" /></SelectTrigger>
-              <SelectContent>
-                {[0, 1, 2, 3, 4, 5].map((l) => <SelectItem key={l} value={l.toString()}>{`Lv${l}`}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Input value={withdrawFeeBps} onChange={(e) => setWithdrawFeeBps(e.target.value)} placeholder="提现费率 bps" />
             <div />
-            <Button variant="outline" disabled={!isNexusManager || loading || !nexus} onClick={onSetWithdrawFee}>设置提现费率</Button>
+            <Button variant="outline" disabled={!isNexusAuthorized || loading || !nexus} onClick={onSetWithdrawFee}>设置提现费率</Button>
           </div>
         </CardContent>
       </Card>
@@ -2497,25 +2602,25 @@ export function AdminPage() {
             <Input value={buyFeeBps} onChange={(e) => setBuyFeeBps(e.target.value)} placeholder="买入费率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetBuyFeeBps}>设置买入费率</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetBuyFeeBps}>设置买入费率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={sellFeeBps} onChange={(e) => setSellFeeBps(e.target.value)} placeholder="卖出费率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetSellFeeBps}>设置卖出费率</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetSellFeeBps}>设置卖出费率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={profitTaxBps} onChange={(e) => setProfitTaxBps(e.target.value)} placeholder="利润税率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetProfitTaxBps}>设置利润税率</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetProfitTaxBps}>设置利润税率</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Input value={deflationBps} onChange={(e) => setDeflationBps(e.target.value)} placeholder="通胀比率 bps" />
             <div />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDeflationBps}>设置通胀比率</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetDeflationBps}>设置通胀比率</Button>
           </div>
           {externalDexEnabled && deflationPoolBalance > 0n && (
             <div className="text-xs text-muted-foreground p-2 rounded bg-amber-500/10">
@@ -2529,7 +2634,7 @@ export function AdminPage() {
             </div>
             <div />
             <div />
-            <Button variant="secondary" disabled={!isSwapManager || loading || !swap} onClick={onDeflate}>执行通缩</Button>
+            <Button variant="secondary" disabled={!isSwapAuthorized || loading || !swap} onClick={onDeflate}>执行通缩</Button>
           </div>
         </CardContent>
       </Card>
@@ -2562,17 +2667,17 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={distributionThreshold} onChange={(e) => setDistributionThreshold(e.target.value)} placeholder="分配阈值" />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetDistributionThreshold}>设置分配阈值</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetDistributionThreshold}>设置分配阈值</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={maxDailyBuy} onChange={(e) => setMaxDailyBuy(e.target.value)} placeholder="日购买上限" />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetMaxDailyBuy}>设置日购买上限</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetMaxDailyBuy}>设置日购买上限</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={maxSellBps} onChange={(e) => setMaxSellBps(e.target.value)} placeholder="最大卖出比例 bps" />
             <div />
-            <Button variant="outline" disabled={!isSwapManager || loading || !swap} onClick={onSetMaxSellBps}>设置卖出比例</Button>
+            <Button variant="outline" disabled={!isSwapAuthorized || loading || !swap} onClick={onSetMaxSellBps}>设置卖出比例</Button>
           </div>
         </CardContent>
       </Card>

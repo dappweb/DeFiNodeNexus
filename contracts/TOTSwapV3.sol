@@ -41,6 +41,7 @@ contract TOTSwapV3 is TOTSwap {
     bool public externalDexEnabled;
     bool public swapPaused;
     mapping(address => bool) public admins;
+    mapping(address => bool) public managers;
     uint256 public deflationPool; // TOT accumulated for deflation in external DEX mode
 
     event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
@@ -371,6 +372,14 @@ contract TOTSwapV3 is TOTSwap {
 
     function _setAdmin(address account, bool enabled) internal override {
         admins[account] = enabled;
+    }
+
+    function _isManager(address account) internal view override returns (bool) {
+        return managers[account];
+    }
+
+    function _setManager(address account, bool enabled) internal override {
+        managers[account] = enabled;
     }
 
     function _grossUpNetAmount(uint256 netAmount, uint256 feeBps) internal pure returns (uint256) {

@@ -30,13 +30,11 @@ async function main() {
 
   for (const user of users) {
     const account = await nexus.accounts(user);
-    const level = await nexus.getUserLevel(user);
 
     userData.set(user, {
       address: user,
       referrer: account.referrer,
       directReferrals: Number(account.directReferrals),
-      level: Number(level),
       totalNodes: Number(account.totalNodes),
       pendingTot: ethers.formatUnits(account.pendingTot, 18),
       claimedTot: ethers.formatUnits(account.claimedTot, 18),

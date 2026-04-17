@@ -296,9 +296,8 @@ export function NodesPage() {
     if (!nexus || !address || amount <= 0n) return 0n;
 
     try {
-      const level = Number(await nexus.getUserLevel(address));
-      const withdrawFeeBps = BigInt(await nexus.withdrawFeeBpsByLevel(level));
-      return (amount * withdrawFeeBps) / 10000n;
+      const feeBps = BigInt(await nexus.withdrawFeeBps());
+      return (amount * feeBps) / 10000n;
     } catch (err) {
       console.warn("[getWithdrawTofFee] failed, defaulting to 0:", (err as Error)?.message?.slice(0, 100));
       return 0n;

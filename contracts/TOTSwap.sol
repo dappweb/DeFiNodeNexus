@@ -96,6 +96,8 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event NexusUpdated(address indexed newNexus);
     event AdminUpdated(address indexed account, bool enabled);
     event AdminBatchUpdated(uint256 count);
+    event ManagerUpdated(address indexed account, bool enabled);
+    event ManagerBatchUpdated(uint256 count);
     event UsdtTokenUpdated(address indexed oldToken, address indexed newToken);
 
     // ======================== Constructor ========================
@@ -129,12 +131,27 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         _;
     }
 
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || _isAdmin(msg.sender) || _isManager(msg.sender), "Not authorized");
+        _;
+    }
+
     function _isAdmin(address account) internal view virtual returns (bool) {
         account;
         return false;
     }
 
+    function _isManager(address account) internal view virtual returns (bool) {
+        account;
+        return false;
+    }
+
     function _setAdmin(address account, bool enabled) internal virtual {
+        account;
+        enabled;
+    }
+
+    function _setManager(address account, bool enabled) internal virtual {
         account;
         enabled;
     }
@@ -564,41 +581,41 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit NexusUpdated(_nexus);
     }
 
-    function setBuyFeeBps(uint256 bps) external onlyOwnerOrAdmin {
+    function setBuyFeeBps(uint256 bps) external onlyAuthorized {
         require(bps <= 1000, "Max 10%");
         buyFeeBps = bps;
     }
 
-    function setSellFeeBps(uint256 bps) external onlyOwnerOrAdmin {
+    function setSellFeeBps(uint256 bps) external onlyAuthorized {
         require(bps <= 2000, "Max 20%");
         sellFeeBps = bps;
     }
 
-    function setProfitTaxBps(uint256 bps) external onlyOwnerOrAdmin {
+    function setProfitTaxBps(uint256 bps) external onlyAuthorized {
         require(bps <= 5000, "Max 50%");
         profitTaxBps = bps;
     }
 
-    function setDistributionThreshold(uint256 threshold) external onlyOwnerOrAdmin {
+    function setDistributionThreshold(uint256 threshold) external onlyAuthorized {
         require(threshold > 0, "Zero");
         distributionThreshold = threshold;
     }
 
-    function setUsdtDistributionThreshold(uint256 threshold) external onlyOwnerOrAdmin {
+    function setUsdtDistributionThreshold(uint256 threshold) external onlyAuthorized {
         require(threshold > 0, "Zero");
         usdtDistributionThreshold = threshold;
     }
 
-    function setMaxDailyBuy(uint256 amount) external onlyOwnerOrAdmin {
+    function setMaxDailyBuy(uint256 amount) external onlyAuthorized {
         maxDailyBuy = amount;
     }
 
-    function setMaxSellBps(uint256 bps) external onlyOwnerOrAdmin {
+    function setMaxSellBps(uint256 bps) external onlyAuthorized {
         require(bps <= BASIS_POINTS, "Too high");
         maxSellBps = bps;
     }
 
-    function setDeflationBps(uint256 bps) external onlyOwnerOrAdmin {
+    function setDeflationBps(uint256 bps) external onlyAuthorized {
         require(bps <= 1000, "Max 10%");
         deflationBps = bps;
     }
@@ -619,6 +636,24 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             emit AdminUpdated(account, enabled_[i]);
         }
         emit AdminBatchUpdated(len);
+    }
+
+    function setManager(address account, bool enabled) external onlyOwnerOrAdmin {
+        require(account != address(0), "Zero");
+        _setManager(account, enabled);
+        emit ManagerUpdated(account, enabled);
+    }
+
+    function setManagers(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwnerOrAdmin {
+        uint256 len = accounts_.length;
+        require(len == enabled_.length, "Length mismatch");
+        for (uint256 i = 0; i < len; i++) {
+            address account = accounts_[i];
+            require(account != address(0), "Zero");
+            _setManager(account, enabled_[i]);
+            emit ManagerUpdated(account, enabled_[i]);
+        }
+        emit ManagerBatchUpdated(len);
     }
 
     function setUsdtToken(address newUsdt) external onlyOwnerOrAdmin {

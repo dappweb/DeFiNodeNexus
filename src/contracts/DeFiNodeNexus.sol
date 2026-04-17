@@ -115,8 +115,10 @@ contract DeFiNodeNexus is Ownable {
     mapping(address => uint256[]) public userNftaNodes;
     mapping(address => uint256[]) public userNftbNodes;
     mapping(address => Account) public accounts;
-    mapping(uint8 => uint256) public withdrawFeeBpsByLevel;
+    uint256 public withdrawFeeBps;
     mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
+    mapping(address => bool) public admins;
+    mapping(address => bool) public managers;
 
     // ======================== Events ========================
 
@@ -137,6 +139,8 @@ contract DeFiNodeNexus is Ownable {
     event TofBurnRateUpdated(uint256 newBps);
     event TofClaimFeeUpdated(uint256 newBps);
     event DistributorUpdated(address indexed addr, bool status);
+    event AdminUpdated(address indexed account, bool enabled);
+    event ManagerUpdated(address indexed account, bool enabled);
 
     // ======================== Constructor ========================
 
@@ -156,13 +160,18 @@ contract DeFiNodeNexus is Ownable {
         institutionWallet = msg.sender;
         projectWallet = msg.sender;
 
-        // Withdraw fee by user level (TOF cost per TOT withdrawn)
-        withdrawFeeBpsByLevel[0] = 1000;  // Lv0  10%
-        withdrawFeeBpsByLevel[1] = 800;   // Lv1  8%
-        withdrawFeeBpsByLevel[2] = 650;   // Lv2  6.5%
-        withdrawFeeBpsByLevel[3] = 500;   // Lv3  5%
-        withdrawFeeBpsByLevel[4] = 400;   // Lv4  4%
-        withdrawFeeBpsByLevel[5] = 300;   // Lv5  3%
+        // Unified withdraw fee (TOF cost per TOT withdrawn)
+        withdrawFeeBps = 1000;  // 10%
+    }
+
+    modifier onlyOwnerOrAdmin() {
+        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || admins[msg.sender] || managers[msg.sender], "Not authorized");
+        _;
     }
 
     // ================================================================
@@ -440,16 +449,6 @@ contract DeFiNodeNexus is Ownable {
         return accumulated - node.rewardDebt;
     }
 
-    function getUserLevel(address user) public view returns (uint8) {
-        Account memory a = accounts[user];
-        if (a.directReferrals >= 50) return 5;
-        if (a.directReferrals >= 30) return 4;
-        if (a.directReferrals >= 15) return 3;
-        if (a.directReferrals >= 8)  return 2;
-        if (a.directReferrals >= 3)  return 1;
-        return 0;
-    }
-
     function getUserNftaNodes(address user) external view returns (uint256[] memory) {
         return userNftaNodes[user];
     }
@@ -483,7 +482,7 @@ contract DeFiNodeNexus is Ownable {
         uint256 dailyYield,
         uint256 maxSupply,
         bool isActive
-    ) external onlyOwner returns (uint256 configuredTierId) {
+    ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(dailyYield > 0, "Yield is zero");
         require(maxSupply > 0, "MaxSupply is zero");
 
@@ -513,7 +512,7 @@ contract DeFiNodeNexus is Ownable {
         uint256 maxSupply,
         uint256 dividendBps,
         bool isActive
-    ) external onlyOwner returns (uint256 configuredTierId) {
+    ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(weight > 0, "Weight is zero");
         require(maxSupply > 0, "MaxSupply is zero");
 
@@ -540,7 +539,7 @@ contract DeFiNodeNexus is Ownable {
     }
 
     /// @notice Admin registers an NFTA purchase (off-chain payment).
-    function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {
+    function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
         require(user != address(0), "User is zero");
         NftaTier storage tier = nftaTiers[tierId];
         require(tier.isActive, "Tier inactive");
@@ -560,7 +559,7 @@ contract DeFiNodeNexus is Ownable {
         uint256 tierId,
         uint256 quantity,
         address referrer
-    ) external onlyOwner returns (uint256 firstNodeId, uint256 lastNodeId) {
+    ) external onlyAuthorized returns (uint256 firstNodeId, uint256 lastNodeId) {
         require(user != address(0), "User is zero");
         require(quantity > 0, "Quantity is zero");
 
@@ -582,7 +581,7 @@ contract DeFiNodeNexus is Ownable {
         }
     }
 
-    function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyOwner returns (uint256 nodeId) {
+    function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
         require(user != address(0), "User is zero");
         NftbTier storage tier = nftbTiers[tierId];
         require(tier.isActive, "Tier inactive");
@@ -596,7 +595,7 @@ contract DeFiNodeNexus is Ownable {
         emit NftbPurchased(user, nodeId, tierId, tier.price);
     }
 
-    function fundRewardPool(uint256 amount) external onlyOwner {
+    function fundRewardPool(uint256 amount) external onlyAuthorized {
         require(amount > 0, "Zero");
         totToken.safeTransferFrom(msg.sender, address(this), amount);
         emit RewardPoolFunded(msg.sender, amount);
@@ -636,13 +635,13 @@ contract DeFiNodeNexus is Ownable {
         emit DividendRoundFunded(amount, 0);
     }
 
-    function setDistributor(address addr, bool status) external onlyOwner {
+    function setDistributor(address addr, bool status) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         isDistributor[addr] = status;
         emit DistributorUpdated(addr, status);
     }
 
-    function setTreasury(address addr) external onlyOwner {
+    function setTreasury(address addr) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         treasury = addr;
         emit TreasuryUpdated(addr);
@@ -653,7 +652,7 @@ contract DeFiNodeNexus is Ownable {
         address _community,
         address _foundation,
         address _institution
-    ) external onlyOwner {
+    ) external onlyOwnerOrAdmin {
         require(
             _zeroLine != address(0) && _community != address(0)
             && _foundation != address(0) && _institution != address(0),
@@ -666,28 +665,27 @@ contract DeFiNodeNexus is Ownable {
         emit WalletsUpdated(_zeroLine, _community, _foundation, _institution);
     }
 
-    function setProjectWallet(address addr) external onlyOwner {
+    function setProjectWallet(address addr) external onlyOwnerOrAdmin {
         require(addr != address(0), "Zero");
         projectWallet = addr;
         emit ProjectWalletUpdated(addr);
     }
 
-    function setTofBurnBps(uint256 bps) external onlyOwner {
+    function setTofBurnBps(uint256 bps) external onlyAuthorized {
         require(bps <= BASIS_POINTS, "Too high");
         tofBurnBps = bps;
         emit TofBurnRateUpdated(bps);
     }
 
-    function setTofClaimFeeBps(uint256 bps) external onlyOwner {
+    function setTofClaimFeeBps(uint256 bps) external onlyAuthorized {
         require(bps <= BASIS_POINTS, "Too high");
         tofClaimFeeBps = bps;
         emit TofClaimFeeUpdated(bps);
     }
 
-    function setWithdrawFeeBps(uint8 level, uint256 feeBps) external onlyOwner {
-        require(level <= 5, "Invalid level");
+    function setWithdrawFeeBps(uint256 feeBps) external onlyAuthorized {
         require(feeBps <= BASIS_POINTS, "Too high");
-        withdrawFeeBpsByLevel[level] = feeBps;
+        withdrawFeeBps = feeBps;
     }
 
     // ================================================================
