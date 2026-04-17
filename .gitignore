@@ -53,8 +53,5 @@ aaClaw.sh
 # exclude local webpack cache (too large for git)
 .next/
 
-# env with secrets
-.env
-
 # release artifacts
 /release/
