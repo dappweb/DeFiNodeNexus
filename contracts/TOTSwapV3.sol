@@ -41,8 +41,8 @@ contract TOTSwapV3 is TOTSwap {
     bool public externalDexEnabled;
     bool public swapPaused;
     mapping(address => bool) public admins;
-    mapping(address => bool) public managers;
     uint256 public deflationPool; // TOT accumulated for deflation in external DEX mode
+    mapping(address => bool) public managers;  // slot after deflationPool for storage compat
 
     event DexRouterUpdated(address indexed oldRouter, address indexed newRouter);
     event DexPairUpdated(address indexed oldPair, address indexed newPair);

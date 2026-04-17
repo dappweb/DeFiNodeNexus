@@ -117,7 +117,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => uint256[]) public userNftaNodes;
     mapping(address => uint256[]) public userNftbNodes;
     mapping(address => Account) public accounts;
-    uint256 public withdrawFeeBps;
+    /// @custom:oz-renamed-from withdrawFeeBpsByLevel
+    mapping(uint8 => uint256) private __deprecated_withdrawFeeBpsByLevel; // slot 23 — kept for storage layout compat
     mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
     mapping(uint256 => uint256) public accUsdtDividendPerWeightByTier;
     mapping(uint256 => uint256) public usdtRewardDebtByNode;
@@ -130,6 +131,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     mapping(address => bool) public managers;
     address[] private managerList;  // Enumerable manager list
     mapping(address => uint256) private managerIndex;  // manager address => index in managerList
+    uint256 public withdrawFeeBps;  // unified withdrawal fee in bps
 
     // ======================== Events ========================
 
