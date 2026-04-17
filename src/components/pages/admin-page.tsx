@@ -1689,6 +1689,20 @@ export function AdminPage() {
       if (!okSwap) return;
     }
     setNewUsdtAddr("");
+
+    // Re-fetch USDT addresses so the UI reflects the new value immediately
+    try {
+      if (nexus && isNexusManager) {
+        const updated = String(await nexus.usdtToken());
+        setNexusUsdtAddress(updated);
+      }
+    } catch {}
+    try {
+      if (swap) {
+        const updated = String(await swap.usdtToken());
+        setSwapUsdtAddress(updated);
+      }
+    } catch {}
   };
 
   return (
