@@ -1729,6 +1729,28 @@ export function AdminPage() {
           <CardDescription>Owner → Admin超管 → Manager管理员。Owner 管理超管，超管管理管理员。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Alert className="border-blue-500/40 bg-blue-500/5">
+            <AlertDescription className="text-xs space-y-3">
+              <div>
+                <div className="font-medium text-foreground">职责边界</div>
+                <div>• Owner：最高治理权限，可管理超管与管理员，并执行全部治理/运营操作。</div>
+                <div>• Admin超管：次高治理权限，可管理管理员并执行治理配置；不可变更 Owner。</div>
+                <div>• Manager管理员：运营执行权限，可执行日常业务操作；不可管理角色与核心治理项。</div>
+              </div>
+              <div>
+                <div className="font-medium text-foreground">授权链路</div>
+                <div>• 仅 Owner 可设置/撤销 Admin超管。</div>
+                <div>• Owner 或 Admin超管 可设置/撤销 Manager管理员。</div>
+                <div>• Nexus 与 Swap 分别鉴权：一个合约有权限，不代表另一个合约自动有权限。</div>
+              </div>
+              <div>
+                <div className="font-medium text-foreground">可操作范围</div>
+                <div>• Manager 可做：发放/领取、分红触发、常规费率与通缩等运营动作。</div>
+                <div>• Admin/Owner 额外可做：角色管理、钱包治理、USDT替换、关键绑定配置。</div>
+              </div>
+            </AlertDescription>
+          </Alert>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-xs space-y-1">
               <div>当前 Nexus USDT: {nexusUsdtAddress ? formatAddress(nexusUsdtAddress) : "读取中..."}</div>
