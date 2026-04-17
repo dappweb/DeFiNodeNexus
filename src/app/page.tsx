@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { execTx, useNexusContract, useSwapContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { getPrimaryCncRpcUrl } from "@/lib/cnc-rpc";
-import { CONTRACTS, SWAP_ABI } from "@/lib/contracts";
+import { CONTRACTS, NEXUS_ABI, SWAP_ABI } from "@/lib/contracts";
 import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
@@ -251,15 +251,25 @@ export default function DashboardPage() {
       let swapAdmin = false;
       let swapManager = false;
 
-      if (nexus) {
-        try { distributor = Boolean(await nexus.isDistributor(address)); } catch {}
-        try { nexusAdmin = Boolean(await nexus.admins(address)); } catch {}
-        try { nexusManager = Boolean(await nexus.managers(address)); } catch {}
+      // Use readonly CNC provider for role checks so they succeed regardless of
+      // which chain the user's wallet is connected to.
+      const readonlyProvider = getCncReadonlyProvider();
+      const readonlyNexus = CONTRACTS.NEXUS
+        ? new ethers.Contract(CONTRACTS.NEXUS, NEXUS_ABI, readonlyProvider)
+        : null;
+      const readonlySwap = CONTRACTS.SWAP
+        ? new ethers.Contract(CONTRACTS.SWAP, SWAP_ABI, readonlyProvider)
+        : null;
+
+      if (readonlyNexus) {
+        try { distributor = Boolean(await readonlyNexus.isDistributor(address)); } catch {}
+        try { nexusAdmin = Boolean(await readonlyNexus.admins(address)); } catch {}
+        try { nexusManager = Boolean(await readonlyNexus.managers(address)); } catch {}
       }
 
-      if (swap) {
-        try { swapAdmin = Boolean(await swap.admins(address)); } catch {}
-        try { swapManager = Boolean(await swap.managers(address)); } catch {}
+      if (readonlySwap) {
+        try { swapAdmin = Boolean(await readonlySwap.admins(address)); } catch {}
+        try { swapManager = Boolean(await readonlySwap.managers(address)); } catch {}
       }
 
       if (!cancelled) {
@@ -273,7 +283,7 @@ export default function DashboardPage() {
 
     checkAccessRoles();
     return () => { cancelled = true; };
-  }, [nexus, swap, address]);
+  }, [address]);
 
   const displayAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
