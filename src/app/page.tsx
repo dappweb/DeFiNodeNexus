@@ -13,14 +13,14 @@ import { MOCK_USER_DATA } from "@/lib/mock-data";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
 import {
-  ArrowDownUp,
-  CheckCircle2,
-  Cpu,
-  Home,
-  ShieldCheck,
-  TrendingUp,
-  UserPlus,
-  Users
+    ArrowDownUp,
+    CheckCircle2,
+    Cpu,
+    Home,
+    ShieldCheck,
+    TrendingUp,
+    UserPlus,
+    Users
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -75,6 +75,10 @@ export default function DashboardPage() {
   const [swapOwnerAddress, setSwapOwnerAddress] = useState<string | null>(null);
   const [swapOwnerStatusLoaded, setSwapOwnerStatusLoaded] = useState(false);
   const [isOperatorManager, setIsOperatorManager] = useState(false);
+  const [isNexusAdminRole, setIsNexusAdminRole] = useState(false);
+  const [isNexusManagerRole, setIsNexusManagerRole] = useState(false);
+  const [isSwapAdminRole, setIsSwapAdminRole] = useState(false);
+  const [isSwapManagerRole, setIsSwapManagerRole] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -229,21 +233,47 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const checkOperator = async () => {
-      if (!nexus || !address) {
-        if (!cancelled) setIsOperatorManager(false);
+    const checkAccessRoles = async () => {
+      if (!address) {
+        if (!cancelled) {
+          setIsOperatorManager(false);
+          setIsNexusAdminRole(false);
+          setIsNexusManagerRole(false);
+          setIsSwapAdminRole(false);
+          setIsSwapManagerRole(false);
+        }
         return;
       }
-      try {
-        const result = await nexus.isDistributor(address);
-        if (!cancelled) setIsOperatorManager(Boolean(result));
-      } catch {
-        if (!cancelled) setIsOperatorManager(false);
+
+      let distributor = false;
+      let nexusAdmin = false;
+      let nexusManager = false;
+      let swapAdmin = false;
+      let swapManager = false;
+
+      if (nexus) {
+        try { distributor = Boolean(await nexus.isDistributor(address)); } catch {}
+        try { nexusAdmin = Boolean(await nexus.admins(address)); } catch {}
+        try { nexusManager = Boolean(await nexus.managers(address)); } catch {}
+      }
+
+      if (swap) {
+        try { swapAdmin = Boolean(await swap.admins(address)); } catch {}
+        try { swapManager = Boolean(await swap.managers(address)); } catch {}
+      }
+
+      if (!cancelled) {
+        setIsOperatorManager(distributor);
+        setIsNexusAdminRole(nexusAdmin);
+        setIsNexusManagerRole(nexusManager);
+        setIsSwapAdminRole(swapAdmin);
+        setIsSwapManagerRole(swapManager);
       }
     };
-    checkOperator();
+
+    checkAccessRoles();
     return () => { cancelled = true; };
-  }, [nexus, address]);
+  }, [nexus, swap, address]);
 
   const displayAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -269,7 +299,13 @@ export default function DashboardPage() {
 
   const isOwner = isNexusOwner || isSwapOwner;
 
-  const shouldShowAdmin = isOwner || isOperatorManager;
+  const shouldShowAdmin =
+    isOwner ||
+    isOperatorManager ||
+    isNexusAdminRole ||
+    isNexusManagerRole ||
+    isSwapAdminRole ||
+    isSwapManagerRole;
 
   // Referral binding required: connected + not owner + not yet bound
   // Root node (owner) never needs referral binding
