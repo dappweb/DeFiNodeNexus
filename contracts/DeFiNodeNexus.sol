@@ -214,6 +214,12 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         _;
     }
 
+    function transferOwnership(address newOwner) public override {
+        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+
     // ================================================================
     //                      PUBLIC FUNCTIONS
     // ================================================================
@@ -929,7 +935,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         withdrawFeeBps = feeBps;
     }
 
-    function setAdmin(address account, bool enabled) external onlyOwner {
+    function setAdmin(address account, bool enabled) external onlyOwnerOrAdmin {
         require(account != address(0), "Zero");
         bool wasAdmin = admins[account];
         admins[account] = enabled;
@@ -951,7 +957,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit AdminUpdated(account, enabled);
     }
 
-    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwner {
+    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwnerOrAdmin {
         uint256 len = accounts_.length;
         require(len == enabled_.length, "Length mismatch");
         for (uint256 i = 0; i < len; i++) {
@@ -1041,7 +1047,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @dev Use newReferrer = address(0) to cut an existing referral chain.
      *      This function only updates direct referral pointers/counters.
      */
-    function forceSetReferrer(address user, address newReferrer) external onlyOwner {
+    function forceSetReferrer(address user, address newReferrer) external onlyAuthorized {
         require(user != address(0), "User is zero");
         require(newReferrer != user, "Self referral");
 
@@ -1242,7 +1248,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal view override {
+        require(msg.sender == owner() || admins[msg.sender], "Not admin");
         newImplementation;
     }
 }

@@ -136,6 +136,12 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         _;
     }
 
+    function transferOwnership(address newOwner) public override {
+        require(msg.sender == owner() || _isAdmin(msg.sender), "Not admin");
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        _transferOwnership(newOwner);
+    }
+
     function _isAdmin(address account) internal view virtual returns (bool) {
         account;
         return false;
@@ -398,7 +404,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Force distribution even if below threshold (owner only).
-    function forceDistribute() external onlyOwner {
+    function forceDistribute() external onlyOwnerOrAdmin {
         require(nftbDividendPool > 0 || nftbUsdtDividendPool > 0, "Pool empty");
         require(nexus != address(0), "Nexus not set");
 
@@ -550,7 +556,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     // ================================================================
 
     /// @notice Add liquidity to the pool (owner seeds 6% TOT + matching USDT).
-    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyOwnerOrAdmin {
+    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public virtual onlyAuthorized {
         require(totAmount > 0 && usdtAmount > 0, "Zero");
 
         totToken.safeTransferFrom(msg.sender, address(this), totAmount);
@@ -620,13 +626,13 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         deflationBps = bps;
     }
 
-    function setAdmin(address account, bool enabled) external onlyOwner {
+    function setAdmin(address account, bool enabled) external onlyOwnerOrAdmin {
         require(account != address(0), "Zero");
         _setAdmin(account, enabled);
         emit AdminUpdated(account, enabled);
     }
 
-    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwner {
+    function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwnerOrAdmin {
         uint256 len = accounts_.length;
         require(len == enabled_.length, "Length mismatch");
         for (uint256 i = 0; i < len; i++) {
@@ -664,11 +670,12 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     /// @notice Emergency withdraw tokens stuck in the contract.
-    function emergencyWithdraw(address token, uint256 amount) external onlyOwner {
+    function emergencyWithdraw(address token, uint256 amount) external onlyOwnerOrAdmin {
         IERC20(token).safeTransfer(msg.sender, amount);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal view override {
+        require(msg.sender == owner() || _isAdmin(msg.sender), "Not admin");
         newImplementation;
     }
 }

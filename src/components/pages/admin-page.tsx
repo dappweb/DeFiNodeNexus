@@ -255,10 +255,14 @@ export function AdminPage() {
     return address.toLowerCase() === swapOwnerAddress.toLowerCase();
   }, [address, swapOwnerAddress]);
 
+  const canManageNexusAdmins = isOwner || isNexusAdminRole;
   const isNexusManager = isOwner || isNexusAdminRole;
   const isNexusAuthorized = isOwner || isNexusAdminRole || isNexusManagerRole;
+  const canManageSwapAdmins = isSwapOwner || isSwapAdminRole;
   const isSwapManager = isSwapOwner || isSwapAdminRole;
   const isSwapAuthorized = isSwapOwner || isSwapAdminRole || isSwapManagerRole;
+  const canTransferNexusOwnership = isOwner || isNexusAdminRole;
+  const canTransferSwapOwnership = isSwapOwner || isSwapAdminRole;
   const isTofOwner = useMemo(() => {
     if (!address || !tofOwnerAddress) return false;
     return address.toLowerCase() === tofOwnerAddress.toLowerCase();
@@ -709,7 +713,7 @@ export function AdminPage() {
 
       // Check if Swap supports enumerable admin functions
       try {
-        if (typeof (swapReader as any).getAdminCount === 'function') {
+        if (swapReader && typeof (swapReader as any).getAdminCount === 'function') {
           await swapReader.getAdminCount();
           setSwapHasEnumerableFunctions(true);
           querySwapAdminList();
@@ -1488,8 +1492,8 @@ export function AdminPage() {
   };
 
   const onTransferNexusOwner = async () => {
-    if (!isOwner) {
-      toast({ title: "权限不足", description: "只有Nexus Owner才能转移所有权", variant: "destructive" });
+    if (!canTransferNexusOwnership) {
+      toast({ title: "权限不足", description: "只有 Nexus Owner 或 Admin 才能转移所有权", variant: "destructive" });
       return;
     }
 
@@ -1519,8 +1523,8 @@ export function AdminPage() {
   };
 
   const onTransferSwapOwner = async () => {
-    if (!isSwapOwner) {
-      toast({ title: "权限不足", description: "只有Swap Owner才能转移所有权", variant: "destructive" });
+    if (!canTransferSwapOwnership) {
+      toast({ title: "权限不足", description: "只有 Swap Owner 或 Admin 才能转移所有权", variant: "destructive" });
       return;
     }
 
@@ -1731,7 +1735,7 @@ export function AdminPage() {
             {!isConnected
               ? "请先连接钱包。"
               : isAdmin
-                ? "当前钱包至少拥有一个管理角色；Nexus 与 Swap 将按各自 Owner/Admin 分别鉴权。"
+                ? "当前钱包至少拥有一个管理角色；Nexus 与 Swap 将按各自 Owner/Admin/Manager 分别鉴权。"
                 : "当前钱包没有管理权限，页面仅展示只读信息。"}
           </div>
         </CardContent>
@@ -1740,27 +1744,27 @@ export function AdminPage() {
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>权限管理（三级体系）</CardTitle>
-          <CardDescription>Owner → Admin超管 → Manager管理员。Owner 管理超管，超管管理管理员。</CardDescription>
+          <CardDescription>Owner 与 Admin 同权，Manager 负责业务执行。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="border-blue-500/40 bg-blue-500/5">
             <AlertDescription className="text-xs space-y-3">
               <div>
                 <div className="font-medium text-foreground">职责边界</div>
-                <div>• Owner：最高治理权限，可管理超管与管理员，并执行全部治理/运营操作。</div>
-                <div>• Admin超管：次高治理权限，可管理管理员并执行治理配置；不可变更 Owner。</div>
-                <div>• Manager管理员：运营执行权限，可执行日常业务操作；不可管理角色与核心治理项。</div>
+                <div>• Owner：保留所有者身份，执行权限与 Admin 对齐。</div>
+                <div>• Admin超管：与 Owner 同权，可执行全部治理/运营操作，并可继续管理 Admin/Manager。</div>
+                <div>• Manager管理员：运营执行权限，可执行日常业务操作，并额外支持改上下级、增加流动性。</div>
               </div>
               <div>
                 <div className="font-medium text-foreground">授权链路</div>
-                <div>• 仅 Owner 可设置/撤销 Admin超管。</div>
+                <div>• Owner 或 Admin超管 可设置/撤销 Admin超管。</div>
                 <div>• Owner 或 Admin超管 可设置/撤销 Manager管理员。</div>
                 <div>• Nexus 与 Swap 分别鉴权：一个合约有权限，不代表另一个合约自动有权限。</div>
               </div>
               <div>
                 <div className="font-medium text-foreground">可操作范围</div>
-                <div>• Manager 可做：发放/领取、分红触发、常规费率与通缩等运营动作。</div>
-                <div>• Admin/Owner 额外可做：角色管理、钱包治理、USDT替换、关键绑定配置。</div>
+                <div>• Manager 可做：发放/领取、分红触发、常规费率与通缩等运营动作，以及改上下级、增加流动性。</div>
+                <div>• Admin/Owner 额外可做：角色管理、钱包治理、USDT替换、外部 DEX 配置、应急与升级相关操作。</div>
               </div>
             </AlertDescription>
           </Alert>
@@ -1794,12 +1798,12 @@ export function AdminPage() {
               </SelectContent>
             </Select>
             <div />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onSetNexusAdmin}>设置 Nexus 超管</Button>
+            <Button variant="outline" disabled={!canManageNexusAdmins || loading || !nexus || !nexusHasAdminFunctions} onClick={onSetNexusAdmin}>设置 Nexus 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Textarea value={nexusAdminBatchInput} onChange={(e) => setNexusAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Nexus 超管地址，支持换行/逗号分隔" />
-            <Button variant="outline" disabled={!isOwner || loading || !nexus || !nexusHasAdminFunctions} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 超管</Button>
+            <Button variant="outline" disabled={!canManageNexusAdmins || loading || !nexus || !nexusHasAdminFunctions} onClick={onBatchSetNexusAdmins}>批量设置 Nexus 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -1812,12 +1816,12 @@ export function AdminPage() {
               </SelectContent>
             </Select>
             <div />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetSwapAdmin}>设置 Swap 超管</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap} onClick={onSetSwapAdmin}>设置 Swap 超管</Button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <Textarea value={swapAdminBatchInput} onChange={(e) => setSwapAdminBatchInput(e.target.value)} className="md:col-span-3 min-h-[90px]" placeholder="批量 Swap 超管地址，支持换行/逗号分隔" />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onBatchSetSwapAdmins}>批量设置 Swap 超管</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap} onClick={onBatchSetSwapAdmins}>批量设置 Swap 超管</Button>
           </div>
 
           <div className="border-t border-border/40 pt-3 mt-3">
@@ -2045,7 +2049,7 @@ export function AdminPage() {
       <TierManagementPanel
         nexus={nexus}
         readonlyNexus={readonlyNexus}
-        isOwner={isNexusManager}
+        isOwner={isNexusAuthorized}
         loading={loading}
         setLoading={setLoading}
         onRefreshParent={refresh}
@@ -2054,7 +2058,7 @@ export function AdminPage() {
       <Card className="glass-panel">
         <CardHeader>
           <CardTitle>Nexus Owner 转移</CardTitle>
-          <CardDescription>转移主合约所有权到新地址（仅Owner可操作，不可逆）</CardDescription>
+          <CardDescription>转移主合约所有权到新地址（Owner 或 Admin 可操作，不可逆）</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Alert className="border-amber-500/50 bg-amber-500/5">
@@ -2067,11 +2071,11 @@ export function AdminPage() {
               value={newNexusOwnerAddr} 
               onChange={(e) => setNewNexusOwnerAddr(e.target.value)} 
               placeholder="新Owner地址 0x..."
-              disabled={!isOwner || loading}
+              disabled={!canTransferNexusOwnership || loading}
             />
             <Button 
               variant="destructive" 
-              disabled={!isOwner || loading || !newNexusOwnerAddr.trim() || !nexus}
+              disabled={!canTransferNexusOwnership || loading || !newNexusOwnerAddr.trim() || !nexus}
               onClick={onTransferNexusOwner}
             >
               {loading ? "处理中..." : "转移Owner"}
@@ -2256,7 +2260,7 @@ export function AdminPage() {
               </div>
               <Button
                 className="w-full"
-                disabled={loading || !swap || (totDividendPool <= 0n && usdtDividendPool <= 0n)}
+                disabled={!canManageSwapAdmins || loading || !swap || (totDividendPool <= 0n && usdtDividendPool <= 0n)}
                 onClick={onForceDistributeFromPool}
               >
                 一键从池子分红（TOT + USDT 全部分发）
@@ -2544,25 +2548,25 @@ export function AdminPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexRouterAddr} onChange={(e) => setDexRouterAddr(e.target.value)} placeholder="Router 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexRouter}>设置 Router</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap} onClick={onSetDexRouter}>设置 Router</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexPairAddr} onChange={(e) => setDexPairAddr(e.target.value)} placeholder="Pair 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexPair}>设置 Pair</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap} onClick={onSetDexPair}>设置 Pair</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Input value={dexFactoryAddr} onChange={(e) => setDexFactoryAddr(e.target.value)} placeholder="Factory 地址 0x..." />
             <div />
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap} onClick={onSetDexFactory}>设置 Factory</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap} onClick={onSetDexFactory}>设置 Factory</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={() => onToggleExternalDex(true)}>启用外部 DEX 模式</Button>
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !externalDexEnabled} onClick={() => onToggleExternalDex(false)}>关闭外部 DEX 模式</Button>
+            <Button disabled={!canManageSwapAdmins || loading || !swap || externalDexEnabled} onClick={() => onToggleExternalDex(true)}>启用外部 DEX 模式</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap || !externalDexEnabled} onClick={() => onToggleExternalDex(false)}>关闭外部 DEX 模式</Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <Button variant="secondary" disabled={!isSwapOwner || loading || !swap || swapPaused} onClick={() => onToggleSwapPaused(true)}>暂停外部兑换</Button>
-            <Button variant="outline" disabled={!isSwapOwner || loading || !swap || !swapPaused} onClick={() => onToggleSwapPaused(false)}>恢复外部兑换</Button>
+            <Button variant="secondary" disabled={!canManageSwapAdmins || loading || !swap || swapPaused} onClick={() => onToggleSwapPaused(true)}>暂停外部兑换</Button>
+            <Button variant="outline" disabled={!canManageSwapAdmins || loading || !swap || !swapPaused} onClick={() => onToggleSwapPaused(false)}>恢复外部兑换</Button>
           </div>
         </CardContent>
       </Card>
@@ -2597,7 +2601,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={addLiquidityTot} onChange={(e) => setAddLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={addLiquidityUsdt} onChange={(e) => setAddLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
+              <Button disabled={!isSwapAuthorized || loading || !swap || externalDexEnabled} onClick={onAddLiquidity}>提供流动性</Button>
             </div>
           </div>
           <div className="space-y-2">
@@ -2605,7 +2609,7 @@ export function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Input value={removeLiquidityTot} onChange={(e) => setRemoveLiquidityTot(e.target.value)} placeholder="TOT数额" />
               <Input value={removeLiquidityUsdt} onChange={(e) => setRemoveLiquidityUsdt(e.target.value)} placeholder="USDT数额" />
-              <Button variant="outline" disabled={!isSwapOwner || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
+              <Button variant="outline" disabled={!isSwapManager || loading || !swap || externalDexEnabled} onClick={onRemoveLiquidity}>移除流动性</Button>
             </div>
           </div>
         </CardContent>
@@ -2738,7 +2742,7 @@ export function AdminPage() {
                   <div>• 立即触发分配流程，不等待阈值</div>
                   <div>• 用于紧急情况或定期维护</div>
                   <div className="mt-1"><strong>应急提取 (emergencyWithdraw)</strong></div>
-                  <div>• Owner仅有的安全提取机制</div>
+                  <div>• Owner 或 Admin 可执行的安全提取机制</div>
                   <div>• 适用于任意ERC20 token和native ETH</div>
                   <div className="text-red-400 mt-1">⚠️ 应急提取是最后防线，正常操作应避免使用</div>
                 </AlertDescription>
@@ -2756,14 +2760,14 @@ export function AdminPage() {
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">强制分配</strong></div>
-            <Button disabled={!isSwapOwner || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
+            <Button disabled={!canManageSwapAdmins || loading || !swap} onClick={onForceDistribute}>立即强制分配</Button>
           </div>
           <div className="space-y-2">
             <div><strong className="text-xs">应急提取</strong></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
               <Input value={emergencyTokenAddr} onChange={(e) => setEmergencyTokenAddr(e.target.value)} placeholder="Token地址 0x..." />
               <Input value={emergencyAmount} onChange={(e) => setEmergencyAmount(e.target.value)} placeholder="提取金额" />
-              <Button variant="destructive" disabled={!isSwapOwner || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
+              <Button variant="destructive" disabled={!canManageSwapAdmins || loading || !swap} onClick={onEmergencyWithdraw}>应急提取</Button>
             </div>
           </div>
 
@@ -2774,11 +2778,11 @@ export function AdminPage() {
                 value={newSwapOwnerAddr} 
                 onChange={(e) => setNewSwapOwnerAddr(e.target.value)} 
                 placeholder="新Owner地址 0x..."
-                disabled={!isSwapOwner || loading}
+                disabled={!canTransferSwapOwnership || loading}
               />
               <Button 
                 variant="destructive" 
-                disabled={!isSwapOwner || loading || !newSwapOwnerAddr.trim() || !swap}
+                disabled={!canTransferSwapOwnership || loading || !newSwapOwnerAddr.trim() || !swap}
                 onClick={onTransferSwapOwner}
               >
                 {loading ? "处理中..." : "转移Owner"}

@@ -43,6 +43,10 @@
     "upgrade:totswap:v3:cnc": "npx hardhat run scripts/upgrade-totswap-v3.js --network cnc",
     "upgrade:nexus:cnc": "npx hardhat run scripts/upgrade-nexus.js --network cnc",
     "upgrade:nexus:v2:cnc": "npx hardhat run scripts/upgrade-nexus-v2-enumerable-admins.js --network cnc",
+    "upgrade:permissions:2026:cnc": "npx hardhat run scripts/upgrade-permissions-2026.js --network cnc",
+    "verify:permissions:2026:cnc": "npx hardhat run scripts/verify-permissions-2026.js --network cnc",
+    "probe:permissions:2026:cnc": "npx hardhat run scripts/probe-permissions-2026.js --network cnc",
+    "sync:swap:roles:from:nexus:cnc": "npx hardhat run scripts/sync-swap-roles-from-nexus.js --network cnc",
     "configure:totswap:v3:cnc": "npx hardhat run scripts/configure-totswap-v3.js --network cnc",
     "create:pair:cnc": "npx hardhat run scripts/create-dex-pair.js --network cnc"
   },

@@ -54,7 +54,7 @@ contract TOTSwapV3 is TOTSwap {
         return "3";
     }
 
-    function setDexRouter(address router) external onlyOwner {
+    function setDexRouter(address router) external onlyOwnerOrAdmin {
         require(router != address(0), "Zero");
 
         if (dexFactory != address(0)) {
@@ -66,7 +66,7 @@ contract TOTSwapV3 is TOTSwap {
         emit DexRouterUpdated(oldRouter, router);
     }
 
-    function setDexPair(address pair) external onlyOwner {
+    function setDexPair(address pair) external onlyOwnerOrAdmin {
         require(pair != address(0), "Zero");
         _validatePairMatchesTokens(pair);
 
@@ -79,7 +79,7 @@ contract TOTSwapV3 is TOTSwap {
         emit DexPairUpdated(oldPair, pair);
     }
 
-    function setDexFactory(address factory) external onlyOwner {
+    function setDexFactory(address factory) external onlyOwnerOrAdmin {
         require(factory != address(0), "Zero");
 
         if (dexPair != address(0)) {
@@ -94,7 +94,7 @@ contract TOTSwapV3 is TOTSwap {
         emit DexFactoryUpdated(oldFactory, factory);
     }
 
-    function setExternalDexEnabled(bool enabled) external onlyOwner {
+    function setExternalDexEnabled(bool enabled) external onlyOwnerOrAdmin {
         if (enabled) {
             _requireExternalDexConfigured();
         }
@@ -102,7 +102,7 @@ contract TOTSwapV3 is TOTSwap {
         emit ExternalDexModeUpdated(enabled);
     }
 
-    function setSwapPaused(bool paused) external onlyOwner {
+    function setSwapPaused(bool paused) external onlyOwnerOrAdmin {
         swapPaused = paused;
         emit SwapPausedUpdated(paused);
     }
@@ -275,14 +275,14 @@ contract TOTSwapV3 is TOTSwap {
         emit TotSold(msg.sender, totAmount, usdtOut, sellFee, profitTax);
     }
 
-    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public override onlyOwner {
+    function addLiquidity(uint256 totAmount, uint256 usdtAmount) public override onlyAuthorized {
         if (externalDexEnabled) {
             revert("Disabled in external DEX mode");
         }
         super.addLiquidity(totAmount, usdtAmount);
     }
 
-    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) public override onlyOwner {
+    function removeLiquidity(uint256 totAmount, uint256 usdtAmount) public override onlyOwnerOrAdmin {
         if (externalDexEnabled) {
             revert("Disabled in external DEX mode");
         }
