@@ -1614,6 +1614,24 @@ export function AdminPage() {
     await runTx("批量设置 Swap 管理员", () => swap.setAdmins(accounts, Array(accounts.length).fill(status)));
   };
 
+  const onRemoveNexusAdmin = async (account: string) => {
+    if (!nexus) return;
+    const confirmed = window.confirm(`确认移除 Nexus 超管权限？\n\n${account}`);
+    if (!confirmed) return;
+    try {
+      await runTx("移除 Nexus 超管", () => nexus.setAdmin(account, false));
+    } catch {
+      toast({ title: "移除失败", description: "当前 Nexus 合约版本不支持 setAdmin，请先升级合约", variant: "destructive" });
+    }
+  };
+
+  const onRemoveSwapAdmin = async (account: string) => {
+    if (!swap) return;
+    const confirmed = window.confirm(`确认移除 Swap 超管权限？\n\n${account}`);
+    if (!confirmed) return;
+    await runTx("移除 Swap 超管", () => swap.setAdmin(account, false));
+  };
+
   // ===== Manager 管理 =====
   const onSetNexusManager = async () => {
     if (!nexus) return;
@@ -1655,6 +1673,13 @@ export function AdminPage() {
     }
     const status = swapManagerStatus === "true";
     await runTx("批量设置 Swap Manager", () => swap.setManagers(accounts, Array(accounts.length).fill(status)));
+  };
+
+  const onRemoveNexusManager = async (account: string) => {
+    if (!nexus) return;
+    const confirmed = window.confirm(`确认移除 Nexus Manager 权限？\n\n${account}`);
+    if (!confirmed) return;
+    await runTx("移除 Nexus Manager", () => nexus.setManager(account, false));
   };
 
   const onReplaceUsdtToken = async () => {
@@ -1970,14 +1995,14 @@ export function AdminPage() {
       {(nexusHasEnumerableFunctions || swapHasEnumerableFunctions) && (
         <Card className="glass-panel border-blue-500/30">
           <CardHeader>
-            <CardTitle>管理员列表查询 (v2)</CardTitle>
-            <CardDescription>显示当前合约的所有管理员地址</CardDescription>
+            <CardTitle>角色列表查询 (v2)</CardTitle>
+            <CardDescription>显示当前合约可枚举的超管 Admin 与 Manager 地址</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {nexusHasEnumerableFunctions && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-sm">Nexus 管理员 ({nexusAdminList.length})</div>
+                  <div className="font-medium text-sm">Nexus 超管 Admin ({nexusAdminList.length})</div>
                   <Button variant="ghost" size="sm" onClick={queryNexusAdminList} disabled={loading}>
                     刷新
                   </Button>
@@ -1987,10 +2012,19 @@ export function AdminPage() {
                     nexusAdminList.map((admin, idx) => (
                       <div key={idx} className="flex items-center justify-between font-mono p-1 hover:bg-muted/20 rounded">
                         <span>[{idx}] {formatAddress(admin)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-red-400 hover:text-red-300"
+                          disabled={!canManageNexusAdmins || loading || !nexus || !nexusHasAdminFunctions}
+                          onClick={() => onRemoveNexusAdmin(admin)}
+                        >
+                          删除
+                        </Button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-muted-foreground">暂无管理员</div>
+                    <div className="text-muted-foreground">暂无超管 Admin</div>
                   )}
                 </div>
               </div>
@@ -1998,7 +2032,7 @@ export function AdminPage() {
             {swapHasEnumerableFunctions && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <div className="font-medium text-sm">Swap 管理员 ({swapAdminList.length})</div>
+                  <div className="font-medium text-sm">Swap 超管 Admin ({swapAdminList.length})</div>
                   <Button variant="ghost" size="sm" onClick={querySwapAdminList} disabled={loading}>
                     刷新
                   </Button>
@@ -2008,10 +2042,49 @@ export function AdminPage() {
                     swapAdminList.map((admin, idx) => (
                       <div key={idx} className="flex items-center justify-between font-mono p-1 hover:bg-muted/20 rounded">
                         <span>[{idx}] {formatAddress(admin)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-red-400 hover:text-red-300"
+                          disabled={!canManageSwapAdmins || loading || !swap}
+                          onClick={() => onRemoveSwapAdmin(admin)}
+                        >
+                          删除
+                        </Button>
                       </div>
                     ))
                   ) : (
-                    <div className="text-muted-foreground">暂无管理员</div>
+                    <div className="text-muted-foreground">暂无超管 Admin</div>
+                  )}
+                </div>
+              </div>
+            )}
+            {nexusHasEnumerableFunctions && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-sm">Nexus Manager ({nexusManagerList.length})</div>
+                  <Button variant="ghost" size="sm" onClick={queryNexusManagerList} disabled={loading}>
+                    刷新
+                  </Button>
+                </div>
+                <div className="border border-border/40 rounded-lg bg-muted/10 p-3 max-h-[200px] overflow-y-auto text-xs space-y-1">
+                  {nexusManagerList.length > 0 ? (
+                    nexusManagerList.map((manager, idx) => (
+                      <div key={idx} className="flex items-center justify-between font-mono p-1 hover:bg-muted/20 rounded">
+                        <span>[{idx}] {formatAddress(manager)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-red-400 hover:text-red-300"
+                          disabled={!isNexusManager || loading || !nexus}
+                          onClick={() => onRemoveNexusManager(manager)}
+                        >
+                          删除
+                        </Button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-muted-foreground">暂无 Manager</div>
                   )}
                 </div>
               </div>

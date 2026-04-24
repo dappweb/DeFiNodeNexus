@@ -8,10 +8,6 @@ t1.test2dapp.xyz {
         header_up X-Forwarded-For {http.request.remote}
         header_up X-Forwarded-Proto {http.request.scheme}
         header_up X-Forwarded-Host {http.request.host}
-        
-        # WebSocket 支持
-        header_up Connection "upgrade"
-        header_up Upgrade "websocket"
     }
     
     # 启用 gzip 压缩
