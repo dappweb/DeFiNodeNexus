@@ -15,6 +15,7 @@ import { getNftaTierName, getNftbTierName } from "@/lib/ui-config";
 import { useWeb3 } from "@/lib/web3-provider";
 import { ethers } from "ethers";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { erc20Abi, type Hex } from "viem";
 
 type NftaTier = {
   id: number;
@@ -143,6 +144,7 @@ export function NodesPage() {
   const [nftaStage, setNftaStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftbStage, setNftbStage] = useState<"idle" | "checking" | "approving" | "purchasing" | "confirming">("idle");
   const [nftaTransferToByNode, setNftaTransferToByNode] = useState<Record<string, string>>({});
+  const [nftbTransferToByNode, setNftbTransferToByNode] = useState<Record<string, string>>({});
   const [nftaClaimFeeBps, setNftaClaimFeeBps] = useState<bigint>(0n);
   const [tofPerUsdt, setTofPerUsdt] = useState<bigint>(DEFAULT_TOF_PER_USDT);
   const [withdrawableTot, setWithdrawableTot] = useState<bigint>(0n);
@@ -400,10 +402,12 @@ export function NodesPage() {
       try {
         console.log("[viemApprove] using walletClient.writeContract, token:", tokenAddress, "spender:", spenderAddress);
         const hash = await walletClient.writeContract({
+          account: from as Hex,
           address: tokenAddress as Hex,
           abi: erc20Abi,
           functionName: "approve",
           args: [spenderAddress as Hex, maxApproval],
+          chain: walletClient.chain ?? null,
           gas: 220_000n,
         });
         console.log("[viemApprove] txHash:", hash);
@@ -814,6 +818,29 @@ export function NodesPage() {
       }
       toast({ title: t("toastTransferSuccess"), description: res.hash?.slice(0, 10) + "..." });
       setNftaTransferToByNode((prev) => ({ ...prev, [nodeId.toString()]: "" }));
+      await refreshData(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const transferNftb = async (nodeId: bigint) => {
+    if (!nexus) return;
+    const target = (nftbTransferToByNode[nodeId.toString()] || "").trim();
+    if (!ethers.isAddress(target)) {
+      toast({ title: t("toastTransferFailed"), description: t("toastTransferInvalidAddress"), variant: "destructive" });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await execTx(() => nexus.transferNftbCard(target, nodeId));
+      if (!res.success) {
+        toast({ title: t("toastTransferFailed"), description: toFriendlyTxError(res.error), variant: "destructive" });
+        return;
+      }
+      toast({ title: t("toastTransferSuccess"), description: res.hash?.slice(0, 10) + "..." });
+      setNftbTransferToByNode((prev) => ({ ...prev, [nodeId.toString()]: "" }));
       await refreshData(false);
     } finally {
       setLoading(false);
@@ -1248,6 +1275,27 @@ export function NodesPage() {
                         <span className="text-muted-foreground">{t("labelPendingShort")} </span>
                         <span className="font-medium text-blue-500">{formatTot(node.pending)} TOT</span>
                       </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                      <Input
+                        value={nftbTransferToByNode[node.nodeId.toString()] || ""}
+                        onChange={(e) =>
+                          setNftbTransferToByNode((prev) => ({
+                            ...prev,
+                            [node.nodeId.toString()]: e.target.value,
+                          }))
+                        }
+                        placeholder={t("transferAddressPlaceholder")}
+                        className="h-8 text-xs"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => transferNftb(node.nodeId)}
+                        disabled={!isConnected || loading}
+                      >
+                        {t("transferBtn")}
+                      </Button>
                     </div>
                   </div>
                 ))

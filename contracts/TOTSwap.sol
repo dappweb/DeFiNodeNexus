@@ -28,7 +28,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
  *
  * Limits:
  *   - §2.4: Each sell ≤ 50% of sender's TOT balance.
- *   - §2.5: Each address can buy ≤ 100,000 TOT per 24 hours.
+ *   - §2.5: Each address can buy ≤ 10,000 TOT per 24 hours.
  */
 contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
@@ -77,7 +77,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     /// @dev Daily buy limit tracking.
     mapping(address => mapping(uint256 => uint256)) public dailyBought;
-    uint256 public maxDailyBuy; // §2.5: 100,000 TOT per 24h
+    uint256 public maxDailyBuy; // §2.5: 10,000 TOT per 24h
 
     /// @dev Sell limit: max percentage of balance per sell.
     uint256 public maxSellBps; // §2.4: 50%
@@ -121,7 +121,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         distributionThreshold = 10_000e18;
         usdtDistributionThreshold = 10_000e18;
         deflationBps = 80;
-        maxDailyBuy = 100_000e18;
+        maxDailyBuy = 10_000e18;
         maxSellBps = 5000;
         lastDeflationTime = block.timestamp;
     }
@@ -174,7 +174,7 @@ contract TOTSwap is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * Flow:
      *   1. Calculate TOT output via constant-product AMM.
      *   2. Deduct 1% buy fee (in TOT) → nftbDividendPool.
-     *   3. Check 24h buy limit ≤ 100,000 TOT.
+     *   3. Check 24h buy limit ≤ maxDailyBuy.
      *   4. Update user cost basis for profit tax tracking.
      *   5. Auto-trigger distribution & deflation if due.
      */

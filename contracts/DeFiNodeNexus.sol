@@ -141,6 +141,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event ProjectWalletUpdated(address indexed newWallet);
     event NftaPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
     event NftaCardTransferred(address indexed from, address indexed to, uint256 indexed nodeId);
+    event NftbCardTransferred(address indexed from, address indexed to, uint256 indexed nodeId);
     event NftbPurchased(address indexed user, uint256 indexed nodeId, uint256 indexed tierId, uint256 price);
     event NftaYieldClaimed(address indexed user, uint256 indexed nodeId, uint256 totAmount, uint256 tofConsumed);
     event NftbDividendClaimed(address indexed user, uint256 indexed nodeId, uint256 amount);
@@ -308,6 +309,47 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
 
         emit NftaCardTransferred(from, to, nodeId);
+    }
+
+    /// @notice Transfer an owned NFTB node to another address.
+    /// @dev Settles pending TOT/USDT dividends to the current owner before transferring ownership.
+    function transferNftbCard(address to, uint256 nodeId) external {
+        require(to != address(0), "To is zero");
+
+        NodeB storage node = nftbNodes[nodeId];
+        address from = node.owner;
+        require(node.isActive, "Inactive");
+        require(from != address(0), "Node not found");
+        require(to != from, "Same owner");
+        require(msg.sender == from || msg.sender == owner(), "Not authorized");
+
+        uint256 accumulatedTot = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
+        if (accumulatedTot > node.rewardDebt) {
+            uint256 pendingTot = accumulatedTot - node.rewardDebt;
+            accounts[from].pendingTot += pendingTot;
+            accounts[from].claimedTot += pendingTot;
+        }
+        node.rewardDebt = accumulatedTot;
+
+        uint256 accumulatedUsdt = (node.weight * accUsdtDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
+        uint256 previousUsdtDebt = usdtRewardDebtByNode[nodeId];
+        if (accumulatedUsdt > previousUsdtDebt) {
+            uint256 pendingUsdt = accumulatedUsdt - previousUsdtDebt;
+            usdtRewardDebtByNode[nodeId] = accumulatedUsdt;
+            usdtToken.safeTransfer(from, pendingUsdt);
+        } else {
+            usdtRewardDebtByNode[nodeId] = accumulatedUsdt;
+        }
+
+        _removeNftbNodeFromUser(from, nodeId);
+        userNftbNodes[to].push(nodeId);
+
+        node.owner = to;
+
+        accounts[from].totalNodes -= 1;
+        accounts[to].totalNodes += 1;
+
+        emit NftbCardTransferred(from, to, nodeId);
     }
 
     /**
@@ -1117,6 +1159,21 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function _removeNftaNodeFromUser(address user, uint256 nodeId) internal {
         uint256[] storage nodes = userNftaNodes[user];
+        uint256 length = nodes.length;
+
+        for (uint256 i = 0; i < length; i++) {
+            if (nodes[i] == nodeId) {
+                nodes[i] = nodes[length - 1];
+                nodes.pop();
+                return;
+            }
+        }
+
+        revert("Node not in owner list");
+    }
+
+    function _removeNftbNodeFromUser(address user, uint256 nodeId) internal {
+        uint256[] storage nodes = userNftbNodes[user];
         uint256 length = nodes.length;
 
         for (uint256 i = 0; i < length; i++) {
