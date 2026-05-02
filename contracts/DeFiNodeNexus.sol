@@ -206,17 +206,17 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(msg.sender == owner() || admins[msg.sender], "ADM");
         _;
     }
 
     modifier onlyAuthorized() {
-        require(msg.sender == owner() || admins[msg.sender] || managers[msg.sender], "Not authorized");
+        require(msg.sender == owner() || admins[msg.sender] || managers[msg.sender], "NA");
         _;
     }
 
     function transferOwnership(address newOwner) public override {
-        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(msg.sender == owner() || admins[msg.sender], "ADM");
         require(newOwner != address(0), "Ownable: new owner is the zero address");
         _transferOwnership(newOwner);
     }
@@ -244,9 +244,9 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function buyNfta(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
-        require(tier.currentSupply < tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
+        require(tier.currentSupply < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
 
@@ -288,10 +288,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         NodeA storage node = nftaNodes[nodeId];
         address from = node.owner;
-        require(node.isActive, "Inactive");
+        require(node.isActive, "IN");
         require(from != address(0), "Node not found");
         require(to != from, "Same owner");
-        require(msg.sender == from || msg.sender == owner(), "Not authorized");
+        require(msg.sender == from || msg.sender == owner(), "NA");
 
         uint256 today = block.timestamp / 1 days;
         bool recipientHadNoNfta = userNftaNodes[to].length == 0;
@@ -318,10 +318,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         NodeB storage node = nftbNodes[nodeId];
         address from = node.owner;
-        require(node.isActive, "Inactive");
+        require(node.isActive, "IN");
         require(from != address(0), "Node not found");
         require(to != from, "Same owner");
-        require(msg.sender == from || msg.sender == owner(), "Not authorized");
+        require(msg.sender == from || msg.sender == owner(), "NA");
 
         uint256 accumulatedTot = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         if (accumulatedTot > node.rewardDebt) {
@@ -366,8 +366,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function buyNftbWithUsdt(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
         require(tier.usdtMinted < tier.maxSupply / 2, "USDT quota sold out");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
@@ -409,8 +409,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function buyNftbWithTof(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
         require(tier.tofMinted < tier.maxSupply / 2, "TOF quota sold out");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
@@ -452,15 +452,15 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function claimNftaYield(uint256 nodeId) public {
         NodeA storage node = nftaNodes[nodeId];
-        require(node.owner == msg.sender, "Not owner");
-        require(node.isActive, "Inactive");
+        require(node.owner == msg.sender, "OWN");
+        require(node.isActive, "IN");
 
         _claimNftaYieldForUser(msg.sender);
     }
 
     function _claimNftaYieldForUser(address user) internal {
         (uint256 reward, uint256 rewardNodeId) = _getHighestActiveNftaYield(user);
-        require(reward > 0, "No NFTA nodes");
+        require(reward > 0, "NNA");
 
         uint256 today = block.timestamp / 1 days;
         require(today > nftaLastClaimDayByUser[user], "Already claimed today");
@@ -492,15 +492,15 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     /// @notice Claim NFTA yield for caller once per day, using highest active NFTA node only.
     function claimAllNftaYield() external {
         uint256[] storage nodes = userNftaNodes[msg.sender];
-        require(nodes.length > 0, "No NFTA nodes");
+        require(nodes.length > 0, "NNA");
 
         _claimNftaYieldForUser(msg.sender);
     }
 
     function claimNftbDividend(uint256 nodeId) public {
         NodeB storage node = nftbNodes[nodeId];
-        require(node.owner == msg.sender, "Not owner");
-        require(node.isActive, "Inactive");
+        require(node.owner == msg.sender, "OWN");
+        require(node.isActive, "IN");
 
         uint256 accumulated = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         uint256 pending = accumulated - node.rewardDebt;
@@ -516,7 +516,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function claimAllNftbDividends() external {
         uint256[] storage nodes = userNftbNodes[msg.sender];
         uint256 length = nodes.length;
-        require(length > 0, "No NFTB nodes");
+        require(length > 0, "NNB");
 
         for (uint256 i = 0; i < length; i++) {
             NodeB storage node = nftbNodes[nodes[i]];
@@ -531,8 +531,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function claimNftbUsdtDividend(uint256 nodeId) public {
         NodeB storage node = nftbNodes[nodeId];
-        require(node.owner == msg.sender, "Not owner");
-        require(node.isActive, "Inactive");
+        require(node.owner == msg.sender, "OWN");
+        require(node.isActive, "IN");
 
         uint256 accumulated = (node.weight * accUsdtDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         uint256 pending = accumulated - usdtRewardDebtByNode[nodeId];
@@ -547,7 +547,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function claimAllNftbUsdtDividends() external {
         uint256[] storage nodes = userNftbNodes[msg.sender];
         uint256 length = nodes.length;
-        require(length > 0, "No NFTB nodes");
+        require(length > 0, "NNB");
 
         for (uint256 i = 0; i < length; i++) {
             NodeB storage node = nftbNodes[nodes[i]];
@@ -633,12 +633,12 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function getAdminAt(uint256 index) external view returns (address) {
-        require(index < adminList.length, "Index out of bounds");
+        require(index < adminList.length, "OOB");
         return adminList[index];
     }
 
     function getAdmins(uint256 offset, uint256 limit) external view returns (address[] memory) {
-        require(limit > 0, "Limit must be > 0");
+        require(limit > 0, "L0");
         uint256 totalCount = adminList.length;
         if (offset >= totalCount) return new address[](0);
         uint256 end = offset + limit;
@@ -660,12 +660,12 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function getManagerAt(uint256 index) external view returns (address) {
-        require(index < managerList.length, "Index out of bounds");
+        require(index < managerList.length, "OOB");
         return managerList[index];
     }
 
     function getManagers(uint256 offset, uint256 limit) external view returns (address[] memory) {
-        require(limit > 0, "Limit must be > 0");
+        require(limit > 0, "L0");
         uint256 totalCount = managerList.length;
         if (offset >= totalCount) return new address[](0);
         uint256 end = offset + limit;
@@ -694,7 +694,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         bool isActive
     ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(dailyYield > 0, "Yield is zero");
-        require(maxSupply > 0, "MaxSupply is zero");
+        require(maxSupply > 0, "MS0");
 
         configuredTierId = tierId;
         if (configuredTierId == 0) {
@@ -724,7 +724,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         bool isActive
     ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(weight > 0, "Weight is zero");
-        require(maxSupply > 0, "MaxSupply is zero");
+        require(maxSupply > 0, "MS0");
 
         configuredTierId = tierId;
         if (configuredTierId == 0) {
@@ -750,10 +750,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     /// @notice Admin registers an NFTA purchase (off-chain payment).
     function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.currentSupply < tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.currentSupply < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -770,12 +770,12 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         uint256 quantity,
         address referrer
     ) external onlyAuthorized returns (uint256 firstNodeId, uint256 lastNodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         require(quantity > 0, "Quantity is zero");
 
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.currentSupply + quantity <= tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.currentSupply + quantity <= tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -792,10 +792,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.usdtMinted + tier.tofMinted < tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.usdtMinted + tier.tofMinted < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -819,7 +819,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * All dividends are in TOT.
      */
     function distributeNftbDividends(uint256 amount) external {
-        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
+        require(msg.sender == owner() || isDistributor[msg.sender], "NA");
         require(amount > 0, "Zero");
 
         totToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -846,7 +846,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function distributeNftbUsdtDividends(uint256 amount) external {
-        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
+        require(msg.sender == owner() || isDistributor[msg.sender], "NA");
         require(amount > 0, "Zero");
 
         usdtToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -879,7 +879,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * The undistributed remainder goes to treasury.
      */
     function distributePredictionFlowUsdt(uint256 flowAmount) external {
-        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
+        require(msg.sender == owner() || isDistributor[msg.sender], "NA");
         require(flowAmount > 0, "Zero");
 
         usdtToken.safeTransferFrom(msg.sender, address(this), flowAmount);
@@ -1001,7 +1001,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function setAdmins(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwnerOrAdmin {
         uint256 len = accounts_.length;
-        require(len == enabled_.length, "Length mismatch");
+        require(len == enabled_.length, "LM");
         for (uint256 i = 0; i < len; i++) {
             address account = accounts_[i];
             require(account != address(0), "Zero");
@@ -1051,7 +1051,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     function setManagers(address[] calldata accounts_, bool[] calldata enabled_) external onlyOwnerOrAdmin {
         uint256 len = accounts_.length;
-        require(len == enabled_.length, "Length mismatch");
+        require(len == enabled_.length, "LM");
         for (uint256 i = 0; i < len; i++) {
             address account = accounts_[i];
             require(account != address(0), "Zero");
@@ -1090,8 +1090,8 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      *      This function only updates direct referral pointers/counters.
      */
     function forceSetReferrer(address user, address newReferrer) external onlyAuthorized {
-        require(user != address(0), "User is zero");
-        require(newReferrer != user, "Self referral");
+        require(user != address(0), "UZ");
+        require(newReferrer != user, "SR");
 
         if (newReferrer != address(0)) {
             _ensureNoReferralCycle(user, newReferrer);
@@ -1169,7 +1169,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             }
         }
 
-        revert("Node not in owner list");
+        revert("NOL");
     }
 
     function _removeNftbNodeFromUser(address user, uint256 nodeId) internal {
@@ -1184,7 +1184,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             }
         }
 
-        revert("Node not in owner list");
+        revert("NOL");
     }
 
     function _getHighestActiveNftaYield(address user) internal view returns (uint256 reward, uint256 rewardNodeId) {
@@ -1273,10 +1273,10 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function _bindReferrer(address user, address referrer) internal {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         require(user != owner(), "Owner is root");
         require(referrer != address(0), "Referrer is zero");
-        require(referrer != user, "Self referral");
+        require(referrer != user, "SR");
         require(accounts[user].referrer == address(0), "Already bound");
 
         _ensureNoReferralCycle(user, referrer);
@@ -1306,7 +1306,7 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {
-        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(msg.sender == owner() || admins[msg.sender], "ADM");
         newImplementation;
     }
 }

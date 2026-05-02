@@ -391,6 +391,7 @@ export const translations = {
     insufficientUsdtBalance: "Insufficient USDT balance",
     insufficientTotBalance: "Insufficient TOT balance",
     exceedsMaxSellAmount: "Amount exceeds max sell per transaction",
+    alreadySoldToday: "Already sold TOT today",
     // Earnings page extra
     withdrawableEarnings: "Withdrawable (TOT)",
     cumulativeEarnings: "Cumulative (TOT)",
@@ -854,6 +855,7 @@ export const translations = {
     insufficientUsdtBalance: "USDT 余额不足",
     insufficientTotBalance: "TOT 余额不足",
     exceedsMaxSellAmount: "数量超过单笔最大卖出限制",
+    alreadySoldToday: "今天已卖出过 TOT",
     // Earnings page extra
     withdrawableEarnings: "可提取收益 (TOT)",
     cumulativeEarnings: "累计收益 (TOT)",

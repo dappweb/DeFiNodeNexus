@@ -116,6 +116,7 @@ contract DeFiNodeNexus is Ownable {
     mapping(address => uint256[]) public userNftbNodes;
     mapping(address => Account) public accounts;
     uint256 public withdrawFeeBps;
+    mapping(address => uint256) public withdrawFeeBps;
     mapping(address => bool) public isDistributor;  // authorized callers for distributeNftbDividends
     mapping(address => bool) public admins;
     mapping(address => bool) public managers;
@@ -165,12 +166,12 @@ contract DeFiNodeNexus is Ownable {
     }
 
     modifier onlyOwnerOrAdmin() {
-        require(msg.sender == owner() || admins[msg.sender], "Not admin");
+        require(msg.sender == owner() || admins[msg.sender], "ADM");
         _;
     }
 
     modifier onlyAuthorized() {
-        require(msg.sender == owner() || admins[msg.sender] || managers[msg.sender], "Not authorized");
+        require(msg.sender == owner() || admins[msg.sender] || managers[msg.sender], "NA");
         _;
     }
 
@@ -197,10 +198,10 @@ contract DeFiNodeNexus is Ownable {
      */
     function buyNfta(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
         require(userNftaNodes[msg.sender].length == 0, "Only one NFTA allowed");
-        require(tier.currentSupply < tier.maxSupply, "Tier sold out");
+        require(tier.currentSupply < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
 
@@ -250,8 +251,8 @@ contract DeFiNodeNexus is Ownable {
      */
     function buyNftbWithUsdt(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
         require(tier.usdtMinted < tier.maxSupply / 2, "USDT quota sold out");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
@@ -293,8 +294,8 @@ contract DeFiNodeNexus is Ownable {
      */
     function buyNftbWithTof(uint256 tierId, address referrer) external returns (uint256 nodeId) {
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.price > 0, "Price is zero");
+        require(tier.isActive, "TI");
+        require(tier.price > 0, "PZ");
         require(tier.tofMinted < tier.maxSupply / 2, "TOF quota sold out");
 
         _bindReferrerIfNeeded(msg.sender, referrer);
@@ -336,8 +337,8 @@ contract DeFiNodeNexus is Ownable {
      */
     function claimNftaYield(uint256 nodeId) public {
         NodeA storage node = nftaNodes[nodeId];
-        require(node.owner == msg.sender, "Not owner");
-        require(node.isActive, "Inactive");
+        require(node.owner == msg.sender, "OWN");
+        require(node.isActive, "IN");
 
         uint256 today = block.timestamp / 1 days;
         require(today > node.lastClaimDay, "Already claimed today");
@@ -370,7 +371,7 @@ contract DeFiNodeNexus is Ownable {
     function claimAllNftaYield() external {
         uint256[] storage nodes = userNftaNodes[msg.sender];
         uint256 length = nodes.length;
-        require(length > 0, "No NFTA nodes");
+        require(length > 0, "NNA");
 
         uint256 today = block.timestamp / 1 days;
         for (uint256 i = 0; i < length; i++) {
@@ -383,8 +384,8 @@ contract DeFiNodeNexus is Ownable {
 
     function claimNftbDividend(uint256 nodeId) public {
         NodeB storage node = nftbNodes[nodeId];
-        require(node.owner == msg.sender, "Not owner");
-        require(node.isActive, "Inactive");
+        require(node.owner == msg.sender, "OWN");
+        require(node.isActive, "IN");
 
         uint256 accumulated = (node.weight * accDividendPerWeightByTier[node.tierId]) / ACC_PRECISION;
         uint256 pending = accumulated - node.rewardDebt;
@@ -400,7 +401,7 @@ contract DeFiNodeNexus is Ownable {
     function claimAllNftbDividends() external {
         uint256[] storage nodes = userNftbNodes[msg.sender];
         uint256 length = nodes.length;
-        require(length > 0, "No NFTB nodes");
+        require(length > 0, "NNB");
 
         for (uint256 i = 0; i < length; i++) {
             NodeB storage node = nftbNodes[nodes[i]];
@@ -484,7 +485,7 @@ contract DeFiNodeNexus is Ownable {
         bool isActive
     ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(dailyYield > 0, "Yield is zero");
-        require(maxSupply > 0, "MaxSupply is zero");
+        require(maxSupply > 0, "MS0");
 
         configuredTierId = tierId;
         if (configuredTierId == 0) {
@@ -514,7 +515,7 @@ contract DeFiNodeNexus is Ownable {
         bool isActive
     ) external onlyAuthorized returns (uint256 configuredTierId) {
         require(weight > 0, "Weight is zero");
-        require(maxSupply > 0, "MaxSupply is zero");
+        require(maxSupply > 0, "MS0");
 
         configuredTierId = tierId;
         if (configuredTierId == 0) {
@@ -540,10 +541,10 @@ contract DeFiNodeNexus is Ownable {
 
     /// @notice Admin registers an NFTA purchase (off-chain payment).
     function registerNftaPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.currentSupply < tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.currentSupply < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -560,12 +561,12 @@ contract DeFiNodeNexus is Ownable {
         uint256 quantity,
         address referrer
     ) external onlyAuthorized returns (uint256 firstNodeId, uint256 lastNodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         require(quantity > 0, "Quantity is zero");
 
         NftaTier storage tier = nftaTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.currentSupply + quantity <= tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.currentSupply + quantity <= tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -582,10 +583,10 @@ contract DeFiNodeNexus is Ownable {
     }
 
     function registerNftbPurchase(address user, uint256 tierId, address referrer) external onlyAuthorized returns (uint256 nodeId) {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         NftbTier storage tier = nftbTiers[tierId];
-        require(tier.isActive, "Tier inactive");
-        require(tier.usdtMinted + tier.tofMinted < tier.maxSupply, "Tier sold out");
+        require(tier.isActive, "TI");
+        require(tier.usdtMinted + tier.tofMinted < tier.maxSupply, "TSO");
 
         _bindReferrerIfNeeded(user, referrer);
 
@@ -609,7 +610,7 @@ contract DeFiNodeNexus is Ownable {
      * All dividends are in TOT.
      */
     function distributeNftbDividends(uint256 amount) external {
-        require(msg.sender == owner() || isDistributor[msg.sender], "Not authorized");
+        require(msg.sender == owner() || isDistributor[msg.sender], "NA");
         require(amount > 0, "Zero");
 
         totToken.safeTransferFrom(msg.sender, address(this), amount);
@@ -793,10 +794,10 @@ contract DeFiNodeNexus is Ownable {
     }
 
     function _bindReferrer(address user, address referrer) internal {
-        require(user != address(0), "User is zero");
+        require(user != address(0), "UZ");
         require(user != owner(), "Owner is root");
         require(referrer != address(0), "Referrer is zero");
-        require(referrer != user, "Self referral");
+        require(referrer != user, "SR");
         require(accounts[user].referrer == address(0), "Already bound");
 
         accounts[user].referrer = referrer;
