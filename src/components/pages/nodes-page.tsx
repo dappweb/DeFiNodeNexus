@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { execTx, useERC20Contract, useNexusContract } from "@/hooks/use-contract";
+import { execTx, useERC20Contract, useNexusContract, useReadonlyNexusContract } from "@/hooks/use-contract";
 import { useToast } from "@/hooks/use-toast";
 import { CONTRACTS } from "@/lib/contracts";
 import { createDefaultSerializedNftaTiers, createDefaultSerializedNftbTiers } from "@/lib/node-tier-config";
@@ -57,45 +57,6 @@ type NodeBItem = {
   pending: bigint;
 };
 
-type NodesSummaryResponse = {
-  nftaTiers: Array<{
-    id: number;
-    price: string;
-    dailyYield: string;
-    maxSupply: string;
-    currentSupply: string;
-    isActive: boolean;
-    remaining: string;
-  }>;
-  nftbTiers: Array<{
-    id: number;
-    price: string;
-    weight: string;
-    maxSupply: string;
-    usdtMinted: string;
-    tofMinted: string;
-    dividendBps: string;
-    isActive: boolean;
-    usdtRemaining: string;
-    tofRemaining: string;
-  }>;
-  nftaNodes: Array<{
-    nodeId: string;
-    tierId: string;
-    dailyYield: string;
-    lastClaimDay: string;
-    isActive: boolean;
-    pending: string;
-  }>;
-  nftbNodes: Array<{
-    nodeId: string;
-    tierId: string;
-    weight: string;
-    isActive: boolean;
-    pending: string;
-  }>;
-};
-
 const toTierId = (id: number | bigint) => Number(id);
 const WAD = 10n ** 18n;
 const DEFAULT_TOF_PER_USDT = 200n * WAD;
@@ -126,6 +87,7 @@ export function NodesPage() {
   const { address, isConnected, walletClient } = useWeb3();
   const { toast } = useToast();
   const nexus = useNexusContract();
+  const readonlyNexus = useReadonlyNexusContract();
   const usdt = useERC20Contract(CONTRACTS.USDT);
   const tof = useERC20Contract(CONTRACTS.TOF);
 
@@ -152,50 +114,13 @@ export function NodesPage() {
   const NODES_SUMMARY_TIMEOUT_MS = 12_000;
   const NODES_SUMMARY_MAX_RETRIES = 2;
 
-  const toBigInt = (value: string) => BigInt(value);
-
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const fetchNodesSummaryWithRetry = useCallback(async (query: string) => {
-    let lastError: unknown = null;
-
-    for (let attempt = 0; attempt <= NODES_SUMMARY_MAX_RETRIES; attempt++) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), NODES_SUMMARY_TIMEOUT_MS);
-      try {
-        const response = await fetch(`/api/nodes/summary${query}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const payload = await response.json().catch(() => ({}));
-
-        if (!response.ok) {
-          throw new Error(payload?.detail || payload?.message || "Failed to load node summary");
-        }
-
-        return payload as NodesSummaryResponse;
-      } catch (error) {
-        lastError = error;
-        const isLastAttempt = attempt === NODES_SUMMARY_MAX_RETRIES;
-        if (!isLastAttempt) {
-          const backoffMs = 300 * 2 ** attempt + Math.floor(Math.random() * 200);
-          await sleep(backoffMs);
-        }
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error("Failed to load node summary");
-  }, []);
-
   const refreshData = useCallback(async (showLoading = true) => {
     if (showLoading) {
       setIsRefreshing(true);
     }
     setLoadError("");
 
-    if (!CONTRACTS.NEXUS) {
+    if (!CONTRACTS.NEXUS || !readonlyNexus) {
       setNftaTiers(DEFAULT_NFTA_TIERS);
       setNftbTiers(DEFAULT_NFTB_TIERS);
       setNftaNodes([]);
@@ -203,92 +128,182 @@ export function NodesPage() {
       setNftaClaimFeeBps(0n);
       setWithdrawableTot(0n);
       setLoadError(t("toastContractMissingDesc"));
-      if (showLoading) {
-        setIsRefreshing(false);
-      }
+      if (showLoading) setIsRefreshing(false);
       setInitialLoaded(true);
       return;
     }
 
     try {
-      const query = address ? `?address=${encodeURIComponent(address)}` : "";
-      const data = await fetchNodesSummaryWithRetry(query);
+      // ── 1. Tier data (no wallet needed, all public view calls) ──────────
+      const nftaTierIds = createDefaultSerializedNftaTiers().map((t) => t.id);
+      const nftbTierIds = createDefaultSerializedNftbTiers().map((t) => t.id);
 
-      setNftaTiers(
-        data.nftaTiers.map((tier) => ({
-          id: tier.id,
-          price: toBigInt(tier.price),
-          dailyYield: toBigInt(tier.dailyYield),
-          maxSupply: toBigInt(tier.maxSupply),
-          currentSupply: toBigInt(tier.currentSupply),
-          isActive: tier.isActive,
-          remaining: toBigInt(tier.remaining),
-        }))
-      );
+      const [nftaTierResults, nftbTierResults] = await Promise.all([
+        Promise.allSettled(
+          nftaTierIds.map(async (id) => {
+            const [tier, remaining] = await Promise.all([
+              readonlyNexus.nftaTiers(id),
+              readonlyNexus.getNftaTierRemaining(id),
+            ]);
+            return { id, tier, remaining };
+          })
+        ),
+        Promise.allSettled(
+          nftbTierIds.map(async (id) => {
+            const [tier, remaining] = await Promise.all([
+              readonlyNexus.nftbTiers(id),
+              readonlyNexus.getNftbTierRemaining(id),
+            ]);
+            return { id, tier, remaining };
+          })
+        ),
+      ]);
 
-      setNftbTiers(
-        data.nftbTiers.map((tier) => ({
-          id: tier.id,
-          price: toBigInt(tier.price),
-          weight: toBigInt(tier.weight),
-          maxSupply: toBigInt(tier.maxSupply),
-          usdtMinted: toBigInt(tier.usdtMinted),
-          tofMinted: toBigInt(tier.tofMinted),
-          dividendBps: toBigInt(tier.dividendBps),
-          isActive: tier.isActive,
-          usdtRemaining: toBigInt(tier.usdtRemaining),
-          tofRemaining: toBigInt(tier.tofRemaining),
-        }))
-      );
+      const resolvedNftaTiers: NftaTier[] = DEFAULT_NFTA_TIERS.map((def) => {
+        const hit = nftaTierResults.find(
+          (r): r is PromiseFulfilledResult<{ id: number; tier: any; remaining: any }> =>
+            r.status === "fulfilled" && r.value.id === def.id
+        );
+        if (!hit) return def;
+        const { tier, remaining } = hit.value;
+        return {
+          id: def.id,
+          price: BigInt(tier.price),
+          dailyYield: BigInt(tier.dailyYield),
+          maxSupply: BigInt(tier.maxSupply),
+          currentSupply: BigInt(tier.currentSupply),
+          isActive: Boolean(tier.isActive),
+          remaining: BigInt(remaining),
+        };
+      });
 
-      setNftaNodes(
-        data.nftaNodes.map((node) => ({
-          nodeId: toBigInt(node.nodeId),
-          tierId: toBigInt(node.tierId),
-          dailyYield: toBigInt(node.dailyYield),
-          lastClaimDay: toBigInt(node.lastClaimDay),
-          isActive: node.isActive,
-          pending: toBigInt(node.pending),
-        }))
-      );
+      const resolvedNftbTiers: NftbTier[] = DEFAULT_NFTB_TIERS.map((def) => {
+        const hit = nftbTierResults.find(
+          (r): r is PromiseFulfilledResult<{ id: number; tier: any; remaining: any }> =>
+            r.status === "fulfilled" && r.value.id === def.id
+        );
+        if (!hit) return def;
+        const { tier, remaining } = hit.value;
+        return {
+          id: def.id,
+          price: BigInt(tier.price),
+          weight: BigInt(tier.weight),
+          maxSupply: BigInt(tier.maxSupply),
+          usdtMinted: BigInt(tier.usdtMinted),
+          tofMinted: BigInt(tier.tofMinted),
+          dividendBps: BigInt(tier.dividendBps),
+          isActive: Boolean(tier.isActive),
+          usdtRemaining: BigInt(remaining[0]),
+          tofRemaining: BigInt(remaining[1]),
+        };
+      });
 
-      setNftbNodes(
-        data.nftbNodes.map((node) => ({
-          nodeId: toBigInt(node.nodeId),
-          tierId: toBigInt(node.tierId),
-          weight: toBigInt(node.weight),
-          isActive: node.isActive,
-          pending: toBigInt(node.pending),
-        }))
-      );
+      setNftaTiers(resolvedNftaTiers);
+      setNftbTiers(resolvedNftbTiers);
 
-      if (nexus && address) {
-        const account = await nexus.accounts(address);
-        setWithdrawableTot(account.pendingTot);
+      // ── 2. User node data (requires connected wallet / address) ─────────
+      if (address && readonlyNexus) {
+        const [nftaIds, nftbIds] = await Promise.all([
+          readonlyNexus.getUserNftaNodes(address),
+          readonlyNexus.getUserNftbNodes(address),
+        ]);
+
+        // Read node structs in parallel
+        const [nftaNodeStructs, nftbNodeStructs] = await Promise.all([
+          Promise.allSettled((nftaIds as bigint[]).map((id) => readonlyNexus.nftaNodes(id))),
+          Promise.allSettled((nftbIds as bigint[]).map((id) => readonlyNexus.nftbNodes(id))),
+        ]);
+
+        // NFTA: only the highest-dailyYield active node has pending populated
+        const rawNftaNodes = nftaNodeStructs
+          .map((r, i) =>
+            r.status === "fulfilled"
+              ? { nodeId: (nftaIds as bigint[])[i], node: r.value as any }
+              : null
+          )
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        let highestPendingNodeId: bigint | null = null;
+        let highestDailyYield = 0n;
+        for (const { node, nodeId } of rawNftaNodes) {
+          if (!node.isActive) continue;
+          const dy = BigInt(node.dailyYield);
+          if (dy > highestDailyYield) { highestDailyYield = dy; highestPendingNodeId = nodeId; }
+        }
+
+        let highestPending = 0n;
+        if (highestPendingNodeId !== null) {
+          try { highestPending = BigInt(await readonlyNexus.pendingNftaYield(highestPendingNodeId)); } catch { /* keep 0 */ }
+        }
+
+        setNftaNodes(
+          rawNftaNodes.map(({ nodeId, node }) => ({
+            nodeId,
+            tierId: BigInt(node.tierId),
+            dailyYield: BigInt(node.dailyYield),
+            lastClaimDay: BigInt(node.lastClaimDay),
+            isActive: Boolean(node.isActive),
+            pending: highestPendingNodeId !== null && nodeId === highestPendingNodeId ? highestPending : 0n,
+          }))
+        );
+
+        // NFTB: read pending for all nodes in parallel
+        const rawNftbNodes = nftbNodeStructs
+          .map((r, i) =>
+            r.status === "fulfilled"
+              ? { nodeId: (nftbIds as bigint[])[i], node: r.value as any }
+              : null
+          )
+          .filter((x): x is NonNullable<typeof x> => x !== null);
+
+        const nftbPendingResults = await Promise.allSettled(
+          rawNftbNodes.map(({ nodeId }) => readonlyNexus.pendingNftbDividend(nodeId))
+        );
+
+        setNftbNodes(
+          rawNftbNodes.map(({ nodeId, node }, i) => ({
+            nodeId,
+            tierId: BigInt(node.tierId),
+            weight: BigInt(node.weight),
+            isActive: Boolean(node.isActive),
+            pending:
+              nftbPendingResults[i].status === "fulfilled"
+                ? BigInt((nftbPendingResults[i] as PromiseFulfilledResult<any>).value)
+                : 0n,
+          }))
+        );
+
+        // Account balance for TOT withdrawal
+        try {
+          const account = await readonlyNexus.accounts(address);
+          setWithdrawableTot(BigInt(account.pendingTot));
+        } catch { setWithdrawableTot(0n); }
       } else {
+        setNftaNodes([]);
+        setNftbNodes([]);
         setWithdrawableTot(0n);
       }
 
-      if (nexus) {
+      // ── 3. Fee parameters ───────────────────────────────────────────────
+      try {
         const [feeBpsRaw, tofPerUsdtRaw] = await Promise.all([
-          nexus.tofClaimFeeBps(),
-          nexus.tofPerUsdt(),
+          readonlyNexus.tofClaimFeeBps(),
+          readonlyNexus.tofPerUsdt(),
         ]);
         const feeBps = BigInt(feeBpsRaw);
         const tofRate = BigInt(tofPerUsdtRaw);
         setNftaClaimFeeBps(feeBps);
         setTofPerUsdt(tofRate > 0n ? tofRate : DEFAULT_TOF_PER_USDT);
-      }
+      } catch { /* keep defaults */ }
+
     } catch (error) {
       console.error("Failed to load node data", error);
       setLoadError(t("nodesLoadFailed"));
     } finally {
-      if (showLoading) {
-        setIsRefreshing(false);
-      }
+      if (showLoading) setIsRefreshing(false);
       setInitialLoaded(true);
     }
-  }, [address, t, nexus, fetchNodesSummaryWithRetry]);
+  }, [address, t, readonlyNexus]);
 
   useEffect(() => {
     refreshData();

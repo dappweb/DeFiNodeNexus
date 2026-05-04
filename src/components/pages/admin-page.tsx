@@ -39,8 +39,6 @@ type NftaIssuedUserRecord = {
   user: string;
   tierId: string;
   nodeId: string;
-  blockNumber: string;
-  txHash: string;
 };
 
 type DividendHealthCheck = {
@@ -759,32 +757,28 @@ export function AdminPage() {
         setRegisterTierId(String(validTierOptions[0].tierId));
       }
 
-      // Event query is isolated: failure here won't block the rest of the page
+      // Load recent NFTA node list directly from contract state — no event scan
       try {
-        const readerProvider = (reader.runner as any)?.provider;
-        if (readerProvider?.getBlockNumber) {
-          const latestBlock = await readerProvider.getBlockNumber();
-          const fromBlock = Math.max(0, latestBlock - 50_000);
-          const events = await reader.queryFilter(reader.filters.NftaPurchased(), fromBlock, latestBlock);
-          const records = events
-            .slice(-100)
-            .reverse()
-            .map((event: any) => ({
-              user: String(event.args?.user || ""),
-              tierId: BigInt(event.args?.tierId ?? 0).toString(),
-              nodeId: BigInt(event.args?.nodeId ?? 0).toString(),
-              blockNumber: String(event.blockNumber ?? "-"),
-              txHash: String(event.transactionHash || ""),
-            }))
-            .filter((row) => row.user && row.user !== ethers.ZeroAddress);
-          setNftaIssuedUsers(records);
-        } else {
-          // Keep existing rows if provider cannot query events temporarily.
-          setNftaIssuedUsers((prev) => prev);
+        const totalNodes = Number(await reader.nextNodeId());
+        const scanCount = Math.min(totalNodes, 300);
+        const startId = Math.max(0, totalNodes - scanCount);
+        const ids = Array.from({ length: scanCount }, (_, i) => BigInt(startId + i));
+        const nodeResults = await Promise.allSettled(ids.map((id) => reader.nftaNodes(id)));
+        const records: NftaIssuedUserRecord[] = [];
+        for (let i = nodeResults.length - 1; i >= 0 && records.length < 100; i--) {
+          const r = nodeResults[i];
+          if (r.status !== "fulfilled") continue;
+          const n = r.value as any;
+          if (!n.owner || n.owner === ethers.ZeroAddress) continue;
+          records.push({
+            user: String(n.owner),
+            tierId: BigInt(n.tierId).toString(),
+            nodeId: String(startId + i),
+          });
         }
+        setNftaIssuedUsers(records);
       } catch (evtErr: any) {
-        console.warn("Event query failed (non-blocking):", evtErr);
-        // Do not clear the table on transient RPC/query issues.
+        console.warn("NFTA node list load failed (non-blocking):", evtErr);
         setNftaIssuedUsers((prev) => prev);
       }
     } catch (err: any) {
@@ -2520,23 +2514,19 @@ export function AdminPage() {
                       <th className="text-left px-3 py-2 font-medium">接收用户</th>
                       <th className="text-left px-3 py-2 font-medium">级别/库存ID</th>
                       <th className="text-left px-3 py-2 font-medium">节点ID</th>
-                      <th className="text-left px-3 py-2 font-medium">区块</th>
-                      <th className="text-left px-3 py-2 font-medium">交易哈希</th>
                     </tr>
                   </thead>
                   <tbody>
                     {nftaIssuedUsers.length === 0 ? (
                       <tr>
-                        <td className="px-3 py-3 text-muted-foreground" colSpan={5}>暂无发放记录</td>
+                        <td className="px-3 py-3 text-muted-foreground" colSpan={3}>暂无发放记录</td>
                       </tr>
                     ) : (
                       nftaIssuedUsers.map((row) => (
-                        <tr key={`${row.txHash}-${row.nodeId}`} className="border-t border-border/40">
+                        <tr key={row.nodeId} className="border-t border-border/40">
                           <td className="px-3 py-2">{formatAddress(row.user)}</td>
                           <td className="px-3 py-2">{`${getNftaTierName(Number(row.tierId))} (${row.tierId})`}</td>
                           <td className="px-3 py-2">{row.nodeId}</td>
-                          <td className="px-3 py-2">{row.blockNumber}</td>
-                          <td className="px-3 py-2 font-mono">{row.txHash ? `${row.txHash.slice(0, 10)}...${row.txHash.slice(-6)}` : "-"}</td>
                         </tr>
                       ))
                     )}

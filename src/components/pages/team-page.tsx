@@ -18,6 +18,17 @@ type TeamMember = {
   pendingTot: bigint;
 };
 
+const MEMBER_QUERY_BATCH = 8;
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+  if (size <= 0) return [items];
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 export function TeamPage() {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -44,8 +55,12 @@ export function TeamPage() {
     }
 
     try {
+      // Step 1: Read caller's account — covers directReferrals, teamNodes, referrer
       const account = await nexus.accounts(address);
       setDirectReferrals(account.directReferrals);
+      // teamNodes is stored on-chain; no BFS needed
+      setTeamMemberCount(Number(account.teamNodes));
+
       const referrer = String(account.referrer);
       if (referrer && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase()) {
         setMyReferrer(ethers.getAddress(referrer));
@@ -53,88 +68,91 @@ export function TeamPage() {
         setMyReferrer(null);
       }
 
-      const getDirectChildren = async (referrerAddress: string) => {
-        const normalizedReferrer = ethers.getAddress(referrerAddress);
-        const events = await nexus.queryFilter(nexus.filters.ReferrerBound(null, normalizedReferrer));
-        const candidates = new Set<string>();
-        for (const ev of events as any[]) {
-          candidates.add(String(ev.args.user).toLowerCase());
-        }
+      // teamDepositTotal: use on-chain teamCommissionEarned as proxy
+      setTeamDepositTotal(account.teamCommissionEarned);
 
-        const currentChildren = await Promise.allSettled(
-          Array.from(candidates).map(async (candidate) => {
-            const memberAccount = await nexus.accounts(candidate);
-            const currentReferrer = String(memberAccount.referrer);
-            if (currentReferrer.toLowerCase() !== normalizedReferrer.toLowerCase()) {
-              return null;
-            }
-            return ethers.getAddress(candidate);
-          })
-        );
+      // Early exit if no direct members
+      if (account.directReferrals === 0n) {
+        setDirectDepositTotal(0n);
+        setMembers([]);
+        return;
+      }
 
-        return currentChildren.flatMap((result) => {
-          if (result.status !== "fulfilled" || !result.value) return [];
-          return [result.value];
-        });
+      // Step 2: Resolve direct children directly from contract storage
+      const getDirectAddresses = async (): Promise<string[]> => {
+        const direct = (await nexus.getDirectChildren(address)) as string[];
+        return direct
+          .filter((item) => typeof item === "string" && ethers.isAddress(item))
+          .map((item) => ethers.getAddress(item));
       };
 
-      const directAddresses = await getDirectChildren(address);
+      const directAddresses = await getDirectAddresses();
 
-      const downlineSet = new Set<string>(directAddresses);
-      const queue = [...directAddresses];
-      while (queue.length > 0) {
-        const current = queue.shift()!;
-        const children = await getDirectChildren(current);
-        for (const child of children) {
-          if (downlineSet.has(child)) continue;
-          downlineSet.add(child);
-          queue.push(child);
-        }
-      }
-      setTeamMemberCount(downlineSet.size);
-
-      const getUserPurchaseTotal = async (userAddress: string) => {
-        const [nftaPurchaseEvents, nftbPurchaseEvents] = await Promise.all([
-          nexus.queryFilter(nexus.filters.NftaPurchased(userAddress, null, null)),
-          nexus.queryFilter(nexus.filters.NftbPurchased(userAddress, null, null)),
+      // Step 4: Compute each direct member's investment from contract state
+      // getUserNftaNodes/getUserNftbNodes + tier price — NO event scan
+      const nftaTierCache = new Map<string, bigint>();
+      const nftbTierCache = new Map<string, bigint>();
+      const getUserInvestment = async (userAddress: string): Promise<bigint> => {
+        const [nftaIds, nftbIds] = await Promise.all([
+          nexus.getUserNftaNodes(userAddress),
+          nexus.getUserNftbNodes(userAddress),
         ]);
+
+        const nftaNodes = await Promise.all(nftaIds.map((id: bigint) => nexus.nftaNodes(id)));
+        const nftbNodes = await Promise.all(nftbIds.map((id: bigint) => nexus.nftbNodes(id)));
+
+        const uniqueNftaTiers = [...new Set(nftaNodes.map((n: any) => String(n.tierId)))];
+        const uniqueNftbTiers = [...new Set(nftbNodes.map((n: any) => String(n.tierId)))];
+
+        await Promise.all([
+          ...uniqueNftaTiers.map(async (tid) => {
+            if (nftaTierCache.has(tid)) return;
+            const tier = await nexus.nftaTiers(BigInt(tid));
+            nftaTierCache.set(tid, BigInt(tier.price));
+          }),
+          ...uniqueNftbTiers.map(async (tid) => {
+            if (nftbTierCache.has(tid)) return;
+            const tier = await nexus.nftbTiers(BigInt(tid));
+            nftbTierCache.set(tid, BigInt(tier.price));
+          }),
+        ]);
+
         let total = 0n;
-        for (const ev of nftaPurchaseEvents as any[]) total += BigInt(ev.args.price);
-        for (const ev of nftbPurchaseEvents as any[]) total += BigInt(ev.args.price);
+        for (const n of nftaNodes) total += nftaTierCache.get(String(n.tierId)) ?? 0n;
+        for (const n of nftbNodes) total += nftbTierCache.get(String(n.tierId)) ?? 0n;
         return total;
       };
 
-      const directTotals = await Promise.allSettled(directAddresses.map((member) => getUserPurchaseTotal(member)));
-      let nextDirectDeposit = 0n;
-      for (const result of directTotals) {
-        if (result.status === "fulfilled") {
-          nextDirectDeposit += result.value;
-        }
+      // Step 5: Fetch member details + investment in batched parallel mode
+      const memberResults: Array<PromiseSettledResult<(TeamMember & { investment: bigint })>> = [];
+      for (const batch of chunkArray(directAddresses, MEMBER_QUERY_BATCH)) {
+        const settled = await Promise.allSettled(
+          batch.map(async (memberAddr) => {
+            const [memberAccount, investment] = await Promise.all([
+              nexus.accounts(memberAddr),
+              getUserInvestment(memberAddr),
+            ]);
+            return {
+              address: ethers.getAddress(memberAddr),
+              totalNodes: memberAccount.totalNodes,
+              pendingTot: memberAccount.pendingTot,
+              investment,
+            } as TeamMember & { investment: bigint };
+          })
+        );
+        memberResults.push(...settled);
       }
 
-      const downlineAddresses = Array.from(downlineSet);
-      const teamTotals = await Promise.allSettled(downlineAddresses.map((member) => getUserPurchaseTotal(member)));
-      let nextTeamDeposit = 0n;
-      for (const result of teamTotals) {
-        if (result.status === "fulfilled") {
-          nextTeamDeposit += result.value;
+      let nextDirectDeposit = 0n;
+      const memberList: TeamMember[] = [];
+      for (const r of memberResults) {
+        if (r.status === "fulfilled") {
+          nextDirectDeposit += r.value.investment;
+          memberList.push({ address: r.value.address, totalNodes: r.value.totalNodes, pendingTot: r.value.pendingTot });
         }
       }
 
       setDirectDepositTotal(nextDirectDeposit);
-      setTeamDepositTotal(nextTeamDeposit);
-
-      const memberCalls = directAddresses.map(async (memberAddr) => {
-        const memberAccount = await nexus.accounts(memberAddr);
-
-        return {
-          address: ethers.getAddress(memberAddr),
-          totalNodes: memberAccount.totalNodes,
-          pendingTot: memberAccount.pendingTot,
-        } as TeamMember;
-      });
-
-      const memberList = await Promise.all(memberCalls);
       setMembers(memberList);
     } catch {
       setDirectReferrals(0n);
