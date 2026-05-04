@@ -179,24 +179,23 @@ async function main() {
       continue;
     }
 
-    const chunks = chunkArray(validChildren, batchSize);
-    if (chunks.length === 0) {
-      // Clear existing index if no valid children should remain.
-      if (currentCount !== null && currentCount > 0) {
-        const tx = await nexusWrite.syncDirectChildren(referrer, [], true);
-        await tx.wait();
-        txCount += 1;
-        console.log(`  -> cleared existing children, tx=${tx.hash}`);
-      }
+    if (validChildren.length === 0) {
       continue;
     }
 
-    for (let i = 0; i < chunks.length; i++) {
-      const clearExisting = i === 0;
-      const tx = await nexusWrite.syncDirectChildren(referrer, chunks[i], clearExisting);
-      await tx.wait();
+    for (let i = 0; i < validChildren.length; i++) {
+      const child = validChildren[i];
+      // Rebuild directChildren index via two-step force-set:
+      // 1) child -> zero, 2) child -> original referrer
+      const tx1 = await nexusWrite.forceSetReferrer(child, ethers.ZeroAddress);
+      await tx1.wait();
       txCount += 1;
-      console.log(`  -> synced chunk ${i + 1}/${chunks.length}, size=${chunks[i].length}, tx=${tx.hash}`);
+
+      const tx2 = await nexusWrite.forceSetReferrer(child, referrer);
+      await tx2.wait();
+      txCount += 1;
+
+      console.log(`  -> synced child ${i + 1}/${validChildren.length}, tx1=${tx1.hash}, tx2=${tx2.hash}`);
     }
 
     const syncedCount = await safeGetDirectChildrenCount(nexusRead, referrer);

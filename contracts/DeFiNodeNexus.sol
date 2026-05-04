@@ -620,28 +620,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         return directChildren[referrer];
     }
 
-    /// @notice Paginated direct children lookup to avoid oversized responses.
-    function getDirectChildrenPage(address referrer, uint256 offset, uint256 limit) external view returns (address[] memory) {
-        require(limit > 0, "L0");
-        uint256 totalCount = directChildren[referrer].length;
-        if (offset >= totalCount) return new address[](0);
-
-        uint256 end = offset + limit;
-        if (end > totalCount) end = totalCount;
-        uint256 count = end - offset;
-
-        address[] memory result = new address[](count);
-        for (uint256 i = 0; i < count; i++) {
-            result[i] = directChildren[referrer][offset + i];
-        }
-        return result;
-    }
-
-    /// @notice Get current direct children count of a referrer.
-    function getDirectChildrenCount(address referrer) external view returns (uint256) {
-        return directChildren[referrer].length;
-    }
-
     /// @notice Get remaining supply for an NFTA tier.
     function getNftaTierRemaining(uint256 tierId) external view returns (uint256) {
         NftaTier memory tier = nftaTiers[tierId];
@@ -1132,7 +1110,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
 
         if (oldReferrer != address(0) && accounts[oldReferrer].directReferrals > 0) {
-            _removeDirectChild(oldReferrer, user);
             accounts[oldReferrer].directReferrals -= 1;
         }
 
@@ -1144,37 +1121,6 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
 
         emit ReferrerUpdated(user, oldReferrer, newReferrer);
-    }
-
-    /// @notice Backfill/repair direct children index for one referrer after upgrade.
-    /// @dev Provide children from off-chain scan. Only children whose current referrer matches are kept.
-    function syncDirectChildren(address referrer, address[] calldata children, bool clearExisting) external onlyAuthorized {
-        require(referrer != address(0), "RZ");
-
-        if (clearExisting) {
-            address[] storage existing = directChildren[referrer];
-            while (existing.length > 0) {
-                address child = existing[existing.length - 1];
-                delete directChildIndexPlusOne[referrer][child];
-                existing.pop();
-            }
-        }
-
-        uint256 len = children.length;
-        for (uint256 i = 0; i < len; i++) {
-            address child = children[i];
-            if (child == address(0) || child == referrer) {
-                continue;
-            }
-            if (accounts[child].referrer != referrer) {
-                continue;
-            }
-            if (directChildIndexPlusOne[referrer][child] == 0) {
-                _addDirectChild(referrer, child);
-            }
-        }
-
-        accounts[referrer].directReferrals = directChildren[referrer].length;
     }
 
     // ================================================================
@@ -1359,29 +1305,11 @@ contract DeFiNodeNexus is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function _addDirectChild(address referrer, address child) internal {
-        require(directChildIndexPlusOne[referrer][child] == 0, "Child exists");
-        directChildren[referrer].push(child);
-        directChildIndexPlusOne[referrer][child] = directChildren[referrer].length;
-    }
-
-    function _removeDirectChild(address referrer, address child) internal {
-        uint256 indexPlusOne = directChildIndexPlusOne[referrer][child];
-        if (indexPlusOne == 0) {
+        if (directChildIndexPlusOne[referrer][child] != 0) {
             return;
         }
-
-        uint256 index = indexPlusOne - 1;
-        address[] storage children = directChildren[referrer];
-        uint256 lastIndex = children.length - 1;
-
-        if (index != lastIndex) {
-            address lastChild = children[lastIndex];
-            children[index] = lastChild;
-            directChildIndexPlusOne[referrer][lastChild] = index + 1;
-        }
-
-        children.pop();
-        delete directChildIndexPlusOne[referrer][child];
+        directChildren[referrer].push(child);
+        directChildIndexPlusOne[referrer][child] = directChildren[referrer].length;
     }
 
     function _ensureNoReferralCycle(address user, address referrer) internal view {
