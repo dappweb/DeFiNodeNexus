@@ -58,8 +58,6 @@ export function TeamPage() {
       // Step 1: Read caller's account — covers directReferrals, teamNodes, referrer
       const account = await nexus.accounts(address);
       setDirectReferrals(account.directReferrals);
-      // teamNodes is stored on-chain; no BFS needed
-      setTeamMemberCount(Number(account.teamNodes));
 
       const referrer = String(account.referrer);
       if (referrer && referrer.toLowerCase() !== ethers.ZeroAddress.toLowerCase()) {
@@ -73,6 +71,7 @@ export function TeamPage() {
 
       // Early exit if no direct members
       if (account.directReferrals === 0n) {
+        setTeamMemberCount(0);
         setDirectDepositTotal(0n);
         setMembers([]);
         return;
@@ -87,6 +86,30 @@ export function TeamPage() {
       };
 
       const directAddresses = await getDirectAddresses();
+
+      // BFS to count unique team members across all generations
+      const countTeamMembers = async (roots: string[]): Promise<number> => {
+        const visited = new Set<string>();
+        const queue = [...roots];
+        while (queue.length > 0) {
+          const cur = queue.shift()!;
+          if (visited.has(cur.toLowerCase())) continue;
+          visited.add(cur.toLowerCase());
+          try {
+            const children = (await nexus.getDirectChildren(cur)) as string[];
+            for (const child of children) {
+              if (ethers.isAddress(child) && !visited.has(child.toLowerCase())) {
+                queue.push(child);
+              }
+            }
+          } catch {
+            // skip failed nodes
+          }
+        }
+        return visited.size;
+      };
+      const teamCount = await countTeamMembers(directAddresses);
+      setTeamMemberCount(teamCount);
 
       // Step 4: Compute each direct member's investment from contract state
       // getUserNftaNodes/getUserNftbNodes + tier price — NO event scan
